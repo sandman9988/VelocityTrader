@@ -25,16 +25,52 @@ class LogReceiverHandler(BaseHTTPRequestHandler):
         # Check authorization if token is set
         if self.auth_token:
             auth_header = self.headers.get("Authorization", "")
-            if not auth_header.startswith("Bearer ") or auth_header[7:] != self.auth_token:
-                self.send_error(401, "Unauthorized")
+            # Validate authorization header format before parsing
+            if not auth_header:
+                self.send_error(401, "Missing Authorization header")
+                return
+            if not auth_header.startswith("Bearer "):
+                self.send_error(401, "Invalid Authorization format (expected 'Bearer <token>')")
+                return
+            if len(auth_header) <= 7:
+                self.send_error(401, "Empty bearer token")
+                return
+            if auth_header[7:] != self.auth_token:
+                self.send_error(401, "Invalid token")
                 return
 
-        # Read request body
-        content_length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_length)
+        # Read request body with validation
+        try:
+            content_length_str = self.headers.get("Content-Length", "0")
+            content_length = int(content_length_str)
+            if content_length < 0:
+                self.send_error(400, "Invalid Content-Length: negative value")
+                return
+            if content_length > 10 * 1024 * 1024:  # 10MB limit
+                self.send_error(413, "Request body too large (max 10MB)")
+                return
+        except ValueError:
+            self.send_error(400, f"Invalid Content-Length header: '{content_length_str}'")
+            return
 
         try:
-            data = json.loads(body.decode("utf-8"))
+            body = self.rfile.read(content_length)
+        except IOError as e:
+            self.send_error(500, f"Error reading request body: {e}")
+            return
+
+        try:
+            decoded_body = body.decode("utf-8")
+        except UnicodeDecodeError as e:
+            self.send_error(400, f"Invalid UTF-8 encoding in request body: {e}")
+            return
+
+        try:
+            data = json.loads(decoded_body)
+            if not isinstance(data, dict):
+                self.send_error(400, "Request body must be a JSON object")
+                return
+
             self.process_logs(data)
 
             self.send_response(200)
@@ -45,29 +81,66 @@ class LogReceiverHandler(BaseHTTPRequestHandler):
 
         except json.JSONDecodeError as e:
             self.send_error(400, f"Invalid JSON: {e}")
+        except IOError as e:
+            self.send_error(500, f"I/O error processing logs: {e}")
         except Exception as e:
             self.send_error(500, f"Server error: {e}")
 
     def process_logs(self, data):
-        """Process and store received logs."""
-        session = data.get("session", "unknown")
-        symbol = data.get("symbol", "unknown")
+        """Process and store received logs.
+
+        Args:
+            data: Dictionary containing session, symbol, and logs
+
+        Raises:
+            IOError: If logs cannot be written to file
+            OSError: If output directory cannot be created
+        """
+        # Validate and sanitize input data
+        session = str(data.get("session", "unknown"))[:64]  # Limit length
+        symbol = str(data.get("symbol", "unknown"))[:32]  # Limit length
         logs = data.get("logs", [])
 
-        # Create output directory
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Sanitize session and symbol for use in filename (remove invalid chars)
+        safe_session = "".join(c for c in session if c.isalnum() or c in "-_")
+        safe_symbol = "".join(c for c in symbol if c.isalnum() or c in "-_")
+
+        if not isinstance(logs, list):
+            print(f"[{datetime.now().isoformat()}] Warning: 'logs' field is not a list, skipping")
+            return
+
+        # Create output directory with error handling
+        try:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError as e:
+            raise IOError(f"Cannot create output directory (permission denied): {self.output_dir}") from e
+        except OSError as e:
+            raise IOError(f"Cannot create output directory: {self.output_dir} - {e}") from e
 
         # Generate filename
         date_str = datetime.now().strftime("%Y-%m-%d")
-        filename = self.output_dir / f"quantum_{symbol}_{session}_{date_str}.jsonl"
+        filename = self.output_dir / f"quantum_{safe_symbol}_{safe_session}_{date_str}.jsonl"
 
-        # Append logs to file (JSONL format)
-        with open(filename, "a") as f:
-            for log_entry in logs:
-                if isinstance(log_entry, str):
-                    f.write(log_entry + "\n")
-                else:
-                    f.write(json.dumps(log_entry) + "\n")
+        # Append logs to file (JSONL format) with proper error handling
+        try:
+            with open(filename, "a", encoding="utf-8") as f:
+                for log_entry in logs:
+                    try:
+                        if isinstance(log_entry, str):
+                            f.write(log_entry + "\n")
+                        elif isinstance(log_entry, dict):
+                            f.write(json.dumps(log_entry) + "\n")
+                        else:
+                            # Convert other types to string representation
+                            f.write(json.dumps(str(log_entry)) + "\n")
+                    except (TypeError, ValueError) as e:
+                        # Log entry couldn't be serialized, skip it
+                        print(f"  Warning: Could not serialize log entry: {e}")
+                        continue
+        except PermissionError as e:
+            raise IOError(f"Cannot write to log file (permission denied): {filename}") from e
+        except IOError as e:
+            raise IOError(f"Error writing to log file: {filename} - {e}") from e
 
         # Print summary to console
         print(f"[{datetime.now().isoformat()}] Received {len(logs)} logs from {symbol} session {session}")
@@ -81,8 +154,13 @@ class LogReceiverHandler(BaseHTTPRequestHandler):
                     message = parsed.get("message", "")
                     ts = parsed.get("ts", "")
                     print(f"  [{level}] {ts} | {message}")
-                except:
+                except json.JSONDecodeError:
                     print(f"  {log_entry}")
+            elif isinstance(log_entry, dict):
+                level = log_entry.get("level", "INFO")
+                message = log_entry.get("message", str(log_entry))
+                ts = log_entry.get("ts", "")
+                print(f"  [{level}] {ts} | {message}")
             else:
                 print(f"  {log_entry}")
 
@@ -98,9 +176,36 @@ def main():
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to")
     args = parser.parse_args()
 
-    LogReceiverHandler.output_dir = Path(args.output)
+    # Validate port range
+    if args.port < 1 or args.port > 65535:
+        print(f"Error: Invalid port number {args.port}. Must be between 1 and 65535.")
+        return 1
 
-    server = HTTPServer((args.host, args.port), LogReceiverHandler)
+    # Validate and set output directory
+    try:
+        output_path = Path(args.output)
+        LogReceiverHandler.output_dir = output_path
+    except Exception as e:
+        print(f"Error: Invalid output path '{args.output}': {e}")
+        return 1
+
+    # Create server with error handling for port binding
+    try:
+        server = HTTPServer((args.host, args.port), LogReceiverHandler)
+    except PermissionError:
+        print(f"Error: Permission denied binding to {args.host}:{args.port}")
+        print("  - Try a port >= 1024 for non-root users")
+        print("  - Or run with elevated privileges")
+        return 1
+    except OSError as e:
+        if "Address already in use" in str(e):
+            print(f"Error: Port {args.port} is already in use")
+            print("  - Try a different port with --port <number>")
+            print("  - Or stop the other service using this port")
+        else:
+            print(f"Error: Cannot bind to {args.host}:{args.port}: {e}")
+        return 1
+
     print(f"Log receiver listening on {args.host}:{args.port}")
     print(f"Logs will be stored in: {args.output}/")
 
@@ -117,7 +222,14 @@ def main():
     except KeyboardInterrupt:
         print("\nShutting down...")
         server.shutdown()
+    except Exception as e:
+        print(f"\nServer error: {e}")
+        server.shutdown()
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(main() or 0)

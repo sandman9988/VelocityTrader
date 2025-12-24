@@ -444,16 +444,39 @@ public:
    bool Init(string prefix = "VT", ENUM_LOG_LEVEL level = LOG_INFO,
              ENUM_LOG_DESTINATION dest = LOG_DEST_FILE, int bufferSize = 100000)
    {
+      // Validate inputs
+      if(StringLen(prefix) == 0)
+      {
+         prefix = "VT";  // Default prefix
+      }
+
+      if(bufferSize < 0)
+      {
+         bufferSize = 100000;  // Default buffer size
+      }
+
+      // Cap buffer size to prevent excessive memory allocation
+      if(bufferSize > 10000000)  // 10 million max
+      {
+         Print("WARNING: CVTLogger::Init - buffer size capped at 10,000,000");
+         bufferSize = 10000000;
+      }
+
       m_logPrefix = prefix;
       m_logLevel = level;
       m_destination = dest;
       m_maxBufferSize = bufferSize;
       m_sessionStart = TimeCurrent();
 
-      // Create log directory
+      // Create log directory with proper error handling
       if(!FolderCreate(m_logPath))
       {
-         // Folder may already exist
+         int err = GetLastError();
+         // Error 5020 = folder already exists, which is fine
+         if(err != 5020 && err != 0)
+         {
+            Print("WARNING: CVTLogger::Init - Cannot create log folder: ", m_logPath, " (error: ", err, ")");
+         }
       }
 
       // Open log files
@@ -462,32 +485,61 @@ public:
          string dateStr = TimeToString(TimeCurrent(), TIME_DATE);
          StringReplace(dateStr, ".", "");
 
+         // Open general log file
          string logFile = m_logPath + "\\" + m_logPrefix + "_" + dateStr + ".log";
          m_hLog = FileOpen(logFile, FILE_WRITE|FILE_TXT|FILE_SHARE_READ);
+         if(m_hLog == INVALID_HANDLE)
+         {
+            int err = GetLastError();
+            Print("WARNING: CVTLogger::Init - Cannot open log file: ", logFile, " (error: ", err, ")");
+         }
 
+         // Open trades CSV file
          string tradeFile = m_logPath + "\\" + m_logPrefix + "_trades_" + dateStr + ".csv";
          m_hTrades = FileOpen(tradeFile, FILE_WRITE|FILE_CSV|FILE_SHARE_READ, ',');
-
          if(m_hTrades != INVALID_HANDLE)
          {
             // Write CSV header
             FileWrite(m_hTrades, "Timestamp", "Symbol", "Action", "Volume",
                      "Price", "SL", "TP", "Ticket", "Profit", "Comment");
          }
+         else
+         {
+            int err = GetLastError();
+            Print("WARNING: CVTLogger::Init - Cannot open trades file: ", tradeFile, " (error: ", err, ")");
+         }
 
+         // Open RL experience file
          string rlFile = m_logPath + "\\" + m_logPrefix + "_rl_" + dateStr + ".jsonl";
          m_hRL = FileOpen(rlFile, FILE_WRITE|FILE_TXT|FILE_SHARE_READ);
+         if(m_hRL == INVALID_HANDLE)
+         {
+            int err = GetLastError();
+            Print("WARNING: CVTLogger::Init - Cannot open RL file: ", rlFile, " (error: ", err, ")");
+         }
       }
 
       // Initialize replay buffer
       if(m_destination == LOG_DEST_RL_BUFFER || m_maxBufferSize > 0)
       {
-         ArrayResize(m_replayBuffer, m_maxBufferSize);
-         m_bufferSize = m_maxBufferSize;
+         int resized = ArrayResize(m_replayBuffer, m_maxBufferSize);
+         if(resized != m_maxBufferSize)
+         {
+            Print("WARNING: CVTLogger::Init - Could not allocate full replay buffer. Requested: ",
+                  m_maxBufferSize, ", Allocated: ", resized);
+            m_bufferSize = resized;
+         }
+         else
+         {
+            m_bufferSize = m_maxBufferSize;
+         }
       }
 
       // Initialize returns tracking
-      ArrayResize(m_returns, 1000);
+      if(ArrayResize(m_returns, 1000) != 1000)
+      {
+         Print("WARNING: CVTLogger::Init - Could not allocate returns array");
+      }
 
       m_initialized = true;
 
@@ -754,16 +806,42 @@ public:
    //+------------------------------------------------------------------+
    int SampleBatch(ExperienceTuple &batch[], int batchSize)
    {
-      if(m_bufferCount == 0)
+      // Validate inputs
+      if(batchSize <= 0)
+      {
          return 0;
+      }
+
+      if(m_bufferCount == 0)
+      {
+         return 0;
+      }
 
       int actualSize = MathMin(batchSize, m_bufferCount);
-      ArrayResize(batch, actualSize);
+      if(actualSize <= 0)
+      {
+         return 0;
+      }
+
+      if(ArrayResize(batch, actualSize) != actualSize)
+      {
+         Print("WARNING: CVTLogger::SampleBatch - cannot allocate batch array");
+         return 0;
+      }
 
       for(int i = 0; i < actualSize; i++)
       {
-         int randIdx = MathRand() % m_bufferCount;
-         batch[i] = m_replayBuffer[randIdx];
+         // Use modulo with bounds check to prevent any overflow issues
+         int randIdx = MathAbs(MathRand()) % m_bufferCount;
+         if(randIdx >= 0 && randIdx < m_bufferCount)
+         {
+            batch[i] = m_replayBuffer[randIdx];
+         }
+         else
+         {
+            // Fallback to first entry if something goes wrong
+            batch[i] = m_replayBuffer[0];
+         }
       }
 
       return actualSize;
@@ -845,25 +923,64 @@ public:
    //+------------------------------------------------------------------+
    bool ExportReplayBuffer(string filename)
    {
-      if(m_bufferCount == 0)
+      // Validate filename
+      if(StringLen(filename) == 0)
+      {
+         Log(LOG_ERROR, "ExportReplayBuffer - empty filename provided");
          return false;
+      }
+
+      if(m_bufferCount == 0)
+      {
+         Log(LOG_WARNING, "ExportReplayBuffer - buffer is empty, nothing to export");
+         return false;
+      }
 
       string path = m_logPath + "\\" + filename;
       int h = FileOpen(path, FILE_WRITE|FILE_TXT);
 
       if(h == INVALID_HANDLE)
+      {
+         int err = GetLastError();
+         Log(LOG_ERROR, StringFormat("ExportReplayBuffer - cannot create file: %s (error: %d)", path, err));
          return false;
+      }
+
+      int exportedCount = 0;
+      int errorCount = 0;
 
       for(int i = 0; i < m_bufferCount; i++)
       {
-         FileWriteString(h, m_replayBuffer[i].ToJSON() + "\n");
+         string json = m_replayBuffer[i].ToJSON();
+         if(StringLen(json) > 0)
+         {
+            uint written = FileWriteString(h, json + "\n");
+            if(written > 0)
+            {
+               exportedCount++;
+            }
+            else
+            {
+               errorCount++;
+            }
+         }
+         else
+         {
+            errorCount++;
+         }
       }
 
       FileClose(h);
 
-      Log(LOG_INFO, StringFormat("Exported %d experiences to %s", m_bufferCount, filename));
+      if(errorCount > 0)
+      {
+         Log(LOG_WARNING, StringFormat("ExportReplayBuffer - %d/%d entries had errors",
+             errorCount, m_bufferCount));
+      }
 
-      return true;
+      Log(LOG_INFO, StringFormat("Exported %d experiences to %s", exportedCount, filename));
+
+      return exportedCount > 0;
    }
 
    //+------------------------------------------------------------------+
@@ -972,10 +1089,23 @@ public:
    //+------------------------------------------------------------------+
    //| Mark current candle for replay study                              |
    //+------------------------------------------------------------------+
-   void MarkCandle(string symbol, ENUM_TIMEFRAMES tf, ENUM_TRADE_TAG tag,
+   bool MarkCandle(string symbol, ENUM_TIMEFRAMES tf, ENUM_TRADE_TAG tag,
                    color clr = clrRed, string notes = "", ulong ticket = 0,
                    ENUM_MARKER_TYPE marker = MARKER_CIRCLE, double score = 0.5)
    {
+      // Validate symbol
+      if(StringLen(symbol) == 0)
+      {
+         Print("ERROR: CVTLogger::MarkCandle - empty symbol provided");
+         return false;
+      }
+
+      // Validate score is in valid range
+      if(!MathIsValidNumber(score) || score < 0.0 || score > 1.0)
+      {
+         score = 0.5;  // Default score
+      }
+
       if(m_markedCount >= m_maxMarkedCandles)
       {
          // Shift array to make room
@@ -985,7 +1115,14 @@ public:
       }
 
       if(m_markedCount >= ArraySize(m_markedCandles))
-         ArrayResize(m_markedCandles, m_markedCount + 100);
+      {
+         int newSize = m_markedCount + 100;
+         if(ArrayResize(m_markedCandles, newSize) != newSize)
+         {
+            Print("ERROR: CVTLogger::MarkCandle - cannot allocate memory for marked candles");
+            return false;
+         }
+      }
 
       MarkedCandle mc;
       mc.Reset();
@@ -994,12 +1131,29 @@ public:
       mc.timeframe = tf;
       mc.barIndex = 0;  // Current bar
 
-      // Get OHLCV
+      // Get OHLCV with validation
       mc.open = iOpen(symbol, tf, 0);
       mc.high = iHigh(symbol, tf, 0);
       mc.low = iLow(symbol, tf, 0);
       mc.close = iClose(symbol, tf, 0);
       mc.volume = iVolume(symbol, tf, 0);
+
+      // Validate OHLCV data
+      if(mc.open <= 0 || mc.high <= 0 || mc.low <= 0 || mc.close <= 0)
+      {
+         Print("WARNING: CVTLogger::MarkCandle - invalid OHLCV data for ", symbol,
+               " (O:", mc.open, " H:", mc.high, " L:", mc.low, " C:", mc.close, ")");
+         // Don't fail completely, but use current price if available
+         double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+         if(bid > 0)
+         {
+            mc.open = mc.high = mc.low = mc.close = bid;
+         }
+         else
+         {
+            return false;
+         }
+      }
 
       mc.tag = tag;
       mc.markerType = marker;
@@ -1020,6 +1174,8 @@ public:
 
       // Write to marked file
       WriteMarkedCandle(mc);
+
+      return true;
    }
 
    //+------------------------------------------------------------------+
@@ -1102,8 +1258,20 @@ public:
    //+------------------------------------------------------------------+
    //| Draw marker on chart                                              |
    //+------------------------------------------------------------------+
-   void DrawMarker(MarkedCandle &mc)
+   bool DrawMarker(MarkedCandle &mc)
    {
+      // Validate timestamp and price
+      if(mc.timestamp <= 0)
+      {
+         Print("WARNING: CVTLogger::DrawMarker - invalid timestamp");
+         return false;
+      }
+      if(mc.high <= 0 || !MathIsValidNumber(mc.high))
+      {
+         Print("WARNING: CVTLogger::DrawMarker - invalid high price");
+         return false;
+      }
+
       string name = m_markerPrefix + IntegerToString(m_markedCount);
 
       int code = 159;  // Circle by default
@@ -1115,21 +1283,44 @@ public:
          case MARKER_STAR:       code = 171; break;
          case MARKER_CROSS:      code = 251; break;
          case MARKER_DIAMOND:    code = 168; break;
+         default:                code = 159; break;
       }
 
-      // Create arrow object
-      ObjectCreate(0, name, OBJ_ARROW, 0, mc.timestamp, mc.high);
+      // Create arrow object with error checking
+      if(!ObjectCreate(0, name, OBJ_ARROW, 0, mc.timestamp, mc.high))
+      {
+         int err = GetLastError();
+         // Error 4200 = object already exists, try with unique name
+         if(err == 4200)
+         {
+            name = m_markerPrefix + IntegerToString(m_markedCount) + "_" +
+                   IntegerToString(GetTickCount());
+            if(!ObjectCreate(0, name, OBJ_ARROW, 0, mc.timestamp, mc.high))
+            {
+               Print("WARNING: CVTLogger::DrawMarker - cannot create marker object (error: ", GetLastError(), ")");
+               return false;
+            }
+         }
+         else if(err != 0)
+         {
+            Print("WARNING: CVTLogger::DrawMarker - ObjectCreate failed (error: ", err, ")");
+            return false;
+         }
+      }
+
       ObjectSetInteger(0, name, OBJPROP_ARROWCODE, code);
       ObjectSetInteger(0, name, OBJPROP_COLOR, mc.markerColor);
       ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
       ObjectSetString(0, name, OBJPROP_TOOLTIP,
          StringFormat("%s: %s", EnumToString(mc.tag), mc.notes));
+
+      return true;
    }
 
    //+------------------------------------------------------------------+
    //| Write marked candle to file                                       |
    //+------------------------------------------------------------------+
-   void WriteMarkedCandle(MarkedCandle &mc)
+   bool WriteMarkedCandle(MarkedCandle &mc)
    {
       if(m_hMarked == INVALID_HANDLE)
       {
@@ -1137,13 +1328,32 @@ public:
          StringReplace(dateStr, ".", "");
          string markFile = m_logPath + "\\" + m_logPrefix + "_marked_" + dateStr + ".jsonl";
          m_hMarked = FileOpen(markFile, FILE_WRITE|FILE_TXT|FILE_SHARE_READ);
+
+         if(m_hMarked == INVALID_HANDLE)
+         {
+            int err = GetLastError();
+            Print("WARNING: CVTLogger::WriteMarkedCandle - cannot open marked file: ", markFile, " (error: ", err, ")");
+            return false;
+         }
       }
 
       if(m_hMarked != INVALID_HANDLE)
       {
-         FileWriteString(m_hMarked, mc.ToJSON() + "\n");
-         FileFlush(m_hMarked);
+         string json = mc.ToJSON();
+         if(StringLen(json) > 0)
+         {
+            uint written = FileWriteString(m_hMarked, json + "\n");
+            if(written == 0)
+            {
+               Print("WARNING: CVTLogger::WriteMarkedCandle - failed to write to file");
+               return false;
+            }
+            FileFlush(m_hMarked);
+            return true;
+         }
       }
+
+      return false;
    }
 
    //+------------------------------------------------------------------+

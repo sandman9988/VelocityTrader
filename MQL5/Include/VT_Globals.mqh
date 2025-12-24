@@ -32,12 +32,30 @@ private:
    double                     m_lastPrice;
 
 public:
-   void Init(string sym)
+   bool Init(string sym)
    {
       m_symbol = sym;
-      m_detector = new CKinematicRegimeDetector();
-      m_ownsDetector = true;
       m_lastPrice = 0;
+      m_ownsDetector = false;
+
+      // Validate symbol
+      if(StringLen(sym) == 0)
+      {
+         Print("ERROR: PhysicsEngine::Init - empty symbol provided");
+         m_detector = NULL;
+         return false;
+      }
+
+      // Attempt to create detector with error handling
+      m_detector = new CKinematicRegimeDetector();
+      if(m_detector == NULL)
+      {
+         Print("ERROR: PhysicsEngine::Init - failed to create CKinematicRegimeDetector for ", sym);
+         return false;
+      }
+
+      m_ownsDetector = true;
+      return true;
    }
 
    void Deinit()
@@ -49,29 +67,75 @@ public:
       }
    }
 
-   void UpdateWithATR(double price, double atr)
+   bool UpdateWithATR(double price, double atr)
    {
-      if(m_detector != NULL && price > 0 && atr > 0)
-         m_detector.Update(price, atr);
+      // Validate detector is initialized
+      if(m_detector == NULL)
+      {
+         return false;  // Silently fail if not initialized
+      }
+
+      // Validate price is positive and finite
+      if(price <= 0 || !MathIsValidNumber(price))
+      {
+         return false;
+      }
+
+      // Validate ATR is positive and finite
+      if(atr <= 0 || !MathIsValidNumber(atr))
+      {
+         return false;
+      }
+
+      // Additional sanity check: ATR should not be larger than price
+      if(atr > price)
+      {
+         Print("WARNING: PhysicsEngine::UpdateWithATR - ATR (", atr, ") > price (", price, ") for ", m_symbol);
+         atr = price * 0.1;  // Cap ATR at 10% of price
+      }
+
+      m_detector.Update(price, atr);
       m_lastPrice = price;
+      return true;
    }
 
    // Legacy Update() for backward compatibility
-   void Update()
+   bool Update()
    {
-      if(m_symbol == "" || m_detector == NULL) return;
+      // Validate state
+      if(StringLen(m_symbol) == 0)
+      {
+         return false;
+      }
+
+      if(m_detector == NULL)
+      {
+         return false;
+      }
+
+      // Get current price with validation
       double price = SymbolInfoDouble(m_symbol, SYMBOL_BID);
-      if(price <= 0) return;
+      if(price <= 0 || !MathIsValidNumber(price))
+      {
+         return false;
+      }
 
       // Estimate ATR from recent movement if not provided
       double atr = 0.0;
-      if(m_lastPrice > 0)
+      if(m_lastPrice > 0 && MathIsValidNumber(m_lastPrice))
+      {
          atr = MathAbs(price - m_lastPrice) * 14.0;
+      }
       else
+      {
          atr = price * 0.001;  // Default 0.1% for first tick
+      }
 
-      atr = MathMax(atr, price * 0.0001);  // Minimum ATR
-      UpdateWithATR(price, atr);
+      // Ensure ATR is valid and within reasonable bounds
+      atr = MathMax(atr, price * 0.0001);  // Minimum ATR: 0.01% of price
+      atr = MathMin(atr, price * 0.5);      // Maximum ATR: 50% of price
+
+      return UpdateWithATR(price, atr);
    }
 
    bool IsReady()
@@ -215,21 +279,45 @@ struct SymCData
       return -1;
    }
 
-   void Update(double mass, double flow, double price, PhysicsEngine &phys)
+   bool Update(double mass, double flow, double price, PhysicsEngine &phys)
    {
-      // Get kinematic state from physics engine
+      // Validate inputs
+      if(!MathIsValidNumber(mass) || !MathIsValidNumber(flow) || !MathIsValidNumber(price))
+      {
+         return false;
+      }
+
+      if(price <= 0)
+      {
+         return false;
+      }
+
+      // Get kinematic state from physics engine with validation
+      if(!phys.IsReady())
+      {
+         // Use defaults when physics engine is not ready
+         chi = 1.0;
+         chiZ = 0.0;
+         priceDeviation = 0.0;
+         regime = REGIME_CALIBRATING;
+         return false;
+      }
+
       KinematicState kinState = phys.GetFullState();
 
-      // Update chi and chiZ from kinematic analysis
-      chi = kinState.chi;
-      chiZ = kinState.chiZ;
+      // Update chi and chiZ from kinematic analysis with validation
+      chi = MathIsValidNumber(kinState.chi) ? kinState.chi : 1.0;
+      chiZ = MathIsValidNumber(kinState.chiZ) ? kinState.chiZ : 0.0;
 
       // Price deviation: normalized position converted to centered scale
       // position 0.5 = neutral, <0.5 = oversold, >0.5 = overbought
-      priceDeviation = (kinState.position - 0.5) * 2.0;
+      double position = MathIsValidNumber(kinState.position) ? kinState.position : 0.5;
+      position = MathMax(0.0, MathMin(1.0, position));  // Clamp to [0, 1]
+      priceDeviation = (position - 0.5) * 2.0;
 
       // Regime from kinematic classification
       regime = kinState.regime;
+      return true;
    }
 };
 

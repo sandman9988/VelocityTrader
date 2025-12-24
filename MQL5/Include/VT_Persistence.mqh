@@ -105,28 +105,74 @@ uint CalculateChecksum(const uchar &data[], int size)
 
 //+------------------------------------------------------------------+
 //| Calculate file checksum by reading entire file                    |
+//| Returns 0 on error (file not found, read error, etc.)             |
 //+------------------------------------------------------------------+
 uint CalculateFileChecksum(string filename, int excludeLastBytes = 4)
 {
+   // Validate input parameters
+   if(StringLen(filename) == 0)
+   {
+      Print("ERROR: CalculateFileChecksum - empty filename provided");
+      return 0;
+   }
+
+   if(excludeLastBytes < 0)
+   {
+      Print("ERROR: CalculateFileChecksum - invalid excludeLastBytes: ", excludeLastBytes);
+      return 0;
+   }
+
    int handle = FileOpen(filename, FILE_READ | FILE_BIN);
-   if(handle == INVALID_HANDLE) return 0;
+   if(handle == INVALID_HANDLE)
+   {
+      int err = GetLastError();
+      if(err != ERR_FILE_NOT_EXIST)  // Don't log for missing files (expected case)
+         Print("WARNING: CalculateFileChecksum - cannot open file: ", filename, " (error: ", err, ")");
+      return 0;
+   }
 
    long fileSize = FileSize(handle);
+   if(fileSize <= 0)
+   {
+      Print("WARNING: CalculateFileChecksum - file is empty or invalid size: ", filename);
+      FileClose(handle);
+      return 0;
+   }
+
    int dataSize = (int)(fileSize - excludeLastBytes);  // Exclude checksum bytes
 
    if(dataSize <= 0)
    {
+      Print("WARNING: CalculateFileChecksum - file too small for checksum: ", filename,
+            " (size: ", fileSize, ", exclude: ", excludeLastBytes, ")");
+      FileClose(handle);
+      return 0;
+   }
+
+   // Sanity check: prevent allocating excessive memory
+   if(dataSize > 100 * 1024 * 1024)  // 100MB limit
+   {
+      Print("ERROR: CalculateFileChecksum - file too large: ", filename, " (", dataSize, " bytes)");
       FileClose(handle);
       return 0;
    }
 
    uchar data[];
-   ArrayResize(data, dataSize);
+   if(ArrayResize(data, dataSize) != dataSize)
+   {
+      Print("ERROR: CalculateFileChecksum - memory allocation failed for ", dataSize, " bytes");
+      FileClose(handle);
+      return 0;
+   }
 
    uint bytesRead = FileReadArray(handle, data, 0, dataSize);
    FileClose(handle);
 
-   if(bytesRead != (uint)dataSize) return 0;
+   if(bytesRead != (uint)dataSize)
+   {
+      Print("WARNING: CalculateFileChecksum - incomplete read: ", bytesRead, "/", dataSize, " bytes from ", filename);
+      return 0;
+   }
 
    return CalculateChecksum(data, dataSize);
 }
@@ -366,18 +412,42 @@ void LoadState()
 
 //+------------------------------------------------------------------+
 //| TryLoadFile: Attempt to load state from specific file             |
+//| Returns true if file loaded successfully, false otherwise          |
 //+------------------------------------------------------------------+
 bool TryLoadFile(string filename)
 {
+   // Validate filename
+   if(StringLen(filename) == 0)
+   {
+      Print("ERROR: TryLoadFile - empty filename provided");
+      return false;
+   }
+
    int handle = FileOpen(filename, FILE_READ | FILE_BIN);
-   if(handle == INVALID_HANDLE) return false;
+   if(handle == INVALID_HANDLE)
+   {
+      int err = GetLastError();
+      if(err != ERR_FILE_NOT_EXIST)
+         Print("WARNING: TryLoadFile - cannot open file: ", filename, " (error: ", err, ")");
+      return false;
+   }
+
+   // Validate file has minimum required size (header only)
+   long fileSize = FileSize(handle);
+   int minHeaderSize = sizeof(int) * 2;  // magic + version
+   if(fileSize < minHeaderSize)
+   {
+      Print("ERROR: TryLoadFile - file too small: ", filename, " (", fileSize, " bytes)");
+      FileClose(handle);
+      return false;
+   }
 
    // Read and validate header
    int magic = FileReadInteger(handle);
    if(magic != PERSISTENCE_MAGIC)
    {
       FileClose(handle);
-      Print("Invalid magic number in ", filename);
+      Print("ERROR: Invalid magic number in ", filename, " (got ", magic, ", expected ", PERSISTENCE_MAGIC, ")");
       return false;
    }
 
@@ -392,49 +462,108 @@ bool TryLoadFile(string filename)
    else if(version != PERSISTENCE_VERSION)
    {
       FileClose(handle);
-      Print("Unknown version ", version, " in ", filename);
+      Print("ERROR: Unknown version ", version, " in ", filename, " (expected ", PERSISTENCE_VERSION, ")");
+      return false;
+   }
+
+   // Verify file is large enough for checksum verification
+   if(fileSize < 8)  // Need at least header + checksum
+   {
+      Print("ERROR: TryLoadFile - file too small for checksum: ", filename);
+      FileClose(handle);
       return false;
    }
 
    // Verify CRC32 checksum before loading
-   FileSeek(handle, -4, SEEK_END);
+   if(!FileSeek(handle, -4, SEEK_END))
+   {
+      Print("ERROR: TryLoadFile - cannot seek to checksum position in ", filename);
+      FileClose(handle);
+      return false;
+   }
    uint storedChecksum = (uint)FileReadInteger(handle);
    FileClose(handle);
 
    uint calculatedChecksum = CalculateFileChecksum(filename, 4);
+   if(calculatedChecksum == 0)
+   {
+      Print("ERROR: TryLoadFile - checksum calculation failed for ", filename);
+      return false;
+   }
+
    if(storedChecksum != calculatedChecksum)
    {
-      Print("CHECKSUM MISMATCH in ", filename,
+      Print("ERROR: CHECKSUM MISMATCH in ", filename,
             " - stored:", storedChecksum, " calculated:", calculatedChecksum);
       return false;
    }
 
    // Reopen and continue loading after checksum verified
    handle = FileOpen(filename, FILE_READ | FILE_BIN);
-   if(handle == INVALID_HANDLE) return false;
+   if(handle == INVALID_HANDLE)
+   {
+      Print("ERROR: TryLoadFile - cannot reopen verified file: ", filename);
+      return false;
+   }
 
    // Skip header (already validated)
    FileReadInteger(handle);  // magic
    FileReadInteger(handle);  // version
 
    datetime saveTime = (datetime)FileReadLong(handle);
+   if(saveTime <= 0 || saveTime > TimeCurrent() + 86400)  // Sanity check: not in future by more than 1 day
+   {
+      Print("WARNING: TryLoadFile - suspicious save timestamp: ", TimeToString(saveTime));
+   }
    Print("Loading state from ", TimeToString(saveTime));
 
-   // Load agents
+   // Load agents with bounds checking
    LoadAgent(handle, g_sniper);
    LoadAgent(handle, g_berserker);
 
-   // Load predictor
-   for(int i = 0; i < 3; i++) g_predictor.regimeWR[i] = FileReadDouble(handle);
-   for(int i = 0; i < 5; i++) g_predictor.chiZoneWR[i] = FileReadDouble(handle);
-   for(int i = 0; i < 5; i++) g_predictor.accelZoneWR[i] = FileReadDouble(handle);
-   for(int i = 0; i < 3; i++) g_predictor.regimeCounts[i] = FileReadInteger(handle);
-   for(int i = 0; i < 5; i++) g_predictor.chiCounts[i] = FileReadInteger(handle);
-   for(int i = 0; i < 5; i++) g_predictor.accelCounts[i] = FileReadInteger(handle);
+   // Load predictor with array bounds validation
+   for(int i = 0; i < 3; i++)
+   {
+      double val = FileReadDouble(handle);
+      g_predictor.regimeWR[i] = MathMax(0.0, MathMin(1.0, val));  // Clamp to valid range
+   }
+   for(int i = 0; i < 5; i++)
+   {
+      double val = FileReadDouble(handle);
+      g_predictor.chiZoneWR[i] = MathMax(0.0, MathMin(1.0, val));
+   }
+   for(int i = 0; i < 5; i++)
+   {
+      double val = FileReadDouble(handle);
+      g_predictor.accelZoneWR[i] = MathMax(0.0, MathMin(1.0, val));
+   }
+   for(int i = 0; i < 3; i++)
+   {
+      int val = FileReadInteger(handle);
+      g_predictor.regimeCounts[i] = MathMax(0, val);  // Non-negative
+   }
+   for(int i = 0; i < 5; i++)
+   {
+      int val = FileReadInteger(handle);
+      g_predictor.chiCounts[i] = MathMax(0, val);
+   }
+   for(int i = 0; i < 5; i++)
+   {
+      int val = FileReadInteger(handle);
+      g_predictor.accelCounts[i] = MathMax(0, val);
+   }
 
-   // Load circuit breaker state
-   g_breaker.state = (ENUM_TRADING_STATE)FileReadInteger(handle);
-   g_breaker.peakEquity = FileReadDouble(handle);
+   // Load circuit breaker state with validation
+   int stateVal = FileReadInteger(handle);
+   if(stateVal < 0 || stateVal > 2)  // Validate enum range
+   {
+      Print("WARNING: TryLoadFile - invalid trading state: ", stateVal, ", defaulting to NORMAL");
+      stateVal = 0;
+   }
+   g_breaker.state = (ENUM_TRADING_STATE)stateVal;
+
+   double peakEquity = FileReadDouble(handle);
+   g_breaker.peakEquity = MathMax(0.0, peakEquity);  // Non-negative
 
    FileClose(handle);
    Print("State loaded successfully (v", PERSISTENCE_VERSION, ")");
@@ -521,20 +650,54 @@ void LoadAgent(int handle, TradingAgent &agent)
 
 //+------------------------------------------------------------------+
 //| LoadProfile: Load agent profile (current version)                 |
+//| Validates all loaded values are within reasonable ranges          |
 //+------------------------------------------------------------------+
 void LoadProfile(int handle, AgentProfile &profile)
 {
+   if(handle == INVALID_HANDLE)
+   {
+      Print("ERROR: LoadProfile - invalid file handle");
+      return;
+   }
+
    for(int i = 0; i < 3; i++)
    {
-      profile.regime[i].qBuy = FileReadDouble(handle);
-      profile.regime[i].qSell = FileReadDouble(handle);
-      profile.regime[i].qHold = FileReadDouble(handle);
-      profile.regime[i].trades = FileReadInteger(handle);
-      profile.regime[i].wins = FileReadInteger(handle);
-      profile.regime[i].pnl = FileReadDouble(handle);
-      profile.regime[i].upside = FileReadDouble(handle);
-      profile.regime[i].downside = FileReadDouble(handle);
-      profile.regime[i].learningRate = FileReadDouble(handle);  // v720: Load learning rate
+      // Load Q-values (no strict bounds, but validate they're finite)
+      double qBuy = FileReadDouble(handle);
+      double qSell = FileReadDouble(handle);
+      double qHold = FileReadDouble(handle);
+
+      // Validate Q-values are finite (not NaN or Inf)
+      if(!MathIsValidNumber(qBuy)) qBuy = 0.0;
+      if(!MathIsValidNumber(qSell)) qSell = 0.0;
+      if(!MathIsValidNumber(qHold)) qHold = 0.0;
+
+      profile.regime[i].qBuy = qBuy;
+      profile.regime[i].qSell = qSell;
+      profile.regime[i].qHold = qHold;
+
+      // Load and validate trade counts (must be non-negative)
+      int trades = FileReadInteger(handle);
+      int wins = FileReadInteger(handle);
+      profile.regime[i].trades = MathMax(0, trades);
+      profile.regime[i].wins = MathMax(0, MathMin(wins, trades));  // wins <= trades
+
+      // Load and validate PnL (no strict bounds but must be finite)
+      double pnl = FileReadDouble(handle);
+      profile.regime[i].pnl = MathIsValidNumber(pnl) ? pnl : 0.0;
+
+      // Load and validate upside/downside (must be non-negative)
+      double upside = FileReadDouble(handle);
+      double downside = FileReadDouble(handle);
+      profile.regime[i].upside = MathIsValidNumber(upside) ? MathMax(0.0, upside) : 0.0;
+      profile.regime[i].downside = MathIsValidNumber(downside) ? MathMax(0.0, downside) : 0.0;
+
+      // Load and validate learning rate (must be positive, reasonable range)
+      double learningRate = FileReadDouble(handle);
+      if(!MathIsValidNumber(learningRate) || learningRate <= 0.0 || learningRate > 1.0)
+         learningRate = InpLearningRateInit;  // Use default if invalid
+      profile.regime[i].learningRate = learningRate;
+
       profile.regime[i].InvalidateCache();
    }
 }
