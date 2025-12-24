@@ -10,6 +10,7 @@
 #property strict
 
 #include "VT_Logger.mqh"
+#include "VT_Definitions.mqh"
 
 //+------------------------------------------------------------------+
 //| CONSTANTS                                                         |
@@ -1362,13 +1363,16 @@ public:
 
       // === PRICE ACTION ===
       // Simplified - check for rejection candles
-      double open = iOpen(symbol, m_timeframe, 0);
-      double high = iHigh(symbol, m_timeframe, 0);
-      double low = iLow(symbol, m_timeframe, 0);
-      double close = iClose(symbol, m_timeframe, 0);
+      SafeOHLCV candle;
+      if(!GetSafeOHLCV(symbol, m_timeframe, 0, candle))
+      {
+         // Invalid OHLCV data - reduce quality score
+         quality.priceActionScore = 0.5;
+         return quality;
+      }
 
-      double body = MathAbs(close - open);
-      double range = high - low;
+      double body = MathAbs(candle.close - candle.open);
+      double range = candle.high - candle.low;
 
       if(range > 0)
       {

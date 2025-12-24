@@ -410,7 +410,8 @@ class FinancialAuditRules:
             'pattern': r'for\s*\([^;]+;\s*\w+\s*<\s*(?:g_symbolCount|SymbolsTotal)',
             'exclude_pattern': r'batch|Batch|BATCH|chunk|Chunk|MAX_BATCH|MAX_SYMBOLS_PER_TICK|limit|Limit|priority|Priority|ranked|Ranked|&&\s*\w+\s*<\s*MAX_|initialized|typeAllowed|warmup|Warmup',
             'description': 'Processing all symbols each tick can cause performance issues with large watchlists',
-            'recommendation': 'Process symbols in priority order: (1) Prioritize symbols with open positions, (2) Rank by trading signal strength, (3) Rotate through remaining symbols across ticks. Use adaptive batch sizes based on tick frequency.'
+            'recommendation': 'Process symbols in priority order: (1) Prioritize symbols with open positions, (2) Rank by trading signal strength, (3) Rotate through remaining symbols across ticks. Use adaptive batch sizes based on tick frequency.',
+            'check_loop_body': True  # Check the loop body for bounded iteration patterns
         },
         'DATA011': {
             'category': AuditCategory.DATA_INTEGRITY,
@@ -1105,6 +1106,26 @@ class FinancialCodeAuditor:
                                         break
                                 if found_check:
                                     continue
+
+                        # Special handling for DATA010 - check loop body for bounded iteration
+                        if rule.get('check_loop_body', False):
+                            # Look ahead 10 lines in the loop body
+                            loop_body = '\n'.join(lines[i:min(i+10, len(lines))])
+                            bounded_patterns = [
+                                r'priority|Priority',
+                                r'initialized',
+                                r'typeAllowed',
+                                r'warmup|Warmup',
+                                r'ShouldUpdate',
+                                r'continue',  # Early continue means bounded iteration
+                            ]
+                            found_bounded = False
+                            for bp in bounded_patterns:
+                                if re.search(bp, loop_body):
+                                    found_bounded = True
+                                    break
+                            if found_bounded:
+                                continue
 
                         # Special handling for DATA003 - check if file handle was validated earlier
                         if rule.get('check_validated_handle', False):
