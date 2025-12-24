@@ -42,15 +42,28 @@ All 4 CRITICAL findings are **false positives** due to auditor limitations in re
 **Finding 1: VT_Logger.mqh:1172**
 ```mql5
 // FALSE POSITIVE - Safe due to capacity guard
+// Lines 1117-1125 resize array if needed
+if(m_markedCount >= ArraySize(m_markedCandles))
+{
+   int newSize = m_markedCount + 100;
+   if(ArrayResize(m_markedCandles, newSize) != newSize)
+   {
+      Print("ERROR: CVTLogger::MarkCandle - cannot allocate memory");
+      return false;
+   }
+}
+
+// Lines 1166-1170 provide final safety check
 if(m_markedCount >= ArraySize(m_markedCandles))
 {
    Print("ERROR: CVTLogger::MarkCandle - array bounds check failed");
    return false;
 }
+
 m_markedCandles[m_markedCount] = mc;  // SAFE: checked above
 ```
 
-**Status**: ✅ Safe - Bounds check present 6 lines above  
+**Status**: ✅ Safe - Dual bounds checking pattern (resize + safety check)  
 **Reason for False Positive**: Auditor doesn't recognize `if(count >= ArraySize(...)) return;` pattern
 
 **Findings 2-4: VT_Persistence.mqh:695, 701, 703**
