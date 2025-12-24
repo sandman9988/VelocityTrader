@@ -1,0 +1,44 @@
+[flake8]
+# VelocityTrader Flake8 Configuration
+# ====================================
+
+# Maximum line length (compatible with most editors)
+max-line-length = 120
+
+# Maximum cyclomatic complexity
+max-complexity = 15
+
+# Ignore specific error codes
+ignore =
+    # E501: line too long (handled by max-line-length with more flexibility)
+    E501,
+    # W503: line break before binary operator (conflicts with black)
+    W503,
+    # E203: whitespace before ':' (conflicts with black for slices)
+    E203
+
+# Exclude directories
+exclude =
+    .git,
+    __pycache__,
+    .mypy_cache,
+    .pytest_cache,
+    venv,
+    env,
+    .venv,
+    build,
+    dist,
+    *.egg-info,
+    Tools/archive
+
+# Per-file ignores for specific patterns
+per-file-ignores =
+    # Test files can have longer lines and unused imports
+    test_*.py: E501, F401
+    *_test.py: E501, F401
+    # Init files often have unused imports for re-export
+    __init__.py: F401
+
+# Statistics
+statistics = True
+count = True

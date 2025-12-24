@@ -1,0 +1,180 @@
+name: MQL5 Validation
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths:
+      - 'MQL5/**/*.mq5'
+      - 'MQL5/**/*.mqh'
+      - '.github/workflows/mql5-validation.yml'
+  pull_request:
+    branches: [ main, master, develop ]
+    paths:
+      - 'MQL5/**/*.mq5'
+      - 'MQL5/**/*.mqh'
+      - '.github/workflows/mql5-validation.yml'
+  workflow_dispatch:
+
+jobs:
+  code-audit:
+    name: MQL5 Code Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run MQL5 Code Auditor
+        run: |
+          echo "Running MQL5 code audit..."
+          if [ -f "Tools/mql5_code_auditor.py" ]; then
+            python Tools/mql5_code_auditor.py --dir MQL5/ --output audit_report.json || true
+            if [ -f "audit_report.json" ]; then
+              echo "Audit report generated:"
+              cat audit_report.json | python -m json.tool | head -100
+            fi
+          else
+            echo "MQL5 code auditor not found, skipping..."
+          fi
+
+  integrity-check:
+    name: MQL5 Integrity Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Integrity Checker
+        run: |
+          echo "Running MQL5 integrity check..."
+          if [ -f "Tools/mql5_integrity_checker.py" ]; then
+            python Tools/mql5_integrity_checker.py MQL5/ || true
+          else
+            echo "Integrity checker not found, skipping..."
+          fi
+
+  financial-audit:
+    name: Financial Standards Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Financial Auditor
+        run: |
+          echo "Running financial standards audit..."
+          if [ -f "Tools/mql5_financial_auditor.py" ]; then
+            python Tools/mql5_financial_auditor.py --dir MQL5/ || true
+          else
+            echo "Financial auditor not found, skipping..."
+          fi
+
+  syntax-validation:
+    name: MQL5 Syntax Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate MQL5 Syntax Patterns
+        run: |
+          echo "Validating MQL5 syntax patterns..."
+
+          # Check for common syntax issues
+          echo "Checking for missing semicolons after statements..."
+          find MQL5/ -name "*.mqh" -o -name "*.mq5" | while read file; do
+            # Check for potential issues (basic pattern matching)
+            if grep -n "return[^;]*$" "$file" 2>/dev/null | grep -v "//" | head -5; then
+              echo "  Potential missing semicolon in: $file"
+            fi
+          done
+
+          echo "Checking for unbalanced braces..."
+          find MQL5/ -name "*.mqh" -o -name "*.mq5" | while read file; do
+            open_braces=$(grep -o "{" "$file" 2>/dev/null | wc -l)
+            close_braces=$(grep -o "}" "$file" 2>/dev/null | wc -l)
+            if [ "$open_braces" != "$close_braces" ]; then
+              echo "  Unbalanced braces in $file: { = $open_braces, } = $close_braces"
+            fi
+          done
+
+          echo "Syntax validation complete."
+
+  include-check:
+    name: Include Dependencies Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check include dependencies
+        run: |
+          echo "Checking MQL5 include dependencies..."
+
+          # Extract all includes and verify files exist
+          find MQL5/ -name "*.mqh" -o -name "*.mq5" | while read file; do
+            grep -h '#include.*"' "$file" 2>/dev/null | sed 's/.*#include.*"\([^"]*\)".*/\1/' | while read inc; do
+              # Check if it's a local include (not system)
+              if [[ "$inc" != "<"* ]]; then
+                dir=$(dirname "$file")
+                if [ ! -f "$dir/$inc" ] && [ ! -f "MQL5/Include/$inc" ]; then
+                  echo "  Missing include in $file: $inc"
+                fi
+              fi
+            done
+          done
+
+          echo "Include check complete."
+
+  metrics:
+    name: Code Metrics
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Calculate code metrics
+        run: |
+          echo "=== MQL5 Code Metrics ==="
+          echo ""
+
+          # Count files
+          mq5_count=$(find MQL5/ -name "*.mq5" | wc -l)
+          mqh_count=$(find MQL5/ -name "*.mqh" | wc -l)
+          echo "Files: $mq5_count .mq5, $mqh_count .mqh"
+
+          # Count lines
+          total_lines=$(find MQL5/ \( -name "*.mq5" -o -name "*.mqh" \) -exec cat {} \; | wc -l)
+          code_lines=$(find MQL5/ \( -name "*.mq5" -o -name "*.mqh" \) -exec cat {} \; | grep -v "^[[:space:]]*$" | grep -v "^[[:space:]]*//" | wc -l)
+          echo "Lines: $total_lines total, $code_lines code (excluding blanks/comments)"
+
+          # Count functions
+          func_count=$(grep -rh "^[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]\+[a-zA-Z_][a-zA-Z0-9_]*(" MQL5/ --include="*.mq5" --include="*.mqh" 2>/dev/null | wc -l)
+          echo "Approximate function count: $func_count"
+
+          # Count structs/classes
+          struct_count=$(grep -rh "^struct\|^class" MQL5/ --include="*.mq5" --include="*.mqh" 2>/dev/null | wc -l)
+          echo "Struct/Class count: $struct_count"
+
+          echo ""
+          echo "=== Metrics Complete ==="

@@ -28,26 +28,62 @@ class FileHashManager:
     
     @staticmethod
     def compute_hash(file_path: Path) -> Optional[str]:
-        """Compute SHA256 hash for file comparison"""
+        """Compute SHA256 hash for file comparison.
+
+        Args:
+            file_path: Path to the file to hash
+
+        Returns:
+            Hex string of SHA256 hash, or None if file doesn't exist or cannot be read
+        """
         if not file_path.exists():
             return None
-        
+
+        if not file_path.is_file():
+            print(f"⚠️  Cannot hash non-file: {file_path}")
+            return None
+
         hasher = hashlib.sha256()
         try:
             with open(file_path, 'rb') as f:
                 for chunk in iter(lambda: f.read(4096), b""):
                     hasher.update(chunk)
             return hasher.hexdigest()
+        except PermissionError:
+            print(f"⚠️  Permission denied reading file for hash: {file_path}")
+            return None
+        except IOError as e:
+            print(f"⚠️  I/O error computing hash for {file_path}: {e}")
+            return None
         except Exception as e:
-            print(f"⚠️  Error computing hash for {file_path}: {e}")
+            print(f"⚠️  Unexpected error computing hash for {file_path}: {e}")
             return None
     
     @staticmethod
     def files_are_identical(file1: Path, file2: Path) -> bool:
-        """Check if two files are identical using hash comparison"""
+        """Check if two files are identical using hash comparison.
+
+        Args:
+            file1: Path to the first file
+            file2: Path to the second file
+
+        Returns:
+            True if both files exist, are readable, and have identical content.
+            False if files differ, don't exist, or cannot be read.
+        """
+        if not file1.exists():
+            return False
+        if not file2.exists():
+            return False
+
         hash1 = FileHashManager.compute_hash(file1)
         hash2 = FileHashManager.compute_hash(file2)
-        return hash1 is not None and hash1 == hash2
+
+        # If either hash computation failed, files are not identical
+        if hash1 is None or hash2 is None:
+            return False
+
+        return hash1 == hash2
 
 
 class MT5SyncEngine:
@@ -59,42 +95,85 @@ class MT5SyncEngine:
         self.sync_manifest = {}
     
     def sync_file(self, src_path: Path, dst_path: Path, create_backup: bool = True) -> Dict[str, Any]:
-        """Sync a single file with hash comparison"""
+        """Sync a single file with hash comparison.
+
+        Args:
+            src_path: Source file path
+            dst_path: Destination file path
+            create_backup: Whether to create a backup of existing destination file
+
+        Returns:
+            Dictionary with sync result containing success, action, error, and backup_created fields
+        """
         result = {
             "success": False,
             "action": "none",
             "error": None,
             "backup_created": False
         }
-        
+
+        # Validate source file exists and is readable
+        if not src_path.exists():
+            result["error"] = f"Source file does not exist: {src_path}"
+            print(f"  ❌ Error: Source not found - {src_path.name}")
+            return result
+
+        if not src_path.is_file():
+            result["error"] = f"Source is not a file: {src_path}"
+            print(f"  ❌ Error: Source is not a file - {src_path.name}")
+            return result
+
         try:
             # Create destination directory if needed
             dst_path.parent.mkdir(parents=True, exist_ok=True)
-            
+        except PermissionError:
+            result["error"] = f"Permission denied creating directory: {dst_path.parent}"
+            print(f"  ❌ Error: Permission denied for directory - {dst_path.parent}")
+            return result
+        except OSError as e:
+            result["error"] = f"Cannot create directory {dst_path.parent}: {e}"
+            print(f"  ❌ Error: Cannot create directory - {e}")
+            return result
+
+        try:
             # Check if files are different
             if FileHashManager.files_are_identical(src_path, dst_path):
                 result["action"] = "unchanged"
                 result["success"] = True
                 print(f"  ✓ Unchanged: {src_path.name}")
                 return result
-            
+
             # Create backup if destination exists and backup is requested
             if create_backup and dst_path.exists():
                 backup_path = dst_path.with_suffix(dst_path.suffix + '.backup')
-                shutil.copy2(dst_path, backup_path)
-                result["backup_created"] = True
-                print(f"  📋 Backup: {dst_path.name} -> {backup_path.name}")
-            
+                try:
+                    shutil.copy2(dst_path, backup_path)
+                    result["backup_created"] = True
+                    print(f"  📋 Backup: {dst_path.name} -> {backup_path.name}")
+                except PermissionError:
+                    print(f"  ⚠️  Warning: Cannot create backup (permission denied): {backup_path}")
+                except shutil.Error as e:
+                    print(f"  ⚠️  Warning: Backup failed: {e}")
+
             # Copy file
             shutil.copy2(src_path, dst_path)
             result["action"] = "synced"
             result["success"] = True
             print(f"  ✅ Synced: {src_path.name}")
-            
+
+        except PermissionError:
+            result["error"] = f"Permission denied copying file: {src_path} -> {dst_path}"
+            print(f"  ❌ Error: Permission denied - {src_path.name}")
+        except shutil.Error as e:
+            result["error"] = f"Copy error: {e}"
+            print(f"  ❌ Error: Copy failed - {src_path.name}: {e}")
+        except IOError as e:
+            result["error"] = f"I/O error: {e}"
+            print(f"  ❌ Error: I/O error - {src_path.name}: {e}")
         except Exception as e:
-            result["error"] = str(e)
+            result["error"] = f"Unexpected error: {e}"
             print(f"  ❌ Error: {src_path.name} - {e}")
-        
+
         return result
     
     def sync_directory_batch(self, sync_mappings: List[Tuple[str, str]], 
@@ -412,26 +491,67 @@ class ProjectQuantumSyncManager:
         return verification
     
     def check_branch_sync_status(self) -> Dict[str, Any]:
-        """Check git branch sync status"""
-        
+        """Check git branch sync status.
+
+        Returns:
+            Dictionary with branch status including current_branch, uncommitted changes,
+            unpushed commits, and sync recommendation. Contains 'error' key on failure.
+        """
         print("🌿 Checking git branch sync status...")
-        
+
+        # Check if project root exists and is a git repository
+        if not self.project_root.exists():
+            print(f"   ❌ Project root does not exist: {self.project_root}")
+            return {"error": f"Project root does not exist: {self.project_root}"}
+
+        git_dir = self.project_root / ".git"
+        if not git_dir.exists():
+            print(f"   ❌ Not a git repository: {self.project_root}")
+            return {"error": f"Not a git repository: {self.project_root}"}
+
         try:
             # Get current branch
-            branch_result = subprocess.run(['git', 'branch', '--show-current'], 
-                                         capture_output=True, text=True, cwd=self.project_root)
+            branch_result = subprocess.run(
+                ['git', 'branch', '--show-current'],
+                capture_output=True, text=True, cwd=self.project_root,
+                timeout=30  # Add timeout to prevent hanging
+            )
+            if branch_result.returncode != 0:
+                error_msg = branch_result.stderr.strip() or "Unknown git error"
+                print(f"   ❌ Error getting current branch: {error_msg}")
+                return {"error": f"Git branch command failed: {error_msg}"}
+
             current_branch = branch_result.stdout.strip()
-            
+
             # Get git status
-            status_result = subprocess.run(['git', 'status', '--porcelain'], 
-                                         capture_output=True, text=True, cwd=self.project_root)
-            git_status = status_result.stdout.strip()
-            
-            # Check for unpushed commits
-            unpushed_result = subprocess.run(['git', 'log', '@{u}..HEAD', '--oneline'], 
-                                           capture_output=True, text=True, cwd=self.project_root)
-            unpushed_commits = unpushed_result.stdout.strip()
-            
+            status_result = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                capture_output=True, text=True, cwd=self.project_root,
+                timeout=30
+            )
+            if status_result.returncode != 0:
+                error_msg = status_result.stderr.strip() or "Unknown git error"
+                print(f"   ⚠️  Warning: Could not get git status: {error_msg}")
+                git_status = ""
+            else:
+                git_status = status_result.stdout.strip()
+
+            # Check for unpushed commits (may fail if no upstream is set)
+            try:
+                unpushed_result = subprocess.run(
+                    ['git', 'log', '@{u}..HEAD', '--oneline'],
+                    capture_output=True, text=True, cwd=self.project_root,
+                    timeout=30
+                )
+                if unpushed_result.returncode == 0:
+                    unpushed_commits = unpushed_result.stdout.strip()
+                else:
+                    # No upstream set, or other error - not a fatal condition
+                    unpushed_commits = ""
+            except subprocess.TimeoutExpired:
+                print(f"   ⚠️  Warning: Timeout checking unpushed commits")
+                unpushed_commits = ""
+
             branch_status = {
                 "current_branch": current_branch,
                 "has_uncommitted_changes": bool(git_status),
@@ -440,18 +560,24 @@ class ProjectQuantumSyncManager:
                 "unpushed_commits": unpushed_commits.split('\n') if unpushed_commits else [],
                 "sync_recommended": False
             }
-            
+
             # Determine if sync is recommended
             if not branch_status["has_uncommitted_changes"] and not branch_status["has_unpushed_commits"]:
                 branch_status["sync_recommended"] = True
-            
+
             print(f"   Current branch: {current_branch}")
             print(f"   Uncommitted changes: {'Yes' if branch_status['has_uncommitted_changes'] else 'No'}")
             print(f"   Unpushed commits: {'Yes' if branch_status['has_unpushed_commits'] else 'No'}")
             print(f"   Sync recommended: {'Yes' if branch_status['sync_recommended'] else 'No'}")
-            
+
             return branch_status
-            
+
+        except subprocess.TimeoutExpired:
+            print(f"   ❌ Git command timed out")
+            return {"error": "Git command timed out"}
+        except FileNotFoundError:
+            print(f"   ❌ Git is not installed or not in PATH")
+            return {"error": "Git is not installed or not in PATH"}
         except Exception as e:
             print(f"   ❌ Error checking git status: {e}")
             return {"error": str(e)}
@@ -472,10 +598,17 @@ class ProjectQuantumSyncManager:
         }
         
         manifest_path = self.project_root / "sync_manifest.json"
-        with open(manifest_path, 'w') as f:
-            json.dump(manifest, f, indent=2)
-        
-        print(f"📄 Sync manifest saved: {manifest_path}")
+        try:
+            with open(manifest_path, 'w') as f:
+                json.dump(manifest, f, indent=2)
+            print(f"📄 Sync manifest saved: {manifest_path}")
+        except PermissionError:
+            print(f"❌ Cannot save manifest (permission denied): {manifest_path}")
+            raise
+        except IOError as e:
+            print(f"❌ Error saving manifest: {manifest_path} - {e}")
+            raise
+
         return manifest_path
 
 
