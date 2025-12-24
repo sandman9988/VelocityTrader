@@ -136,9 +136,9 @@ input bool      InpShadowOnly = false;           // Shadow only mode
 // ═══════════════════════════════════════════════════════════════════
 // INCLUDE MODULAR COMPONENTS
 // ═══════════════════════════════════════════════════════════════════
-#include "Include/VT_Globals.mqh"      // All structs and global variables
-#include "Include/VT_HUD.mqh"          // HUD rendering functions
-#include "Include/VT_Persistence.mqh"  // State save/load functions
+#include <VT_Globals.mqh>              // All structs and global variables
+#include <VT_HUD.mqh>                  // HUD rendering functions
+#include <VT_Persistence.mqh>          // State save/load functions
 
 // ═══════════════════════════════════════════════════════════════════
 // LEGACY INLINE DEFINITIONS (Now in header files - kept for reference)

@@ -84,25 +84,32 @@ Target:
 
 ---
 
-## File Structure (Target)
+## File Structure (Current)
 
 ```
 VelocityTrader/
-├── VelocityTrader_v7_1_Duel.mq5    # Main EA (slim)
-├── Include/
-│   ├── VT_Definitions.mqh
-│   ├── VT_RLParameters.mqh
-│   ├── VT_Structures.mqh
-│   ├── VT_Predictor.mqh
-│   ├── VT_CircuitBreaker.mqh
-│   ├── VT_Globals.mqh
-│   ├── VT_HUD.mqh                  # Enhanced HUD
-│   ├── VT_Persistence.mqh          # Save/Load
-│   └── VT_Physics.mqh              # Physics engine (TODO)
+├── MQL5/                           # Standard MT5 structure
+│   ├── Experts/
+│   │   └── VelocityTrader_v7_1_Duel.mq5
+│   ├── Include/
+│   │   ├── VT_Definitions.mqh
+│   │   ├── VT_RLParameters.mqh
+│   │   ├── VT_Structures.mqh
+│   │   ├── VT_Predictor.mqh
+│   │   ├── VT_CircuitBreaker.mqh
+│   │   ├── VT_Globals.mqh
+│   │   ├── VT_HUD.mqh              # HUD rendering
+│   │   ├── VT_Persistence.mqh      # Save/Load
+│   │   └── VT_Physics.mqh          # Physics engine (TODO)
+│   ├── Indicators/
+│   ├── Scripts/
+│   └── Libraries/
 ├── Tools/                          # MQL5 standards library
-└── marketing/
+├── marketing/
+├── README.md
+└── NOTES.md
 ```
 
 ---
 
-*Last Updated: 2024-12-24*
+*Last Updated: 2025-12-24*
