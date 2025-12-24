@@ -1,5 +1,7 @@
 # VelocityTrader v7.1: Duel Architecture
 
+![VelocityTrader Cover](marketing/images/cover_background.png)
+
 > **WARNING: NOT PRODUCTION READY**
 >
 > This system has **232 CRITICAL safety violations** (down from 310). Core physics components are now functional. ~1970 lines of legacy code removed. See `PROJECT_AUDIT.md` for details.
@@ -8,11 +10,19 @@
 
 A sophisticated MetaTrader 5 Expert Advisor implementing a 2-Agent / 3-Regime Evolutionary Reinforcement Learning Trading System with physics-based kinematic market analysis.
 
+### The Future of Algorithmic Trading
+
+VelocityTrader represents a paradigm shift in automated trading systems—a self-evolving platform that combines cutting-edge reinforcement learning with physics-based market analysis. Unlike traditional systems that rely on static rules, VelocityTrader continuously learns and adapts through its revolutionary dual-agent architecture, ensuring optimal performance across all market conditions.
+
+📊 **[View Detailed Presentations](marketing/presentations/)** | 🎨 **[Design Philosophy](marketing/VelocityTrader_Visual_Design.md)**
+
 ---
 
 ## Overview
 
 VelocityTrader employs a revolutionary **Duel Architecture** where two distinct trading agents (Sniper and Berserker) compete and evolve using shadow/real trading pairs. The system uses **physics-based regime detection** to classify markets into Breakout, Trend, or Mean Reversion states, then applies agent-specific strategies with RL-optimized parameters.
+
+![Strategy Concept](marketing/images/strategy_concept.png)
 
 ### Key Features
 
@@ -27,6 +37,8 @@ VelocityTrader employs a revolutionary **Duel Architecture** where two distinct 
 ---
 
 ## System Architecture
+
+![System Architecture](marketing/images/code_architecture.png)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -130,6 +142,8 @@ VelocityTrader employs a revolutionary **Duel Architecture** where two distinct 
 
 ## The Duel Concept
 
+![Duel Architecture](marketing/images/duel_concept.png)
+
 ### Champion vs Challenger
 
 Each agent maintains two parallel instances:
@@ -161,6 +175,8 @@ Capital is dynamically allocated between agents based on Profit Factor:
 
 ## Physics-Based Regime Detection
 
+![Physics Engine](marketing/images/physics_engine.png)
+
 ### Kinematic Model
 
 The system models price action using classical mechanics:
@@ -184,6 +200,8 @@ The system models price action using classical mechanics:
 
 ### Regime Classification
 
+![Market Regimes](marketing/images/market_regimes.png)
+
 | Regime | Condition | Strategy |
 |--------|-----------|----------|
 | **BREAKOUT** | \|Accel Z\| > 2σ | Trade with explosive moves |
@@ -194,6 +212,8 @@ The system models price action using classical mechanics:
 ---
 
 ## Reinforcement Learning Framework
+
+![RL Framework](marketing/images/rl_framework.png)
 
 ### 17 RL-Tunable Parameters
 
@@ -234,6 +254,8 @@ Reward = {
 
 ## Risk Management Layers
 
+![Risk Management](marketing/images/risk_management.png)
+
 ### Layer 1: Statistical Gate
 - Minimum 30 trades to prove edge
 - Win rate must exceed 52% + friction
@@ -261,6 +283,8 @@ HALTED → (60min cooldown) → RETRAINING → (meet criteria) → PENDING → (
 ---
 
 ## HUD Dashboard
+
+![HUD Dashboard](marketing/images/dashboard_hud.png)
 
 6-tab performance dashboard (navigate with keys 1-6 or Tab):
 
@@ -372,6 +396,10 @@ Proprietary - All rights reserved
 
 For issues and feature requests, please open an issue in the repository.
 
+For detailed presentations and marketing materials, visit the [marketing folder](marketing/).
+
 ---
+
+![The Future](marketing/images/final_future.png)
 
 *VelocityTrader v7.1 - The Future of Algorithmic Trading*
