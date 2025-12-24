@@ -1204,9 +1204,10 @@ void OnDeinit(const int reason)
    SaveState();
    CleanupHUD();
    EventKillTimer();
-   
+
    // Release L2 subscriptions
-   for(int i = 0; i < g_symbolCount; i++)
+   int symLimit = MathMin(g_symbolCount, MAX_SYMBOLS);
+   for(int i = 0; i < symLimit; i++)
    {
       if(g_symbols[i].initialized)
       {
@@ -1215,7 +1216,7 @@ void OnDeinit(const int reason)
             IndicatorRelease(g_symbols[i].atrHandle);
       }
    }
-   
+
    Print("VelocityTrader v7.1 deinitialized. Reason: ", reason);
 }
 
@@ -1302,7 +1303,8 @@ void OnTimer()
    if(timerTicks % 240 == 0)
    {
       // Update low-priority symbols that weren't updated via OnTick
-      for(int i = 0; i < g_symbolCount; i++)
+      int symLimit = MathMin(g_symbolCount, MAX_SYMBOLS);
+      for(int i = 0; i < symLimit; i++)
       {
          if(g_perfManager.symbolData[i].priority == PRIORITY_IDLE)
          {
@@ -1465,9 +1467,10 @@ void OnTick()
       // Build lists of symbols with positions and top-ranked
       int posSymbols[MAX_POSITIONS];
       int posCount = 0;
-      for(int i = 0; i < g_posCount && i < MAX_POSITIONS; i++)
+      int posLimit = MathMin(g_posCount, MAX_POSITIONS);
+      for(int i = 0; i < posLimit; i++)
       {
-         if(g_positions[i].active)
+         if(g_positions[i].active && posCount < MAX_POSITIONS)
          {
             int symIdx = FindSymbolIndex(g_positions[i].symbol);
             if(symIdx >= 0)
@@ -1476,9 +1479,12 @@ void OnTick()
       }
 
       int topSymbols[10];
-      int topCount = MathMin(10, g_rankCount);
+      int topCount = MathMin(MathMin(10, g_rankCount), MAX_SYMBOLS);
       for(int i = 0; i < topCount; i++)
-         topSymbols[i] = g_ranking[i].symbolIdx;
+      {
+         if(IsValidIndex(i, MAX_SYMBOLS))
+            topSymbols[i] = g_ranking[i].symbolIdx;
+      }
 
       g_perfManager.UpdatePriorities(posSymbols, posCount, topSymbols, topCount, currentIdx);
    }
@@ -2427,20 +2433,20 @@ void UpdateCapitalAllocation()
 {
    double sniperPF = g_sniper.real.GetPF();
    double berserkerPF = g_berserker.real.GetPF();
-   
+
    if(sniperPF < 0.1) sniperPF = 0.1;
    if(berserkerPF < 0.1) berserkerPF = 0.1;
-   
+
    double total = sniperPF + berserkerPF;
-   double sniperAlloc = sniperPF / total;
-   
+   double sniperAlloc = SafeDivide(sniperPF, total, 0.5);
+
    // Apply limits
    sniperAlloc = MathMax(InpMinAllocation, MathMin(InpMaxAllocation, sniperAlloc));
-   
+
    g_sniper.capitalAlloc = sniperAlloc;
    g_berserker.capitalAlloc = 1.0 - sniperAlloc;
-   
-   Print("Capital Allocation Updated - SNIPER: ", 
+
+   Print("Capital Allocation Updated - SNIPER: ",
          DoubleToString(sniperAlloc * 100, 1), "% | BERSERKER: ",
          DoubleToString((1.0 - sniperAlloc) * 100, 1), "%");
 }
@@ -2451,12 +2457,12 @@ void UpdateCapitalAllocation()
 void UpdateEdgeStatus()
 {
    // Sniper
-   double sniperAvgWin = (g_sniper.shadow.totalWins > 0) ?
-                         (g_sniper.shadow.totalUpside / g_sniper.shadow.totalWins) : 10;
-   double sniperAvgLoss = (g_sniper.shadow.totalTrades - g_sniper.shadow.totalWins > 0) ?
-                          (g_sniper.shadow.totalDownside / 
-                           (g_sniper.shadow.totalTrades - g_sniper.shadow.totalWins)) : 8;
-   
+   double sniperAvgWin = SafeDivide(g_sniper.shadow.totalUpside,
+                                    (double)g_sniper.shadow.totalWins, 10.0);
+   int sniperLosses = g_sniper.shadow.totalTrades - g_sniper.shadow.totalWins;
+   double sniperAvgLoss = SafeDivide(g_sniper.shadow.totalDownside,
+                                     (double)sniperLosses, 8.0);
+
    g_sniper.hasEdge = g_statGate.HasEdge(
       g_sniper.shadow.totalWins,
       g_sniper.shadow.totalTrades,
@@ -2465,14 +2471,14 @@ void UpdateEdgeStatus()
    g_sniper.pValue = g_statGate.CalculatePValue(
       g_sniper.shadow.totalWins, g_sniper.shadow.totalTrades
    );
-   
+
    // Berserker
-   double berserkerAvgWin = (g_berserker.shadow.totalWins > 0) ?
-                            (g_berserker.shadow.totalUpside / g_berserker.shadow.totalWins) : 10;
-   double berserkerAvgLoss = (g_berserker.shadow.totalTrades - g_berserker.shadow.totalWins > 0) ?
-                             (g_berserker.shadow.totalDownside / 
-                              (g_berserker.shadow.totalTrades - g_berserker.shadow.totalWins)) : 8;
-   
+   double berserkerAvgWin = SafeDivide(g_berserker.shadow.totalUpside,
+                                       (double)g_berserker.shadow.totalWins, 10.0);
+   int berserkerLosses = g_berserker.shadow.totalTrades - g_berserker.shadow.totalWins;
+   double berserkerAvgLoss = SafeDivide(g_berserker.shadow.totalDownside,
+                                        (double)berserkerLosses, 8.0);
+
    g_berserker.hasEdge = g_statGate.HasEdge(
       g_berserker.shadow.totalWins,
       g_berserker.shadow.totalTrades,
