@@ -838,6 +838,16 @@ class FinancialCodeAuditor:
                                     elif re.search(rf'&&\s*{index_var}\s*<\s*\d+', context_str):
                                         found_bounds_check = True
 
+                                # Pattern 8b: Index from validated function - if(idx >= 0 && array[idx].something)
+                                # This pattern is used when idx comes from FindXxxIndex() which returns -1 on failure
+                                if not found_bounds_check:
+                                    # Look for if(index_var >= 0 && ...) in recent context
+                                    if re.search(rf'if\s*\(\s*{index_var}\s*>=\s*0\s*&&', context_str):
+                                        found_bounds_check = True
+                                    # Also: if(idx >= 0) { ... access idx ... }
+                                    elif re.search(rf'if\s*\(\s*{index_var}\s*>=\s*0\s*\)', context_str):
+                                        found_bounds_check = True
+
                                 # Pattern 9: Offset guard - if(base + max_offset < size) { arr[base + 0..max_offset] }
                                 # e.g., if(startIdx + 8 < size) { features[startIdx + 0] = ...; }
                                 if not found_bounds_check:
