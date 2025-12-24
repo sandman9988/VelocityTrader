@@ -706,6 +706,17 @@ class FinancialCodeAuditor:
                                         # Check if the index uses that variable minus 1
                                         if '-' in index_expr and '1' in index_expr:
                                             found_bounds_check = True
+
+                                # Pattern 3b: More flexible early return patterns
+                                if not found_bounds_check:
+                                    # Look for early return on out of bounds in function context (100 lines)
+                                    func_context = '\n'.join(lines[max(0, i-100):i])
+                                    # Pattern: if(idx < 0 || idx > N) return; where N is a constant
+                                    if re.search(rf'if\s*\(\s*{index_var}\s*<\s*0\s*\|\|\s*{index_var}\s*>\s*\d+\s*\)', func_context):
+                                        found_bounds_check = True
+                                    # Pattern: if(idx < 0 || idx >= N) return;
+                                    elif re.search(rf'if\s*\(\s*{index_var}\s*<\s*0\s*\|\|\s*{index_var}\s*>=\s*\d+\s*\)', func_context):
+                                        found_bounds_check = True
                                 
                                 # Pattern 4: Check for index_var with modulo (wraps around)
                                 if not found_bounds_check and '%' in index_expr:
