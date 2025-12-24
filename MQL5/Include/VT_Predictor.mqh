@@ -100,7 +100,7 @@ struct ProbabilityPredictor
    {
       // If Omega below baseline, reduce size
       if(omega < InpOmegaBaseline)
-         return MathMax(0.3, omega / InpOmegaBaseline);
+         return MathMax(0.3, SafeDivide(omega, InpOmegaBaseline, 0.3));
 
       // Scale up based on Omega excess, capped at max
       // Formula: 1.0 + (omega - baseline) * scaling_factor
@@ -146,11 +146,12 @@ struct StatisticalGate
       if(total < 10) return 1.0;
 
       double p = 0.5;
-      double observed = (double)wins / total;
-      double stdErr = MathSqrt(p * (1.0 - p) / total);
+      double observed = SafeDivide((double)wins, (double)total, 0.5);
+      double variance = SafeDivide(p * (1.0 - p), (double)total, 0.0001);
+      double stdErr = MathSqrt(variance);
       if(stdErr < 0.0001) return 1.0;
 
-      double zScore = (observed - p) / stdErr;
+      double zScore = SafeDivide(observed - p, stdErr, 0.0);
 
       return 1.0 - NormalCDF(zScore);
    }
@@ -160,9 +161,9 @@ struct StatisticalGate
       if(total < InpMinTradesForEdge) return false;
 
       // Win rate must beat friction-adjusted coin flip
-      double frictionHurdle = (avgWin > 0.01) ? (avgFriction / avgWin) : 0;
+      double frictionHurdle = SafeDivide(avgFriction, avgWin, 0.0);
       double minWR = InpMinWinRate + frictionHurdle;
-      double actualWR = (double)wins / total;
+      double actualWR = SafeDivide((double)wins, (double)total, 0.0);
 
       if(actualWR < minWR) return false;
 

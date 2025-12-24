@@ -66,6 +66,49 @@ enum ENUM_ASSET_TYPE
 };
 
 //+------------------------------------------------------------------+
+//| SAFETY HELPERS - Defensive Programming                            |
+//+------------------------------------------------------------------+
+
+// Safe division - prevents divide by zero
+double SafeDivide(double numerator, double denominator, double defaultValue = 0.0)
+{
+   if(denominator == 0.0 || !MathIsValidNumber(denominator))
+      return defaultValue;
+   double result = numerator / denominator;
+   if(!MathIsValidNumber(result))
+      return defaultValue;
+   return result;
+}
+
+// Safe array index validation
+bool IsValidIndex(int index, int arraySize)
+{
+   return (index >= 0 && index < arraySize);
+}
+
+// Safe number validation (not NaN or Infinity)
+bool IsValidNumber(double value)
+{
+   return MathIsValidNumber(value) && value != EMPTY_VALUE;
+}
+
+// Normalize lot size to broker specifications
+double NormalizeLots(double lots, double volumeMin, double volumeMax, double volumeStep)
+{
+   if(volumeStep <= 0) volumeStep = 0.01;
+   lots = MathFloor(lots / volumeStep) * volumeStep;
+   lots = MathMax(lots, volumeMin);
+   lots = MathMin(lots, volumeMax);
+   return NormalizeDouble(lots, 2);
+}
+
+// Clamp value to range
+double ClampValue(double value, double minVal, double maxVal)
+{
+   return MathMax(minVal, MathMin(maxVal, value));
+}
+
+//+------------------------------------------------------------------+
 //| COLORS                                                            |
 //+------------------------------------------------------------------+
 #define CLR_HEADER       C'0,255,255'
