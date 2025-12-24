@@ -1,5 +1,11 @@
 # VelocityTrader v7.1: Duel Architecture
 
+> **WARNING: NOT PRODUCTION READY**
+>
+> This system has **309 CRITICAL safety violations** and contains **stub implementations** of core physics components. See `PROJECT_AUDIT.md` for details.
+>
+> **Production Readiness: 28%** | Do not deploy to live trading without completing remediation.
+
 A sophisticated MetaTrader 5 Expert Advisor implementing a 2-Agent / 3-Regime Evolutionary Reinforcement Learning Trading System with physics-based kinematic market analysis.
 
 ---
