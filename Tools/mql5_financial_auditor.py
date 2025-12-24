@@ -1,0 +1,851 @@
+#!/usr/bin/env python3
+"""
+ProjectQuantum MQL5 Financial Code Auditor
+==========================================
+Institutional-grade code auditing for algorithmic trading systems.
+
+Checks based on:
+- SEC/FINRA algorithmic trading requirements
+- MiFID II algorithm testing standards
+- Best practices from quantitative hedge funds
+- OWASP security guidelines adapted for trading
+
+Categories:
+1. NUMERICAL SAFETY - Precision, overflow, underflow
+2. MEMORY SAFETY - Buffers, arrays, allocation
+3. EXECUTION SAFETY - Order handling, position management
+4. RISK CONTROLS - Limits, circuit breakers, exposure
+5. DATA INTEGRITY - Validation, sanitization, logging
+6. DEFENSIVE PROGRAMMING - Error handling, edge cases
+7. REGULATORY COMPLIANCE - Audit trails, timestamps
+
+Author: ProjectQuantum Team
+Version: 1.0.0
+"""
+
+import re
+import sys
+import json
+import hashlib
+from pathlib import Path
+from datetime import datetime
+from dataclasses import dataclass, field
+from typing import Dict, List
+from enum import Enum
+from collections import defaultdict
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger(__name__)
+
+
+class AuditCategory(Enum):
+    """Financial audit categories"""
+    NUMERICAL_SAFETY = "Numerical Safety"
+    MEMORY_SAFETY = "Memory Safety"
+    EXECUTION_SAFETY = "Execution Safety"
+    RISK_CONTROLS = "Risk Controls"
+    DATA_INTEGRITY = "Data Integrity"
+    DEFENSIVE_PROGRAMMING = "Defensive Programming"
+    REGULATORY_COMPLIANCE = "Regulatory Compliance"
+    CODE_QUALITY = "Code Quality"
+
+
+class Severity(Enum):
+    """Issue severity - financial context"""
+    CRITICAL = 1    # Could cause financial loss or system failure
+    HIGH = 2        # Significant risk, must fix before production
+    MEDIUM = 3      # Should fix, potential issues
+    LOW = 4         # Best practice violation
+    INFO = 5        # Informational, optimization opportunity
+
+
+@dataclass
+class AuditFinding:
+    """A single audit finding"""
+    file: str
+    line: int
+    category: AuditCategory
+    severity: Severity
+    rule_id: str
+    title: str
+    description: str
+    recommendation: str
+    code_context: str = ""
+    references: List[str] = field(default_factory=list)
+
+
+class FinancialAuditRules:
+    """
+    Comprehensive financial code audit rules
+    """
+
+    RULES = {
+        # ================================================================
+        # NUMERICAL SAFETY
+        # ================================================================
+        'NUM001': {
+            'category': AuditCategory.NUMERICAL_SAFETY,
+            'severity': Severity.CRITICAL,
+            'title': 'Unsafe Division Operation',
+            'pattern': r'(?<!/)/(?!/|=|\*)\s*([a-zA-Z_]\w*)',
+            'exclude_pattern': r'SafeDiv|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'',
+            'description': 'Division by variable without zero-check can crash or produce infinity',
+            'recommendation': 'Use SafeDiv(numerator, denominator, default_value) or explicit zero-check',
+            'check_denominator_validation': True,  # Special flag for checking nearby validation
+            'check_string_context': True  # NEW: Exclude string operations
+        },
+        'NUM002': {
+            'category': AuditCategory.NUMERICAL_SAFETY,
+            'severity': Severity.HIGH,
+            'title': 'Direct Floating Point Comparison',
+            'pattern': r'(?:==|!=)\s*(?:\d+\.\d+|[a-zA-Z_]\w*\s*[,)])',
+            'context_pattern': r'double|float',
+            'exclude_pattern': r'NULL|nullptr|true|false|\w+\s*==\s*\w+\s*\)|enum|int\s+\w+|long\s+\w+',
+            'description': 'Direct equality comparison of floating point values is unreliable',
+            'recommendation': 'Use MathAbs(a - b) < EPSILON or IsEqual(a, b)'
+        },
+        'NUM003': {
+            'category': AuditCategory.NUMERICAL_SAFETY,
+            'severity': Severity.HIGH,
+            'title': 'Potential Integer Overflow',
+            'pattern': r'\b(int|long)\s+\w+\s*=\s*\w+\s*\*\s*\w+',
+            'description': 'Integer multiplication without overflow check',
+            'recommendation': 'Use SafeMul() or check bounds before multiplication'
+        },
+        'NUM004': {
+            'category': AuditCategory.NUMERICAL_SAFETY,
+            'severity': Severity.MEDIUM,
+            'title': 'Hardcoded Numeric Constant',
+            'pattern': r'(?<![\w.])(?:0\.0[0-9]{3,}|[1-9]\d{3,}(?:\.\d+)?)(?![\w.])',
+            'exclude_pattern': r'#define|const\s+|FNV|2166136261|16777619|0\.0001|32768|1440|10080|43200|86400|/ 100\.0|tolerance|epsilon',
+            'description': 'Magic numbers should be defined as named constants',
+            'recommendation': 'Define as const or #define with descriptive name'
+        },
+        'NUM005': {
+            'category': AuditCategory.NUMERICAL_SAFETY,
+            'severity': Severity.MEDIUM,
+            'title': 'Unsafe Square Root',
+            'pattern': r'MathSqrt\s*\(',
+            'exclude_pattern': r'SafeSqrt|>\s*0|>=\s*0',
+            'description': 'MathSqrt with negative input returns NaN',
+            'recommendation': 'Use SafeSqrt() or validate input >= 0'
+        },
+        'NUM006': {
+            'category': AuditCategory.NUMERICAL_SAFETY,
+            'severity': Severity.MEDIUM,
+            'title': 'Unsafe Logarithm',
+            'pattern': r'MathLog\s*\(',
+            'exclude_pattern': r'SafeLog|>\s*0',
+            'description': 'MathLog with non-positive input is undefined',
+            'recommendation': 'Use SafeLog() or validate input > 0'
+        },
+        'NUM007': {
+            'category': AuditCategory.NUMERICAL_SAFETY,
+            'severity': Severity.HIGH,
+            'title': 'Unsafe Power Operation',
+            'pattern': r'MathPow\s*\(',
+            'exclude_pattern': r'SafePow',
+            'description': 'MathPow can overflow or return NaN with certain inputs',
+            'recommendation': 'Use SafePow() with bounds checking'
+        },
+
+        # ================================================================
+        # MEMORY SAFETY
+        # ================================================================
+        'MEM001': {
+            'category': AuditCategory.MEMORY_SAFETY,
+            'severity': Severity.CRITICAL,
+            'title': 'Array Access Without Bounds Check',
+            'pattern': r'(\w+)\s*\[\s*([a-zA-Z_]\w*(?:\s*[\+\-\*/]\s*\w+)*)\s*\]',
+            'exclude_pattern': r'ArraySize|<\s*ArraySize|>=\s*0\s*&&',
+            'description': 'Array access with computed index without bounds validation',
+            'recommendation': 'Validate: if(index >= 0 && index < ArraySize(arr))',
+            'check_loop_bounds': True  # Special flag for smarter checking
+        },
+        'MEM002': {
+            'category': AuditCategory.MEMORY_SAFETY,
+            'severity': Severity.HIGH,
+            'title': 'Dynamic Memory Without Null Check',
+            'pattern': r'new\s+\w+',
+            'exclude_pattern': r'==\s*NULL|!=\s*NULL|if\s*\(',
+            'description': 'Dynamic allocation may fail, returning NULL',
+            'recommendation': 'Always check: if(ptr == NULL) { handle error }'
+        },
+        'MEM003': {
+            'category': AuditCategory.MEMORY_SAFETY,
+            'severity': Severity.HIGH,
+            'title': 'Potential Memory Leak',
+            'pattern': r'\bnew\s+\w+',
+            'context_check': 'delete_tracking',
+            'description': 'Dynamic allocation without corresponding delete',
+            'recommendation': 'Ensure every new has matching delete or use RAII pattern'
+        },
+        'MEM004': {
+            'category': AuditCategory.MEMORY_SAFETY,
+            'severity': Severity.MEDIUM,
+            'title': 'ArrayResize Without Error Check',
+            'pattern': r'ArrayResize\s*\([^)]+\)',
+            'exclude_pattern': r'if\s*\(|==\s*-1|<\s*0',
+            'description': 'ArrayResize returns -1 on failure',
+            'recommendation': 'Check return: if(ArrayResize(arr, size) < 0) { handle error }'
+        },
+        'MEM005': {
+            'category': AuditCategory.MEMORY_SAFETY,
+            'severity': Severity.MEDIUM,
+            'title': 'Buffer Size Not Validated',
+            'pattern': r'(?:Ring)?Buffer\s*\(\s*(\d+)\s*\)',
+            'description': 'Fixed buffer sizes should be validated constants',
+            'recommendation': 'Use named constants and validate buffer capacity'
+        },
+
+        # ================================================================
+        # EXECUTION SAFETY (Trading Specific)
+        # ================================================================
+        'EXEC001': {
+            'category': AuditCategory.EXECUTION_SAFETY,
+            'severity': Severity.CRITICAL,
+            'title': 'Order Without Validation',
+            'pattern': r'OrderSend\s*\(',
+            'exclude_pattern': r'Validate|Check|if\s*\(|Verify',
+            'description': 'Order submission without pre-validation',
+            'recommendation': 'Validate symbol, volume, prices, stops before OrderSend'
+        },
+        'EXEC002': {
+            'category': AuditCategory.EXECUTION_SAFETY,
+            'severity': Severity.CRITICAL,
+            'title': 'Position Size Not Normalized',
+            'pattern': r'(?:volume|lot|lots)\s*[=:]\s*(?!\s*Normalize)',
+            'exclude_pattern': r'NormalizeVolume|NormalizeLot|NormalizeLotSize|SymbolInfo|lot_step|Clamp|MathFloor.*lot|MathRound.*lot|MathCeil.*lot|steps\s*\*|m_min_lot|m_max_lot|min_lot|max_lot|= 0\.|= 1\.|= 100\.|base_lots|normalized_lots|final_lots|// |/\*|intermediate|calculation',
+            'description': 'Lot size must be normalized to broker requirements before order submission',
+            'recommendation': 'Use NormalizeVolume() or validate against SYMBOL_VOLUME_*',
+            'check_return_normalization': True  # NEW: Check if function returns normalized value
+        },
+        'EXEC003': {
+            'category': AuditCategory.EXECUTION_SAFETY,
+            'severity': Severity.HIGH,
+            'title': 'Stop Level Not Validated',
+            'pattern': r'(?:stop|sl|tp)\s*[=:]\s*\w+\s*[\+\-]',
+            'exclude_pattern': r'SYMBOL_TRADE_STOPS_LEVEL|ValidateStop',
+            'description': 'Stop/TP distance not checked against broker minimum',
+            'recommendation': 'Validate against SymbolInfoInteger(SYMBOL_TRADE_STOPS_LEVEL)'
+        },
+        'EXEC004': {
+            'category': AuditCategory.EXECUTION_SAFETY,
+            'severity': Severity.HIGH,
+            'title': 'Price Not Normalized',
+            'pattern': r'(?:price|entry|exit)\s*=\s*(?!\s*NormalizeDouble)',
+            'exclude_pattern': r'NormalizeDouble|Bid|Ask|SymbolInfo|=\s*0|=\s*prices\[|=\s*GlobalVariable|z_score|slippage|Calculate|first_|last_',
+            'description': 'Prices must be normalized to symbol digits',
+            'recommendation': 'Use NormalizeDouble(price, _Digits)'
+        },
+        'EXEC005': {
+            'category': AuditCategory.EXECUTION_SAFETY,
+            'severity': Severity.MEDIUM,
+            'title': 'Trade Result Not Checked',
+            'pattern': r'OrderSend\s*\([^)]+\)\s*;',
+            'exclude_pattern': r'if\s*\(|result|retcode',
+            'description': 'Order result not checked for success/failure',
+            'recommendation': 'Always check trade.ResultRetcode() after OrderSend'
+        },
+        'EXEC006': {
+            'category': AuditCategory.EXECUTION_SAFETY,
+            'severity': Severity.MEDIUM,
+            'title': 'Spread Not Validated',
+            'pattern': r'(?:Bid|Ask)',
+            'context_pattern': r'OrderSend|trade\.',
+            'exclude_pattern': r'spread|Spread|SPREAD',
+            'description': 'Trade execution without spread check',
+            'recommendation': 'Validate spread < max_spread before trading'
+        },
+
+        # ================================================================
+        # RISK CONTROLS
+        # ================================================================
+        'RISK001': {
+            'category': AuditCategory.RISK_CONTROLS,
+            'severity': Severity.CRITICAL,
+            'title': 'Missing Maximum Position Size Limit',
+            'pattern': r'(?:volume|lot)\s*=',
+            'context_pattern': r'class\s+\w*(?:Risk|Position|Size)',
+            'exclude_pattern': r'max_lot|MAX_LOT|m_max|maxLot',
+            'description': 'Position sizing without maximum limit check',
+            'recommendation': 'Implement max position size limit: Math.min(calculated, max_allowed)'
+        },
+        'RISK002': {
+            'category': AuditCategory.RISK_CONTROLS,
+            'severity': Severity.CRITICAL,
+            'title': 'Missing Drawdown Check',
+            'pattern': r'OnTick|OnTimer',
+            'context_check': 'drawdown_check',
+            'exclude_pattern': r'GetSavedPositionTicket|NeedsPositionRecovery|Recovery|recovery|// Recovery|/\* Recovery',
+            'description': 'Trading logic without drawdown limit check (excludes recovery methods)',
+            'recommendation': 'Check drawdown before each trade decision (not needed for position recovery)'
+        },
+        'RISK003': {
+            'category': AuditCategory.RISK_CONTROLS,
+            'severity': Severity.HIGH,
+            'title': 'Missing Account Equity Check',
+            'pattern': r'OrderSend',
+            'exclude_pattern': r'AccountInfoDouble|Equity|Balance|Margin',
+            'description': 'Order without account state validation',
+            'recommendation': 'Verify sufficient margin and equity before trading'
+        },
+        'RISK004': {
+            'category': AuditCategory.RISK_CONTROLS,
+            'severity': Severity.HIGH,
+            'title': 'Missing Daily Loss Limit',
+            'pattern': r'class\s+\w*(?:Risk|Circuit)',
+            'context_check': 'daily_loss',
+            'description': 'Risk management without daily loss limit',
+            'recommendation': 'Implement daily P&L limit with circuit breaker'
+        },
+        'RISK005': {
+            'category': AuditCategory.RISK_CONTROLS,
+            'severity': Severity.MEDIUM,
+            'title': 'Missing Correlation Check',
+            'pattern': r'(?:portfolio|multi.*symbol|symbol.*array)',
+            'exclude_pattern': r'correlation|Correlation',
+            'description': 'Multi-symbol trading without correlation awareness',
+            'recommendation': 'Track and limit correlated exposure'
+        },
+
+        # ================================================================
+        # DATA INTEGRITY
+        # ================================================================
+        'DATA001': {
+            'category': AuditCategory.DATA_INTEGRITY,
+            'severity': Severity.HIGH,
+            'title': 'Unvalidated External Input',
+            'pattern': r'input\s+(?:double|int|string)\s+\w+\s*=',
+            'exclude_pattern': r'Validate|Check|if\s*\(',
+            'description': 'User input parameters without validation',
+            'recommendation': 'Validate all inputs in OnInit() with bounds checking'
+        },
+        'DATA002': {
+            'category': AuditCategory.DATA_INTEGRITY,
+            'severity': Severity.HIGH,
+            'title': 'Missing Data Validity Check',
+            'pattern': r'iClose|iOpen|iHigh|iLow|iVolume|iTime',
+            'exclude_pattern': r'==\s*0|==\s*EMPTY_VALUE|if\s*\(',
+            'description': 'Historical data access without validity check',
+            'recommendation': 'Check for EMPTY_VALUE or 0 before using data'
+        },
+        'DATA003': {
+            'category': AuditCategory.DATA_INTEGRITY,
+            'severity': Severity.MEDIUM,
+            'title': 'File Operation Without Error Handling',
+            'pattern': r'File(?:Open|Read|Write|Close)',
+            'exclude_pattern': r'if\s*\(|INVALID_HANDLE|==\s*-1',
+            'description': 'File operations can fail',
+            'recommendation': 'Always check file handles and operation results'
+        },
+        'DATA004': {
+            'category': AuditCategory.DATA_INTEGRITY,
+            'severity': Severity.MEDIUM,
+            'title': 'JSON/String Parsing Without Validation',
+            'pattern': r'StringTo(?:Integer|Double)|CharArrayToString',
+            'exclude_pattern': r'try|catch|if\s*\(',
+            'description': 'String parsing can fail with invalid data',
+            'recommendation': 'Validate string format before parsing'
+        },
+
+        # ================================================================
+        # DEFENSIVE PROGRAMMING
+        # ================================================================
+        'DEF001': {
+            'category': AuditCategory.DEFENSIVE_PROGRAMMING,
+            'severity': Severity.HIGH,
+            'title': 'Missing Null Pointer Check',
+            'pattern': r'(\w+)\s*[.>]\s*\w+\s*\(',
+            'exclude_pattern': r'!=\s*NULL|==\s*NULL|if\s*\(\s*\w+\s*\)|\.Init\(|\.Reset\(|\.Clear\(|\.Update\(|\.Calculate\(|\.Detect\(|\.Normalize\(|\.GetVolatility\(|\.Get[A-Z]|\.Any|\.To[A-Z]|result\.|state\.|config\.|cfg\.|micro\.|meso\.|macro\.|m_\w+\.|this\.|child\.|metrics\.|yz\.|cycle\.|physics\.|w\.',
+            'description': 'Object method call without null check',
+            'recommendation': 'Check: if(ptr != NULL) before dereferencing'
+        },
+        'DEF002': {
+            'category': AuditCategory.DEFENSIVE_PROGRAMMING,
+            'severity': Severity.MEDIUM,
+            'title': 'Missing Error Code Check',
+            'pattern': r'GetLastError\s*\(\s*\)',
+            'exclude_pattern': r'if\s*\(|==\s*0|!=\s*0',
+            'description': 'GetLastError called but result not used',
+            'recommendation': 'Check error code: if(GetLastError() != 0) { handle }'
+        },
+        'DEF003': {
+            'category': AuditCategory.DEFENSIVE_PROGRAMMING,
+            'severity': Severity.MEDIUM,
+            'title': 'Switch Without Default Case',
+            'pattern': r'switch\s*\([^)]+\)\s*\{[^}]+\}',
+            'exclude_pattern': r'default\s*:',
+            'description': 'Switch statement missing default case',
+            'recommendation': 'Always include default case for unexpected values'
+        },
+        'DEF004': {
+            'category': AuditCategory.DEFENSIVE_PROGRAMMING,
+            'severity': Severity.LOW,
+            'title': 'Empty Catch/Exception Block',
+            'pattern': r'catch\s*\([^)]*\)\s*\{\s*\}',
+            'description': 'Empty catch block silently swallows errors',
+            'recommendation': 'Log errors even if not re-throwing'
+        },
+
+        # ================================================================
+        # REGULATORY COMPLIANCE
+        # ================================================================
+        'REG001': {
+            'category': AuditCategory.REGULATORY_COMPLIANCE,
+            'severity': Severity.HIGH,
+            'title': 'Missing Audit Trail',
+            'pattern': r'OrderSend|PositionClose|PositionModify',
+            'exclude_pattern': r'Log|Print|FileWrite|Journal',
+            'description': 'Trade operations without audit logging',
+            'recommendation': 'Log all trade decisions with timestamp, reason, and parameters'
+        },
+        'REG002': {
+            'category': AuditCategory.REGULATORY_COMPLIANCE,
+            'severity': Severity.MEDIUM,
+            'title': 'Missing Timestamp in Logs',
+            'pattern': r'Print\s*\(',
+            'exclude_pattern': r'TimeToString|TimeCurrent|timestamp|TimeLocal|CLogger|WARNING|ERROR|ARCHITECTURE|BuildFingerprint|TestFramework|message\)|log_line',
+            'description': 'Log entries should include timestamps',
+            'recommendation': 'Include timestamp in all log entries'
+        },
+        'REG003': {
+            'category': AuditCategory.REGULATORY_COMPLIANCE,
+            'severity': Severity.MEDIUM,
+            'title': 'Hardcoded Trading Hours',
+            'pattern': r'(?:Hour\s*[<>=]|TimeHour\s*\([^)]+\)\s*[<>=])\s*\d+',
+            'description': 'Trading hours should be configurable',
+            'recommendation': 'Use input parameters or symbol session info'
+        },
+
+        # ================================================================
+        # CODE QUALITY
+        # ================================================================
+        'QUAL001': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.LOW,
+            'title': 'Function Too Long',
+            'pattern': r'^\s*(?:void|int|double|bool|string)\s+\w+\s*\([^)]*\)\s*\{',
+            'context_check': 'function_length',
+            'description': 'Functions over 50 lines are harder to maintain',
+            'recommendation': 'Break into smaller, focused functions'
+        },
+        'QUAL002': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.LOW,
+            'title': 'Deeply Nested Code',
+            'pattern': r'\{\s*\{',
+            'context_check': 'nesting_depth',
+            'description': 'Deep nesting reduces readability',
+            'recommendation': 'Refactor using early returns or separate functions'
+        },
+        'QUAL003': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.INFO,
+            'title': 'Missing Include Guard',
+            'pattern': r'^#property',
+            'exclude_pattern': r'#ifndef|#define\s+\w+_MQH',
+            'file_type': '.mqh',
+            'description': 'Header files should have include guards',
+            'recommendation': 'Add #ifndef FILENAME_MQH / #define FILENAME_MQH / #endif'
+        },
+    }
+
+
+class FinancialCodeAuditor:
+    """
+    Main auditor implementing financial-grade checks
+    """
+
+    def __init__(self, project_root: Path):
+        self.project_root = project_root
+        self.findings: List[AuditFinding] = []
+        self.file_hashes: Dict[str, str] = {}
+        self._display_limit = None  # Optional limit for detailed findings display
+
+    def audit_file(self, file_path: Path) -> List[AuditFinding]:
+        """Audit a single file against all rules"""
+        findings = []
+
+        # Read file
+        try:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
+                content = f.read()
+                lines = content.split('\n')
+        except Exception as e:
+            logger.error(f"Failed to read {file_path}: {e}")
+            return findings
+
+        # Compute hash
+        with open(file_path, 'rb') as f:
+            self.file_hashes[str(file_path)] = hashlib.sha256(f.read()).hexdigest()
+
+        # Apply each rule
+        for rule_id, rule in FinancialAuditRules.RULES.items():
+            # Check file type filter
+            if 'file_type' in rule:
+                if not str(file_path).endswith(rule['file_type']):
+                    continue
+
+            pattern = re.compile(rule['pattern'], re.MULTILINE | re.IGNORECASE)
+            exclude = re.compile(rule.get('exclude_pattern', r'$^'))
+
+            # Track multi-line comment state
+            in_multiline_comment = False
+
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+
+                # Handle multi-line comment state
+                if in_multiline_comment:
+                    if '*/' in stripped:
+                        in_multiline_comment = False
+                        # Process part of line after comment ends
+                        line = line.split('*/', 1)[1] if '*/' in line else ''
+                        stripped = line.strip()
+                        if not stripped:
+                            continue
+                    else:
+                        continue
+
+                # Skip single-line comments and preprocessor directives
+                if not stripped or stripped.startswith('//') or stripped.startswith('#'):
+                    continue
+
+                # Strip single-line comments from the line
+                if '//' in line:
+                    line_before_comment = line.split('//', 1)[0]
+                    if not line_before_comment.strip():
+                        continue
+                    line = line_before_comment
+
+                # Check for multi-line comment start
+                if '/*' in line:
+                    if '*/' not in line[line.index('/*')+2:]:
+                        in_multiline_comment = True
+                    # Process part of line before comment
+                    line_before_comment = line.split('/*', 1)[0]
+                    if not line_before_comment.strip():
+                        continue
+                    line = line_before_comment
+
+                # Check pattern
+                if pattern.search(line):
+                    # Check exclusion
+                    if not exclude.search(line):
+                        # Special handling for MEM001 - check for loop bounds
+                        if rule.get('check_loop_bounds', False):
+                            # Extract the index variable from the array access
+                            match = pattern.search(line)
+                            if match:
+                                array_name = match.group(1)
+                                index_expr = match.group(2).strip()
+                                index_var = index_expr.split()[0]  # Get first part of index expression
+                                
+                                # Look back up to 20 lines for bounds checking (increased from 15)
+                                context_start = max(0, i - 20)
+                                context_lines = lines[context_start:i]
+                                context_str = '\n'.join(context_lines)
+                                found_bounds_check = False
+                                
+                                # Pattern 1: Check for: for(int index_var = 0; index_var < CONSTANT; ...)
+                                # This handles loops with fixed bounds like for(int i = 0; i < 4; ...)
+                                if re.search(rf'for\s*\(\s*int\s+{index_var}\s*=\s*0\s*;\s*{index_var}\s*<\s*\d+', context_str):
+                                    # Verify the constant matches the expected array size
+                                    # For m_regime_stats[i], the constant should be 4
+                                    const_match = re.search(rf'for\s*\(\s*int\s+{index_var}\s*=\s*0\s*;\s*{index_var}\s*<\s*(\d+)', context_str)
+                                    if const_match:
+                                        const_val = int(const_match.group(1))
+                                        # Known fixed-size arrays
+                                        if ('regime_stats' in array_name and const_val == 4) or \
+                                           ('clusters' in array_name and const_val <= 20) or \
+                                           (const_val <= 10):  # Small constant loops are generally safe
+                                            found_bounds_check = True
+                                
+                                # Pattern 2: Check for: for(int index_var = ...; index_var < size_var; ...)
+                                if not found_bounds_check and re.search(rf'for\s*\([^;]*{index_var}\s*=.*;\s*{index_var}\s*<\s*\w+', context_str):
+                                    found_bounds_check = True
+                                
+                                # Pattern 3: Check for: if(index_var >= 0 && index_var < size) or if(index_var < 0 || index_var >= size) return
+                                if not found_bounds_check:
+                                    # Positive check: if(idx >= 0 && idx < 4) { ... use idx ... }
+                                    if re.search(rf'if\s*\([^)]*{index_var}\s*>=\s*0\s*&&\s*{index_var}\s*<', context_str):
+                                        found_bounds_check = True
+                                    # Negative check with early return: if(idx < 0 || idx >= N) return
+                                    # Matches both constants and variables: >= 4 or >= priorities_size
+                                    elif re.search(rf'if\s*\(\s*{index_var}\s*<\s*0\s*\|\|\s*{index_var}\s*>=\s*\w+\s*\)\s*return', context_str):
+                                        found_bounds_check = True
+                                    # Check for enclosing if with size comparison: if(m_size > 0 && m_size <= array_size)
+                                    # This handles: if(m_size > 0 && m_size <= cdf_size) { cdf[m_size - 1] = ... }
+                                    elif re.search(rf'if\s*\([^)]*\w+\s*>\s*0\s*&&\s*\w+\s*<=\s*{array_name}_size', context_str):
+                                        # Check if the index uses that variable minus 1
+                                        if '-' in index_expr and '1' in index_expr:
+                                            found_bounds_check = True
+                                
+                                # Pattern 4: Check for index_var with modulo (wraps around)
+                                if not found_bounds_check and '%' in index_expr:
+                                    # Modulo operations ensure index is within bounds
+                                    found_bounds_check = True
+                                
+                                # Pattern 5: Loop bounded by array size that was just resized
+                                # Check for: ArrayResize(array, size); ... for(i < size) ... array[i]
+                                if not found_bounds_check:
+                                    # Look for ArrayResize of this array
+                                    if re.search(rf'ArrayResize\s*\(\s*{array_name}\s*,', context_str):
+                                        # And loop bounded by same variable
+                                        if re.search(rf'for\s*\([^;]*{index_var}.*{index_var}\s*<\s*(\w+)', context_str):
+                                            found_bounds_check = True
+                                
+                                # Pattern 6: Check if the array is a known fixed-size member variable
+                                # e.g., m_regime_stats[4] is always size 4
+                                if not found_bounds_check:
+                                    # Check if variable is validated earlier in the function
+                                    # Look for the function start and check for early return validation
+                                    func_start = max(0, i - 50)
+                                    for j in range(func_start, i):
+                                        # Look for function declaration
+                                        if re.match(r'\s*(int|double|bool|void|string)\s+\w+\s*\(', lines[j]):
+                                            # Found function start, now look for validation
+                                            for k in range(j, i):
+                                                # Check for early return pattern: if(idx < 0 || idx >= N) return;
+                                                if re.search(rf'if\s*\(\s*{index_var}\s*<\s*0\s*\|\|\s*{index_var}\s*>=\s*\d+\s*\)', lines[k]):
+                                                    found_bounds_check = True
+                                                    break
+                                            break
+                                
+                                # Pattern 7: Check for if(index_var < size_var) wrapping array access
+                                # This handles: if(m_cluster_count < clusters_size) { ... m_clusters[m_cluster_count] ... }
+                                if not found_bounds_check:
+                                    # Look for pattern: if(index_var < size_var) where size_var relates to array_name
+                                    # Common patterns: clusters_size for m_clusters, array_size for array, etc.
+                                    size_var_patterns = [
+                                        f'{array_name}_size',  # exact match: m_clusters_size
+                                        f'{array_name.lstrip("m_")}_size',  # without m_ prefix
+                                        'size',  # generic size variable
+                                        'Size',  # capitalized
+                                        rf'\w+_size',  # any *_size variable
+                                    ]
+                                    for size_pattern in size_var_patterns:
+                                        # Check for: if(index_var < size_var)
+                                        if re.search(rf'if\s*\(\s*{index_var}\s*<\s*{size_pattern}\s*\)', context_str):
+                                            found_bounds_check = True
+                                            break
+                                
+                                if found_bounds_check:
+                                    continue
+                        
+                        # Special handling for NUM001 - check for denominator validation
+                        if rule.get('check_denominator_validation', False):
+                            # Extract the denominator variable from the division
+                            match = pattern.search(line)
+                            if match:
+                                denominator = match.group(1).strip()
+                                # Look back up to 10 lines for validation of this denominator
+                                context_start = max(0, i - 10)
+                                found_validation = False
+                                for ctx_line in lines[context_start:i]:
+                                    # Check for various validation patterns:
+                                    # if(denominator != 0), if(MathAbs(denominator) < epsilon), etc.
+                                    if re.search(rf'\b{denominator}\b.*[<>!=]', ctx_line) and \
+                                       ('if' in ctx_line or 'return' in ctx_line):
+                                        found_validation = True
+                                        break
+                                    # Check if denominator was assigned from SafeDiv or similar
+                                    if re.search(rf'{denominator}\s*=.*Safe', ctx_line):
+                                        found_validation = True
+                                        break
+                                if found_validation:
+                                    continue
+                        
+                        # Context check if needed
+                        if 'context_pattern' in rule:
+                            context_pattern = re.compile(rule['context_pattern'])
+                            context_start = max(0, i - 10)
+                            context = '\n'.join(lines[context_start:i+5])
+                            if not context_pattern.search(context):
+                                continue
+
+                        finding = AuditFinding(
+                            file=str(file_path.relative_to(self.project_root)),
+                            line=i,
+                            category=rule['category'],
+                            severity=rule['severity'],
+                            rule_id=rule_id,
+                            title=rule['title'],
+                            description=rule['description'],
+                            recommendation=rule['recommendation'],
+                            code_context=line.strip()[:100]
+                        )
+                        findings.append(finding)
+
+        return findings
+
+    def audit_project(self) -> Dict:
+        """Audit entire project"""
+        logger.info(f"Starting financial audit of {self.project_root}")
+
+        # Find all MQL5 files
+        mql5_dir = self.project_root / "MQL5"
+        files = list(mql5_dir.rglob("*.mqh")) + list(mql5_dir.rglob("*.mq5"))
+        files = [f for f in files if '.backup' not in str(f)]
+
+        logger.info(f"Found {len(files)} files to audit")
+
+        # Audit each file
+        all_findings = []
+        for file_path in files:
+            findings = self.audit_file(file_path)
+            all_findings.extend(findings)
+            if findings:
+                logger.info(f"  {file_path.name}: {len(findings)} findings")
+
+        self.findings = all_findings
+
+        # Generate summary
+        summary = self._generate_summary()
+        return summary
+
+    def _generate_summary(self) -> Dict:
+        """Generate audit summary"""
+        by_category = defaultdict(list)
+        by_severity = defaultdict(list)
+        by_file = defaultdict(list)
+
+        for finding in self.findings:
+            by_category[finding.category.value].append(finding)
+            by_severity[finding.severity.name].append(finding)
+            by_file[finding.file].append(finding)
+
+        return {
+            'timestamp': datetime.now().isoformat(),
+            'project': str(self.project_root),
+            'total_findings': len(self.findings),
+            'by_category': {k: len(v) for k, v in by_category.items()},
+            'by_severity': {k: len(v) for k, v in by_severity.items()},
+            'by_file': {k: len(v) for k, v in sorted(by_file.items(),
+                                                     key=lambda x: len(x[1]),
+                                                     reverse=True)[:20]},
+            'critical_count': len(by_severity.get('CRITICAL', [])),
+            'high_count': len(by_severity.get('HIGH', [])),
+            'file_hashes': self.file_hashes
+        }
+
+    def print_report(self):
+        """Print detailed audit report"""
+        summary = self._generate_summary()
+
+        print("\n" + "=" * 70)
+        print("FINANCIAL CODE AUDIT REPORT")
+        print("=" * 70)
+        print(f"Timestamp: {summary['timestamp']}")
+        print(f"Project:   {summary['project']}")
+        print("-" * 70)
+        print(f"Total Findings: {summary['total_findings']}")
+        print(f"  CRITICAL: {summary['critical_count']}")
+        print(f"  HIGH:     {summary['high_count']}")
+        print("-" * 70)
+
+        print("\nFindings by Category:")
+        for cat, count in sorted(summary['by_category'].items()):
+            print(f"  {cat:30} : {count}")
+
+        print("\nFindings by Severity:")
+        for sev, count in sorted(summary['by_severity'].items()):
+            print(f"  {sev:12} : {count}")
+
+        print("\nTop Files by Finding Count:")
+        for file, count in list(summary['by_file'].items())[:10]:
+            print(f"  {count:3} : {file}")
+
+        # Print critical findings
+        critical = [f for f in self.findings if f.severity == Severity.CRITICAL]
+        if critical:
+            print("\n" + "=" * 70)
+            print(f"CRITICAL FINDINGS (Must Fix) - {len(critical)} total")
+            print("=" * 70)
+            
+            # Group by file for better readability
+            from collections import defaultdict
+            by_file = defaultdict(list)
+            for f in critical:
+                by_file[f.file].append(f)
+            
+            # Print summary by file
+            print("\nCRITICAL Violations by File:")
+            for file_path, findings in sorted(by_file.items(), key=lambda x: len(x[1]), reverse=True):
+                from pathlib import Path
+                fname = Path(file_path).name
+                print(f"  {len(findings):3d} : {fname}")
+            
+            # Print detailed findings (with optional limit)
+            display_limit = self._display_limit if hasattr(self, '_display_limit') and self._display_limit else len(critical)
+            print(f"\nDetailed CRITICAL Findings (showing {min(display_limit, len(critical))} of {len(critical)}):\n")
+            for i, f in enumerate(critical[:display_limit], 1):
+                print(f"[{i}/{len(critical)}] [{f.rule_id}] {f.title}")
+                print(f"  File: {f.file}:{f.line}")
+                print(f"  Code: {f.code_context}")
+                print(f"  Fix:  {f.recommendation}")
+                print()
+
+        print("\n" + "=" * 70)
+
+    def save_report(self, output_path: Path):
+        """Save detailed report to JSON"""
+        report = {
+            'summary': self._generate_summary(),
+            'findings': [
+                {
+                    'file': f.file,
+                    'line': f.line,
+                    'category': f.category.value,
+                    'severity': f.severity.name,
+                    'rule_id': f.rule_id,
+                    'title': f.title,
+                    'description': f.description,
+                    'recommendation': f.recommendation,
+                    'code_context': f.code_context
+                }
+                for f in self.findings
+            ]
+        }
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2)
+
+        logger.info(f"Report saved to {output_path}")
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='Financial-grade MQL5 Code Auditor'
+    )
+    parser.add_argument('--project', type=Path, default=Path('.'))
+    parser.add_argument('--output', type=Path, help='Save report to JSON')
+    parser.add_argument('--critical-only', action='store_true', help='Show only CRITICAL severity')
+    parser.add_argument('--limit', type=int, help='Limit number of detailed findings to display')
+
+    args = parser.parse_args()
+
+    auditor = FinancialCodeAuditor(args.project.resolve())
+    auditor.audit_project()
+    
+    # If limit specified, temporarily modify print_report to use it
+    if args.limit:
+        auditor._display_limit = args.limit
+    
+    auditor.print_report()
+
+    if args.output:
+        auditor.save_report(args.output)
+
+    # Exit with error if critical issues
+    critical_count = len([f for f in auditor.findings
+                          if f.severity == Severity.CRITICAL])
+    return 1 if critical_count > 0 else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

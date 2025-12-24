@@ -1,0 +1,854 @@
+{
+  "scan_timestamp": "2025-12-23T10:58:31.145902",
+  "summary": {
+    "total_files": 64,
+    "locations_scanned": 1,
+    "files_per_location": {
+      "github": 64
+    },
+    "duplicate_filenames": 0,
+    "hash_conflicts": 0,
+    "missing_in_github": 0,
+    "github_only": 64,
+    "scan_errors": 0
+  },
+  "conflicts": [],
+  "missing_in_github": [],
+  "github_only": [
+    {
+      "filename": "Test_SafeMath.mq5",
+      "path": "Scripts/ProjectQuantum/Test_SafeMath.mq5"
+    },
+    {
+      "filename": "Test_SymbolUtils.mq5",
+      "path": "Scripts/ProjectQuantum/Test_SymbolUtils.mq5"
+    },
+    {
+      "filename": "Test_CLearningMetrics.mq5",
+      "path": "Scripts/ProjectQuantum/Test_CLearningMetrics.mq5"
+    },
+    {
+      "filename": "Test_CPersistence.mq5",
+      "path": "Scripts/ProjectQuantum/Test_CPersistence.mq5"
+    },
+    {
+      "filename": "Test_ArchitecturalPrinciples.mq5",
+      "path": "Scripts/ProjectQuantum/Test_ArchitecturalPrinciples.mq5"
+    },
+    {
+      "filename": "Test_Security.mq5",
+      "path": "Scripts/ProjectQuantum/Test_Security.mq5"
+    },
+    {
+      "filename": "Test_CRiskIntelligence.mq5",
+      "path": "Scripts/ProjectQuantum/Test_CRiskIntelligence.mq5"
+    },
+    {
+      "filename": "Test_CFractalAnalyzer.mq5",
+      "path": "Scripts/ProjectQuantum/Test_CFractalAnalyzer.mq5"
+    },
+    {
+      "filename": "Test_Lifecycle.mq5",
+      "path": "Scripts/ProjectQuantum/Test_Lifecycle.mq5"
+    },
+    {
+      "filename": "Test_ArrayUtils.mq5",
+      "path": "Scripts/ProjectQuantum/Test_ArrayUtils.mq5"
+    },
+    {
+      "filename": "Test_CRL_Agent.mq5",
+      "path": "Scripts/ProjectQuantum/Test_CRL_Agent.mq5"
+    },
+    {
+      "filename": "Test_Defensive.mq5",
+      "path": "Scripts/ProjectQuantum/Test_Defensive.mq5"
+    },
+    {
+      "filename": "ProjectQuantum_Main.mq5",
+      "path": "Experts/ProjectQuantum/ProjectQuantum_Main.mq5"
+    },
+    {
+      "filename": "ProjectQuantum_UnitTests.mq5",
+      "path": "Experts/ProjectQuantum/ProjectQuantum_UnitTests.mq5"
+    },
+    {
+      "filename": "KatzFractalDimension.mq5",
+      "path": "Indicators/ProjectQuantum/KatzFractalDimension.mq5"
+    },
+    {
+      "filename": "ProjectQuantum.mqh",
+      "path": "Include/ProjectQuantum.mqh"
+    },
+    {
+      "filename": "CVersionManager.mqh",
+      "path": "Include/ProjectQuantum/Core/CVersionManager.mqh"
+    },
+    {
+      "filename": "TestFramework.mqh",
+      "path": "Include/ProjectQuantum/Core/TestFramework.mqh"
+    },
+    {
+      "filename": "CLogger.mqh",
+      "path": "Include/ProjectQuantum/Core/CLogger.mqh"
+    },
+    {
+      "filename": "Core.mqh",
+      "path": "Include/ProjectQuantum/Core/Core.mqh"
+    },
+    {
+      "filename": "CPersistence.mqh",
+      "path": "Include/ProjectQuantum/Core/CPersistence.mqh"
+    },
+    {
+      "filename": "CSystemOptimizer.mqh",
+      "path": "Include/ProjectQuantum/Core/CSystemOptimizer.mqh"
+    },
+    {
+      "filename": "CSymbolNormalizer.mqh",
+      "path": "Include/ProjectQuantum/Core/CSymbolNormalizer.mqh"
+    },
+    {
+      "filename": "Defensive.mqh",
+      "path": "Include/ProjectQuantum/Core/Defensive.mqh"
+    },
+    {
+      "filename": "SymbolUtils.mqh",
+      "path": "Include/ProjectQuantum/Core/SymbolUtils.mqh"
+    },
+    {
+      "filename": "CAdaptiveNormalizer.mqh",
+      "path": "Include/ProjectQuantum/Core/CAdaptiveNormalizer.mqh"
+    },
+    {
+      "filename": "ArrayUtils.mqh",
+      "path": "Include/ProjectQuantum/Core/ArrayUtils.mqh"
+    },
+    {
+      "filename": "SafeMath.mqh",
+      "path": "Include/ProjectQuantum/Core/SafeMath.mqh"
+    },
+    {
+      "filename": "CDominantCycle.mqh",
+      "path": "Include/ProjectQuantum/Core/CDominantCycle.mqh"
+    },
+    {
+      "filename": "CFileIntegrity.mqh",
+      "path": "Include/ProjectQuantum/Core/CFileIntegrity.mqh"
+    },
+    {
+      "filename": "CErrorLearningAgent.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CErrorLearningAgent.mqh"
+    },
+    {
+      "filename": "CGenetics.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CGenetics.mqh"
+    },
+    {
+      "filename": "CRL_Agent.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CRL_Agent.mqh"
+    },
+    {
+      "filename": "CRiskAdversary.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CRiskAdversary.mqh"
+    },
+    {
+      "filename": "CReplayBuffer.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CReplayBuffer.mqh"
+    },
+    {
+      "filename": "CProbabilityPredictor.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CProbabilityPredictor.mqh"
+    },
+    {
+      "filename": "CJourneyReward.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CJourneyReward.mqh"
+    },
+    {
+      "filename": "CShadowManager.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CShadowManager.mqh"
+    },
+    {
+      "filename": "CRLExitAgent.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CRLExitAgent.mqh"
+    },
+    {
+      "filename": "CMarketProbability.mqh",
+      "path": "Include/ProjectQuantum/Intelligence/CMarketProbability.mqh"
+    },
+    {
+      "filename": "CPerformanceMonitor.mqh",
+      "path": "Include/ProjectQuantum/Performance/CPerformanceMonitor.mqh"
+    },
+    {
+      "filename": "CRiskIntelligence.mqh",
+      "path": "Include/ProjectQuantum/Performance/CRiskIntelligence.mqh"
+    },
+    {
+      "filename": "CAgnosticClock.mqh",
+      "path": "Include/ProjectQuantum/Performance/CAgnosticClock.mqh"
+    },
+    {
+      "filename": "CInstrumentProfiler.mqh",
+      "path": "Include/ProjectQuantum/Performance/CInstrumentProfiler.mqh"
+    },
+    {
+      "filename": "CRegimeJudge.mqh",
+      "path": "Include/ProjectQuantum/Performance/CRegimeJudge.mqh"
+    },
+    {
+      "filename": "CLearningMetrics.mqh",
+      "path": "Include/ProjectQuantum/Performance/CLearningMetrics.mqh"
+    },
+    {
+      "filename": "CPositionRegistry.mqh",
+      "path": "Include/ProjectQuantum/Performance/CPositionRegistry.mqh"
+    },
+    {
+      "filename": "CAdaptiveCycle.mqh",
+      "path": "Include/ProjectQuantum/Performance/CAdaptiveCycle.mqh"
+    },
+    {
+      "filename": "ProjectQuantum_Architecture.mqh",
+      "path": "Include/ProjectQuantum/Architecture/ProjectQuantum_Architecture.mqh"
+    },
+    {
+      "filename": "Project_Quantum.mqh",
+      "path": "Include/ProjectQuantum/Architecture/Project_Quantum.mqh"
+    },
+    {
+      "filename": "Journey_Architecture.mqh",
+      "path": "Include/ProjectQuantum/Architecture/Journey_Architecture.mqh"
+    },
+    {
+      "filename": "CThreeLevelRisk.mqh",
+      "path": "Include/ProjectQuantum/Risk/CThreeLevelRisk.mqh"
+    },
+    {
+      "filename": "CRiskManager.mqh",
+      "path": "Include/ProjectQuantum/Risk/CRiskManager.mqh"
+    },
+    {
+      "filename": "CAssetClassRisk.mqh",
+      "path": "Include/ProjectQuantum/Risk/CAssetClassRisk.mqh"
+    },
+    {
+      "filename": "CPortfolioRisk.mqh",
+      "path": "Include/ProjectQuantum/Risk/CPortfolioRisk.mqh"
+    },
+    {
+      "filename": "CPositionSizer.mqh",
+      "path": "Include/ProjectQuantum/Risk/CPositionSizer.mqh"
+    },
+    {
+      "filename": "CCompositeValidator.mqh",
+      "path": "Include/ProjectQuantum/Risk/CCompositeValidator.mqh"
+    },
+    {
+      "filename": "CRealTimeLogMonitor.mqh",
+      "path": "Include/ProjectQuantum/Monitoring/CRealTimeLogMonitor.mqh"
+    },
+    {
+      "filename": "CCircuitBreaker.mqh",
+      "path": "Include/ProjectQuantum/Safety/CCircuitBreaker.mqh"
+    },
+    {
+      "filename": "CMarketAgnostic.mqh",
+      "path": "Include/ProjectQuantum/Physics/CMarketAgnostic.mqh"
+    },
+    {
+      "filename": "CFractalAnalyzer.mqh",
+      "path": "Include/ProjectQuantum/Physics/CFractalAnalyzer.mqh"
+    },
+    {
+      "filename": "CMarketPhysics.mqh",
+      "path": "Include/ProjectQuantum/Physics/CMarketPhysics.mqh"
+    },
+    {
+      "filename": "CPhysicsMonitor.mqh",
+      "path": "Include/ProjectQuantum/Physics/CPhysicsMonitor.mqh"
+    },
+    {
+      "filename": "CPortfolioPhysics.mqh",
+      "path": "Include/ProjectQuantum/Physics/CPortfolioPhysics.mqh"
+    }
+  ],
+  "all_files": [
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_SafeMath.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_SafeMath.mq5",
+      "location": "github",
+      "hash": "d77d33bcf2f5fd36fd185353e925752fa6e1e09f04590200846b3c6c58308462",
+      "size": 3178,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_SymbolUtils.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_SymbolUtils.mq5",
+      "location": "github",
+      "hash": "2747bd5606cf41ebe181626faab689ecfeee2738556f13acc2dc8d5c5f198dc1",
+      "size": 12253,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_CLearningMetrics.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_CLearningMetrics.mq5",
+      "location": "github",
+      "hash": "e2ef2f18358971cdc86645f4f50a93309f5233933a53eff7f0f71846e8bfa4f6",
+      "size": 16044,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_CPersistence.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_CPersistence.mq5",
+      "location": "github",
+      "hash": "888db902f6f21dfdcf17acfc178e5ff49492342eabdcedf1fad1408a30abb724",
+      "size": 15214,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_ArchitecturalPrinciples.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_ArchitecturalPrinciples.mq5",
+      "location": "github",
+      "hash": "224189f30054ec835e320f07fbd7c619a3c8ea1309e9e84bc2e88dcaa60eb663",
+      "size": 22633,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_Security.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_Security.mq5",
+      "location": "github",
+      "hash": "0343a1663d2e3316091bdd0add312f9cf2f3bebc1ce11ad5b4aeef808509615a",
+      "size": 18633,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_CRiskIntelligence.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_CRiskIntelligence.mq5",
+      "location": "github",
+      "hash": "80b7ef1104a958e9e7d6f199006c529932aeaa8c2425262603592a702461c410",
+      "size": 17238,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_CFractalAnalyzer.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_CFractalAnalyzer.mq5",
+      "location": "github",
+      "hash": "411b2fc86a175319a6e8e42169d2046043101ab835097bc6baa4b2a5f6141481",
+      "size": 27910,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_Lifecycle.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_Lifecycle.mq5",
+      "location": "github",
+      "hash": "2a293a330001597d4432779f7659bfe8cceb36d9a8ae9b72b1751ca28b136ee3",
+      "size": 21545,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_ArrayUtils.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_ArrayUtils.mq5",
+      "location": "github",
+      "hash": "678471a7c78022424e9bf5377ffe572406c2a90c0144b68db400ac1af14d46b9",
+      "size": 11174,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_CRL_Agent.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_CRL_Agent.mq5",
+      "location": "github",
+      "hash": "4e5ce8c4f2fd478715864194cf4c139cd42a50052802f803abc435d9866d4a40",
+      "size": 30556,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Scripts/ProjectQuantum/Test_Defensive.mq5",
+      "relative_path": "Scripts/ProjectQuantum/Test_Defensive.mq5",
+      "location": "github",
+      "hash": "72d786a8040dfbe0376545fc46674b13c1adc013b1341b190553d10621a39c1d",
+      "size": 14487,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Experts/ProjectQuantum/ProjectQuantum_Main.mq5",
+      "relative_path": "Experts/ProjectQuantum/ProjectQuantum_Main.mq5",
+      "location": "github",
+      "hash": "8afec6527f47d394fdacc03628e8ec8b68cd108285456fc185e267ae29f9b7de",
+      "size": 81067,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Experts/ProjectQuantum/ProjectQuantum_UnitTests.mq5",
+      "relative_path": "Experts/ProjectQuantum/ProjectQuantum_UnitTests.mq5",
+      "location": "github",
+      "hash": "c79bb44507931231f3e2c373952ac99f0694f858e7f56e4aa492b280be03f508",
+      "size": 16734,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Indicators/ProjectQuantum/KatzFractalDimension.mq5",
+      "relative_path": "Indicators/ProjectQuantum/KatzFractalDimension.mq5",
+      "location": "github",
+      "hash": "54402ffcfea36c7562b375fb1c3ca13840ccdb17b9db6fecde92f904b43f43ce",
+      "size": 10434,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum.mqh",
+      "relative_path": "Include/ProjectQuantum.mqh",
+      "location": "github",
+      "hash": "52815c2978ae7f6604e6fc47cb5e8decbebdeb69d6a0b6606ffac5d06455e628",
+      "size": 10021,
+      "modified": "2025-12-23T06:18:45",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/CVersionManager.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/CVersionManager.mqh",
+      "location": "github",
+      "hash": "1f95cd8a5d039d265f916efe90667c3bbe84ace3c8117adaa0116f655c7224eb",
+      "size": 16854,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/TestFramework.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/TestFramework.mqh",
+      "location": "github",
+      "hash": "6063c67430b0abfd11ed033bafc36740b0320dcc3355f1c5968de7b201e1f1ec",
+      "size": 18825,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/CLogger.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/CLogger.mqh",
+      "location": "github",
+      "hash": "ee535b05d1d803077bcbb5803baa567aff6920967dd16aaecc0e151904fe6247",
+      "size": 25462,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/Core.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/Core.mqh",
+      "location": "github",
+      "hash": "2dd4f591d98b5040999125760f27fdfb18175d2ee39c96ecdcc194cf069d83da",
+      "size": 35575,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/CPersistence.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/CPersistence.mqh",
+      "location": "github",
+      "hash": "77a9c20d2726dbaabd5bf1f412e1899342e9fdf37e029e7347b7116f88cbcd8b",
+      "size": 48342,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/CSystemOptimizer.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/CSystemOptimizer.mqh",
+      "location": "github",
+      "hash": "9b857f16d738f0df4901bd8366a85b7cc1688580f013698bc1c8dd9e4e98e3b3",
+      "size": 11041,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/CSymbolNormalizer.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/CSymbolNormalizer.mqh",
+      "location": "github",
+      "hash": "835599dd5b9d7835a0380cea4e66ba1afa7943e012ba8d582d81544591454db0",
+      "size": 13764,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/Defensive.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/Defensive.mqh",
+      "location": "github",
+      "hash": "c86f06652314907fe145950f6460b37ebefe7c4f05d65306242bd2ee0a384b61",
+      "size": 20282,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/SymbolUtils.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/SymbolUtils.mqh",
+      "location": "github",
+      "hash": "e9c7a78e7e828c7cedaac98297663802ac55e0ab11f629621c44debc1d09ef3e",
+      "size": 15553,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/CAdaptiveNormalizer.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/CAdaptiveNormalizer.mqh",
+      "location": "github",
+      "hash": "31c6f970217f628a90a21b4927523293a2175ea65cf281a697bec88af0ae4e6a",
+      "size": 32451,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/ArrayUtils.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/ArrayUtils.mqh",
+      "location": "github",
+      "hash": "524e7cc3d741c441c913fe11b3cc03699cf6eb9f2ff8bca301392ac22049af75",
+      "size": 15626,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/SafeMath.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/SafeMath.mqh",
+      "location": "github",
+      "hash": "c1960c666f88abf01c6afe2aa59b92488978383bd34208e593727b022875307a",
+      "size": 12064,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/CDominantCycle.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/CDominantCycle.mqh",
+      "location": "github",
+      "hash": "ef32bcd136b498943aec496dfb49b525119200d3da9dd016f3ffee3008baf3b2",
+      "size": 26380,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Core/CFileIntegrity.mqh",
+      "relative_path": "Include/ProjectQuantum/Core/CFileIntegrity.mqh",
+      "location": "github",
+      "hash": "33b83382e0ea77c7a72b6302932359036aa54e27386fafd3082e616aa6651c7f",
+      "size": 16114,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CErrorLearningAgent.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CErrorLearningAgent.mqh",
+      "location": "github",
+      "hash": "47ed90e69c3bc215f6da9944128d5b35acf6b29c75185a48c47d6f79612dcb99",
+      "size": 17656,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CGenetics.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CGenetics.mqh",
+      "location": "github",
+      "hash": "fec6063a637360c770afae7bb9f641e8e3723cf924b3e0973cffe0bea24d6860",
+      "size": 30399,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CRL_Agent.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CRL_Agent.mqh",
+      "location": "github",
+      "hash": "cbe6667b5147aa5022477804074594d0d3bd3712de810cc94bdfbf64bc927b25",
+      "size": 36952,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CRiskAdversary.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CRiskAdversary.mqh",
+      "location": "github",
+      "hash": "c415dfc17236a78d84e316613949a6684266e59087e750740eb3d042baa8f1ee",
+      "size": 38990,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CReplayBuffer.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CReplayBuffer.mqh",
+      "location": "github",
+      "hash": "e7cecd17c3a3157317ced3d0c5b35a7cf9cba57b32d4b08e03af6ebb7d5eb381",
+      "size": 45217,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CProbabilityPredictor.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CProbabilityPredictor.mqh",
+      "location": "github",
+      "hash": "f096b2a928aedfa1c1d165e68f6eceb9ec84077bc344735a63296a638e46d1e1",
+      "size": 26590,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CJourneyReward.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CJourneyReward.mqh",
+      "location": "github",
+      "hash": "aa03dfccde9cb5a0b43ed2f155065312fdd91685f108192baffb4e2ff29f2117",
+      "size": 19969,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CShadowManager.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CShadowManager.mqh",
+      "location": "github",
+      "hash": "8c073e3b99046cba29a2a8cfd1e18e7f6e3b1be0975d62fde9e1aef060806dff",
+      "size": 33300,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CRLExitAgent.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CRLExitAgent.mqh",
+      "location": "github",
+      "hash": "1f224a73c378053372895760ff04d033c1ca4ad940227c579d9f41411cc54d52",
+      "size": 22189,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Intelligence/CMarketProbability.mqh",
+      "relative_path": "Include/ProjectQuantum/Intelligence/CMarketProbability.mqh",
+      "location": "github",
+      "hash": "6b0201463a1c7fc460a7ff1693a23ef5c49d7c47370927f1fe97ea95b548b7be",
+      "size": 11063,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Performance/CPerformanceMonitor.mqh",
+      "relative_path": "Include/ProjectQuantum/Performance/CPerformanceMonitor.mqh",
+      "location": "github",
+      "hash": "f93573c5d1235afe6b4e75ff6aff9d5e62e9a0aec9161ac2e1c70fcef6224d5a",
+      "size": 17827,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Performance/CRiskIntelligence.mqh",
+      "relative_path": "Include/ProjectQuantum/Performance/CRiskIntelligence.mqh",
+      "location": "github",
+      "hash": "17d466ed00d5083b71a67ab68dffedb0060e75ef97c291ac51e3ccc501c8b49a",
+      "size": 34080,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Performance/CAgnosticClock.mqh",
+      "relative_path": "Include/ProjectQuantum/Performance/CAgnosticClock.mqh",
+      "location": "github",
+      "hash": "81a49acfe7be775c13ec1f9082933fd02e17f2e7906195fae862a320f1184a1a",
+      "size": 14456,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Performance/CInstrumentProfiler.mqh",
+      "relative_path": "Include/ProjectQuantum/Performance/CInstrumentProfiler.mqh",
+      "location": "github",
+      "hash": "210eb3a2ceb5833b5b952180501811be72227669133fdb71ee93e94ffd030b1e",
+      "size": 18001,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Performance/CRegimeJudge.mqh",
+      "relative_path": "Include/ProjectQuantum/Performance/CRegimeJudge.mqh",
+      "location": "github",
+      "hash": "878d1f539f31b374be426b3a7e36530e96e181d12b3e48865baf18bdcf3153b1",
+      "size": 12881,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Performance/CLearningMetrics.mqh",
+      "relative_path": "Include/ProjectQuantum/Performance/CLearningMetrics.mqh",
+      "location": "github",
+      "hash": "113c6de001d77bf8a0f0206f568fccffc7bf0872bdb36797d12e958ca6ed5b02",
+      "size": 37432,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Performance/CPositionRegistry.mqh",
+      "relative_path": "Include/ProjectQuantum/Performance/CPositionRegistry.mqh",
+      "location": "github",
+      "hash": "45bb9f6feea1b2afb4111b5c3440723e80b09b8d23a93dfe15d4e7a89ef1089b",
+      "size": 23179,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Performance/CAdaptiveCycle.mqh",
+      "relative_path": "Include/ProjectQuantum/Performance/CAdaptiveCycle.mqh",
+      "location": "github",
+      "hash": "2b2324fa4fbf8514d239f6b7251bffe97a457f98fd0d5ecce43277e0eed5ba36",
+      "size": 10631,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Architecture/ProjectQuantum_Architecture.mqh",
+      "relative_path": "Include/ProjectQuantum/Architecture/ProjectQuantum_Architecture.mqh",
+      "location": "github",
+      "hash": "822765f13c752c877f6aa87a0f1a186234e3cdca9bd81f1155d596dd936b1709",
+      "size": 925,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Architecture/Project_Quantum.mqh",
+      "relative_path": "Include/ProjectQuantum/Architecture/Project_Quantum.mqh",
+      "location": "github",
+      "hash": "46472c2fc3c354d433ffda97bdf9c1571b9dccd5c78cd9f148ea0348c1ce4ad3",
+      "size": 38037,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Architecture/Journey_Architecture.mqh",
+      "relative_path": "Include/ProjectQuantum/Architecture/Journey_Architecture.mqh",
+      "location": "github",
+      "hash": "7e4ca7ceabe9da4e63ae9cb48a491ea6e3156b5f5ca6d5240b2fc0aa35fac97b",
+      "size": 744,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Risk/CThreeLevelRisk.mqh",
+      "relative_path": "Include/ProjectQuantum/Risk/CThreeLevelRisk.mqh",
+      "location": "github",
+      "hash": "ce4e5ee3e549cf49829585c04bc8ffdfe778300442fe51faccb9dae0882fd4ff",
+      "size": 27014,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Risk/CRiskManager.mqh",
+      "relative_path": "Include/ProjectQuantum/Risk/CRiskManager.mqh",
+      "location": "github",
+      "hash": "ce1304c2105bd62df975b28c521ef6eae7ae3089b546f21ebbf9d1fb64511f46",
+      "size": 17864,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Risk/CAssetClassRisk.mqh",
+      "relative_path": "Include/ProjectQuantum/Risk/CAssetClassRisk.mqh",
+      "location": "github",
+      "hash": "cacb90d6fc48d6bfab7bdd82b77402a8bd1825d94364e9443169abfe651ef213",
+      "size": 22258,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Risk/CPortfolioRisk.mqh",
+      "relative_path": "Include/ProjectQuantum/Risk/CPortfolioRisk.mqh",
+      "location": "github",
+      "hash": "8409294e02cc351fe865be6ae31a15963faeae3aceed397d51206b85bb511804",
+      "size": 25297,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Risk/CPositionSizer.mqh",
+      "relative_path": "Include/ProjectQuantum/Risk/CPositionSizer.mqh",
+      "location": "github",
+      "hash": "8079c17aa88ec590c469f640562816a34b176825c50774921a478af968d95954",
+      "size": 18753,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Risk/CCompositeValidator.mqh",
+      "relative_path": "Include/ProjectQuantum/Risk/CCompositeValidator.mqh",
+      "location": "github",
+      "hash": "2b577a6a97b2b33f24eb95d695b52ba342a4dd112b56d96016dd0deffaf188a3",
+      "size": 27268,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Monitoring/CRealTimeLogMonitor.mqh",
+      "relative_path": "Include/ProjectQuantum/Monitoring/CRealTimeLogMonitor.mqh",
+      "location": "github",
+      "hash": "1ba37c1f9716bf70bab9c7a9ca6a8b8ae712cb8221aac5d91944380d6872e5f8",
+      "size": 14899,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Safety/CCircuitBreaker.mqh",
+      "relative_path": "Include/ProjectQuantum/Safety/CCircuitBreaker.mqh",
+      "location": "github",
+      "hash": "f2196f76ab91ff5d28af79f23805860eb043daf3a66c6e2edc10fb05bb7ce637",
+      "size": 30237,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Physics/CMarketAgnostic.mqh",
+      "relative_path": "Include/ProjectQuantum/Physics/CMarketAgnostic.mqh",
+      "location": "github",
+      "hash": "1c494c2b97b1d245d88260e7a888548090de5d84ffb79d4276c60168b27f3e23",
+      "size": 23186,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Physics/CFractalAnalyzer.mqh",
+      "relative_path": "Include/ProjectQuantum/Physics/CFractalAnalyzer.mqh",
+      "location": "github",
+      "hash": "96c89a60680896514b05c4777a9839449ac90a8ae4c56f7572b3e0d15f807c7a",
+      "size": 40741,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Physics/CMarketPhysics.mqh",
+      "relative_path": "Include/ProjectQuantum/Physics/CMarketPhysics.mqh",
+      "location": "github",
+      "hash": "d9f5288750e36826ab79acc31f6bf5ab23d00082cafe06e41f54c3e9434b2299",
+      "size": 31030,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Physics/CPhysicsMonitor.mqh",
+      "relative_path": "Include/ProjectQuantum/Physics/CPhysicsMonitor.mqh",
+      "location": "github",
+      "hash": "a8b292a83096abeefe651f8ce6583ff08f15196b4215dabbbd9e5eb66da52334",
+      "size": 27417,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    },
+    {
+      "path": "/home/user/ProjectQuantum/MQL5/Include/ProjectQuantum/Physics/CPortfolioPhysics.mqh",
+      "relative_path": "Include/ProjectQuantum/Physics/CPortfolioPhysics.mqh",
+      "location": "github",
+      "hash": "b29f999c66b39015dbb01614ea6feff91e483978cff98fb2a2137911d4e48685",
+      "size": 43774,
+      "modified": "2025-12-23T05:38:00",
+      "version": "1.216"
+    }
+  ],
+  "scan_errors": []
+}

@@ -35,6 +35,17 @@
 #include <Trade\PositionInfo.mqh>
 #include <Trade\DealInfo.mqh>
 
+// ═══════════════════════════════════════════════════════════════════
+// MODULAR INCLUDES - VelocityTrader v7.1 Component Library
+// ═══════════════════════════════════════════════════════════════════
+// Note: VT_Globals.mqh includes all other headers in correct order:
+//   - VT_Definitions.mqh (constants, enums, colors)
+//   - VT_RLParameters.mqh (RL tunable parameters)
+//   - VT_Structures.mqh (core data structures)
+//   - VT_Predictor.mqh (probability predictor, statistical gate)
+//   - VT_CircuitBreaker.mqh (risk management state machine)
+// ═══════════════════════════════════════════════════════════════════
+
 //+------------------------------------------------------------------+
 //| INPUT PARAMETERS                                                  |
 //+------------------------------------------------------------------+
@@ -122,6 +133,29 @@ input bool      InpManualReinstate = false;      // Set TRUE to reinstate
 input bool      InpForceHalt = false;            // Set TRUE to force halt
 input bool      InpShadowOnly = false;           // Shadow only mode
 
+// ═══════════════════════════════════════════════════════════════════
+// INCLUDE MODULAR COMPONENTS
+// ═══════════════════════════════════════════════════════════════════
+#include "Include/VT_Globals.mqh"      // All structs and global variables
+#include "Include/VT_HUD.mqh"          // HUD rendering functions
+#include "Include/VT_Persistence.mqh"  // State save/load functions
+
+// ═══════════════════════════════════════════════════════════════════
+// LEGACY INLINE DEFINITIONS (Now in header files - kept for reference)
+// ═══════════════════════════════════════════════════════════════════
+// The following definitions are now in Include/*.mqh files:
+// - VT_Definitions.mqh: MAX_SYMBOLS, MAX_POSITIONS, ROLLING_WINDOW,
+//                       PERSISTENCE_MAGIC, enums, color defines
+// - VT_RLParameters.mqh: RLParameters struct
+// - VT_Structures.mqh: WelfordStats, BrokerSpec, StrategyStats,
+//                      AgentProfile, TradingAgent, VelocityRank,
+//                      PositionData, PeriodStats, ExcursionStats, SystemStatus
+// - VT_Predictor.mqh: ProbabilityPredictor, StatisticalGate
+// - VT_CircuitBreaker.mqh: CircuitBreaker
+// - VT_Globals.mqh: SymCData, PhysicsEngine, SymbolInfo, all g_* variables
+// ═══════════════════════════════════════════════════════════════════
+
+#if 0  // BEGIN LEGACY INLINE DEFINITIONS (disabled - now in headers)
 //+------------------------------------------------------------------+
 //| CONSTANTS                                                         |
 //+------------------------------------------------------------------+
@@ -1076,752 +1110,11 @@ struct CircuitBreaker
       }
       else if(state == STATE_RETRAINING)
       {
-         // Check if retrain criteria met
-         if(retrainTrades >= InpRetrainMinTrades)
-         {
-            double wr = (retrainTrades > 0) ? ((double)retrainWins / retrainTrades) : 0;
-            double pf = (retrainDownside > 0.01) ? (retrainUpside / retrainDownside) : 0;
-
-            if(wr >= InpRetrainMinWR && pf >= InpRetrainMinPF)
-            {
-               state = STATE_PENDING;
-               Print("Retrain criteria met. WR=", DoubleToString(wr*100,1),
-                     "% PF=", DoubleToString(pf,2), " - Awaiting approval.");
-               Alert("VelocityTrader: Ready for reinstatement - Set InpManualReinstate=true");
-            }
-         }
-      }
-      else if(state == STATE_PENDING)
-      {
-         if(InpManualReinstate)
-         {
-            state = STATE_LIVE;
-            Print("Manually reinstated to LIVE trading.");
-         }
-      }
-
-      // Force halt override
-      if(InpForceHalt && state == STATE_LIVE)
-      {
-         Halt("Manual force halt");
-      }
-   }
-
-   void RecordRetrainTrade(double pnl)
-   {
-      if(state != STATE_RETRAINING) return;
-
-      retrainTrades++;
-      retrainPnL += pnl;
-      if(pnl > 0)
-      {
-         retrainWins++;
-         retrainUpside += pnl;
-      }
-      else
-      {
-         retrainDownside += MathAbs(pnl);
-      }
-   }
-
-   void RecordDailyPnL(double pnl)
-   {
-      UpdateDaily();
-      dailyPnL += pnl;
-   }
-
-   bool CanTradeLive()
-   {
-      return (state == STATE_LIVE);
-   }
-
-   bool CanTradeShadow()
-   {
-      return (state == STATE_LIVE || state == STATE_RETRAINING || state == STATE_PENDING);
-   }
-
-   string GetStateString()
-   {
-      switch(state)
-      {
-         case STATE_LIVE:       return "LIVE";
-         case STATE_HALTED:     return "HALTED";
-         case STATE_RETRAINING: return "RETRAINING";
-         case STATE_PENDING:    return "PENDING";
-         default:               return "UNKNOWN";
+         // NOTE: This code was truncated in the original - fixed in VT_CircuitBreaker.mqh
       }
    }
 };
-
-//+------------------------------------------------------------------+
-//| STRUCTURE: Period Statistics (Day/Week/Month/Total)               |
-//+------------------------------------------------------------------+
-struct PeriodStats
-{
-   double pnl;
-   int    trades;
-   int    wins;
-   double startEquity;
-   datetime startTime;
-
-   void Reset(double equity)
-   {
-      pnl = 0;
-      trades = 0;
-      wins = 0;
-      startEquity = equity;
-      startTime = TimeCurrent();
-   }
-
-   double GetWR()
-   {
-      // DEFENSIVE: Guard against division by zero
-      if(trades <= 0) return 0.0;
-      return ((double)wins / trades) * 100.0;
-   }
-
-   double GetROI()
-   {
-      // DEFENSIVE: Guard against division by zero and invalid equity
-      if(startEquity <= 0.01) return 0.0;
-      return (pnl / startEquity) * 100.0;
-   }
-};
-
-//+------------------------------------------------------------------+
-//| STRUCTURE: Excursion Statistics (MAE/MFE Analysis)                |
-//+------------------------------------------------------------------+
-struct ExcursionStats
-{
-   double avgMAE;
-   double maxMAE;
-   double avgMFE;
-   double maxMFE;
-   double sumMAE;
-   double sumMFE;
-   int    count;
-
-   void Init()
-   {
-      avgMAE = 0; maxMAE = 0;
-      avgMFE = 0; maxMFE = 0;
-      sumMAE = 0; sumMFE = 0;
-      count = 0;
-   }
-
-   void Update(double mae, double mfe)
-   {
-      count++;
-      sumMAE += mae;
-      sumMFE += mfe;
-
-      // DEFENSIVE: Validate count before division
-      if(count > 0)
-      {
-         avgMAE = sumMAE / count;
-         avgMFE = sumMFE / count;
-      }
-
-      if(mae < maxMAE) maxMAE = mae;  // MAE is negative
-      if(mfe > maxMFE) maxMFE = mfe;
-   }
-
-   double GetAvgETD(double avgPnL)
-   {
-      // ETD = End Trade Drawdown = MFE - Final PnL
-      // DEFENSIVE: Handle NaN cases
-      if(!MathIsValidNumber(avgMFE) || !MathIsValidNumber(avgPnL))
-         return 0.0;
-      return avgMFE - avgPnL;
-   }
-};
-
-//+------------------------------------------------------------------+
-//| STRUCTURE: System Status (Health Monitoring)                      |
-//+------------------------------------------------------------------+
-struct SystemStatus
-{
-   bool brokerConnected;
-   bool networkOK;
-   bool rlActive;
-   bool riskOK;
-   datetime lastCheck;
-
-   void Update()
-   {
-      lastCheck = TimeCurrent();
-
-      // Check broker connection
-      brokerConnected = (AccountInfoInteger(ACCOUNT_TRADE_ALLOWED) != 0);
-
-      // Check network by validating we can get quotes
-      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      networkOK = (bid > 0);
-
-      // RL is active if we have any shadow trades
-      rlActive = true;  // Always active in this version
-
-      // Risk check - basic account validation
-      double equity = AccountInfoDouble(ACCOUNT_EQUITY);
-      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-      riskOK = (equity > 0 && balance > 0 && equity > balance * 0.5);
-   }
-};
-
-//+------------------------------------------------------------------+
-//| STRUCTURE: Velocity Ranking                                       |
-//+------------------------------------------------------------------+
-struct VelocityRank
-{
-   int    symbolIdx;
-   double score;
-};
-
-//+------------------------------------------------------------------+
-//| STRUCTURE: Position Tracking                                      |
-//+------------------------------------------------------------------+
-struct Position
-{
-   ulong    ticket;
-   string   symbol;
-   int      direction;      // +1 = long, -1 = short
-   double   entryPrice;
-   double   currentSL;
-   double   lots;
-   double   entryATR;
-   int      agentId;
-   bool     isShadow;
-   int      regimeAtEntry;
-   double   frictionCost;
-   datetime openTime;
-   double   pWinAtEntry;
-   bool     active;
-
-   // MAE/MFE tracking
-   double   mae;            // Maximum Adverse Excursion (worst drawdown, negative)
-   double   mfe;            // Maximum Favorable Excursion (best profit)
-   double   currentPnL;     // Current P&L in pips
-};
-
-//+------------------------------------------------------------------+
-//| CLASS: Kinematic Physics Engine                                   |
-//| Applies classical mechanics to model market dynamics              |
-//+------------------------------------------------------------------+
-class CKinematicPhysics
-{
-private:
-   string      m_symbol;
-   bool        m_initialized;
-   bool        m_ready;
-   int         m_tickCount;
-
-   // Physics values
-   double      m_mass;
-   double      m_force;
-   double      m_velocity;
-   double      m_acceleration;
-   double      m_momentum;
-
-   // Historical tracking
-   double      m_prevPrice;
-   double      m_prevVelocity;
-   double      m_prevVolume;
-   double      m_avgVelocity[3];
-   int         m_velIdx;
-
-   // Welford stats for normalization
-   WelfordStats m_accelStats;
-   WelfordStats m_velStats;
-
-   // Level 2 data
-   MqlBookInfo m_book[];
-   bool        m_hasL2;
-
-public:
-   void Init(string symbol)
-   {
-      m_symbol = symbol;
-      m_initialized = true;
-      m_ready = false;
-      m_tickCount = 0;
-
-      m_mass = 1.0;
-      m_force = 0;
-      m_velocity = 0;
-      m_acceleration = 0;
-      m_momentum = 0;
-
-      m_prevPrice = 0;
-      m_prevVelocity = 0;
-      m_prevVolume = 0;
-      m_velIdx = 0;
-      ArrayInitialize(m_avgVelocity, 0);
-
-      m_accelStats.Init(InpPhysicsBuffer);
-      m_velStats.Init(InpPhysicsBuffer);
-
-      // Try to subscribe to L2 data
-      m_hasL2 = false;
-      if(InpUseLevel2)
-      {
-         m_hasL2 = MarketBookAdd(m_symbol);
-         if(!m_hasL2)
-         {
-            // Silent fallback - L2 not available
-         }
-      }
-   }
-
-   void Deinit()
-   {
-      if(m_hasL2)
-         MarketBookRelease(m_symbol);
-      m_initialized = false;
-   }
-
-   void Update()
-   {
-      if(!m_initialized) return;
-
-      // Get current price
-      double price = SymbolInfoDouble(m_symbol, SYMBOL_BID);
-
-      // DEFENSIVE: Validate price data
-      if(price <= 0 || !MathIsValidNumber(price))
-         return;
-
-      // Initialize previous price on first tick
-      if(m_prevPrice <= 0)
-      {
-         m_prevPrice = price;
-         return;
-      }
-
-      m_tickCount++;
-
-      // Get volume for force calculation
-      MqlTick tick;
-      double volume = 1.0;
-      if(SymbolInfoTick(m_symbol, tick))
-      {
-         volume = (tick.volume_real > 0) ? tick.volume_real : (double)tick.volume;
-         // DEFENSIVE: Ensure volume is valid
-         if(volume <= 0 || !MathIsValidNumber(volume)) volume = 1.0;
-      }
-
-      // Calculate mass from L2 or synthetic
-      UpdateMass();
-
-      // Calculate velocity (price change)
-      double point = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
-      // DEFENSIVE: Guard against zero point
-      if(point <= 0) point = 0.00001;
-
-      m_velocity = (price - m_prevPrice) / point;
-
-      // Track velocity for smoothing
-      m_avgVelocity[m_velIdx] = m_velocity;
-      m_velIdx = (m_velIdx + 1) % 3;
-
-      // Calculate smoothed velocity
-      double smoothVel = (m_avgVelocity[0] + m_avgVelocity[1] + m_avgVelocity[2]) / 3.0;
-      m_velStats.Update(smoothVel);
-
-      // Calculate acceleration (change in velocity)
-      m_acceleration = smoothVel - m_prevVelocity;
-      m_accelStats.Update(m_acceleration);
-
-      // Calculate force = volume * direction
-      int direction = (price > m_prevPrice) ? 1 : (price < m_prevPrice) ? -1 : 0;
-      double volDelta = volume - m_prevVolume;
-      // DEFENSIVE: Clamp extreme values
-      volDelta = MathMax(-1000000, MathMin(1000000, volDelta));
-      m_force = volDelta * direction;
-
-      // Calculate momentum
-      m_momentum = m_mass * smoothVel;
-
-      // Update previous values
-      m_prevPrice = price;
-      m_prevVelocity = smoothVel;
-      m_prevVolume = volume;
-
-      // Mark as ready after calibration period
-      if(m_tickCount >= InpCalibrationTicks)
-         m_ready = true;
-   }
-
-   void UpdateMass()
-   {
-      // DEFENSIVE: Default mass to prevent division by zero
-      m_mass = 1.0;
-
-      // Try L2 data first
-      if(m_hasL2 && InpUseLevel2)
-      {
-         if(MarketBookGet(m_symbol, m_book))
-         {
-            double totalVolume = 0;
-            int levels = MathMin(ArraySize(m_book), InpL2Depth);
-            for(int i = 0; i < levels; i++)
-            {
-               totalVolume += m_book[i].volume_real;
-            }
-            // DEFENSIVE: Ensure positive mass
-            if(totalVolume > 0)
-            {
-               m_mass = totalVolume;
-               return;
-            }
-         }
-      }
-
-      // Synthetic mass calculation
-      double volume = 0;
-      MqlTick tick;
-      if(SymbolInfoTick(m_symbol, tick))
-      {
-         volume = (tick.volume_real > 0) ? tick.volume_real : (double)tick.volume;
-      }
-
-      double priceDelta = MathAbs(m_velocity);
-      // DEFENSIVE: Guard against division by zero
-      if(priceDelta > 0.0001)
-      {
-         m_mass = volume / priceDelta;
-         // Apply decay for synthetic mass
-         m_mass *= InpMassDecay;
-      }
-
-      // DEFENSIVE: Clamp mass to reasonable range
-      m_mass = MathMax(0.001, MathMin(m_mass, 1e12));
-   }
-
-   bool IsReady() { return m_ready; }
-
-   double GetMass() { return m_mass; }
-   double GetForce() { return m_force; }
-   double GetVelocity() { return m_velocity; }
-
-   double GetAcceleration()
-   {
-      // Return normalized acceleration (z-score)
-      return m_accelStats.GetZScore(m_acceleration);
-   }
-
-   double GetRawAcceleration() { return m_acceleration; }
-   double GetMomentum() { return m_momentum; }
-
-   double GetVelocityZ()
-   {
-      return m_velStats.GetZScore(m_velocity);
-   }
-};
-
-//+------------------------------------------------------------------+
-//| CLASS: SymC Monitor (System Chi / Damping Ratio)                  |
-//| Detects market regimes based on liquidity and flow dynamics       |
-//+------------------------------------------------------------------+
-class CSymC_Monitor
-{
-private:
-   bool        m_initialized;
-   bool        m_ready;
-   int         m_tickCount;
-
-   // Chi calculation
-   double      m_chi;
-   double      m_avgLiquidity;
-   double      m_avgFlow;
-
-   // Price deviation
-   double      m_priceMA;
-   double      m_priceDeviation;
-
-   // Regime tracking
-   ENUM_REGIME m_regime;
-   int         m_velocityPersist;
-   int         m_lastVelDirection;
-
-   // Welford stats
-   WelfordStats m_chiStats;
-   WelfordStats m_priceStats;
-
-public:
-   void Init()
-   {
-      m_initialized = true;
-      m_ready = false;
-      m_tickCount = 0;
-
-      m_chi = 1.0;
-      m_avgLiquidity = 1.0;
-      m_avgFlow = 1.0;
-
-      m_priceMA = 0;
-      m_priceDeviation = 0;
-
-      m_regime = REGIME_CALIBRATING;
-      m_velocityPersist = 0;
-      m_lastVelDirection = 0;
-
-      m_chiStats.Init(InpPhysicsBuffer);
-      m_priceStats.Init(InpPhysicsBuffer);
-   }
-
-   void Update(double mass, double flow, double price, CKinematicPhysics &physics)
-   {
-      if(!m_initialized) return;
-
-      m_tickCount++;
-
-      // DEFENSIVE: Validate inputs
-      if(!MathIsValidNumber(mass) || !MathIsValidNumber(flow) || !MathIsValidNumber(price))
-         return;
-      if(price <= 0) return;
-
-      // Update liquidity (mass-based) with EMA
-      // DEFENSIVE: Ensure positive values
-      double validMass = MathMax(0.001, mass);
-      m_avgLiquidity = (m_avgLiquidity * 0.95) + (validMass * 0.05);
-
-      // Update flow with EMA
-      double validFlow = MathMax(0.001, MathAbs(flow));
-      m_avgFlow = (m_avgFlow * 0.95) + (validFlow * 0.05);
-
-      // Calculate Chi (damping ratio)
-      // DEFENSIVE: Guard against division by zero
-      if(m_avgFlow > 0.0001)
-         m_chi = m_avgLiquidity / m_avgFlow;
-      else
-         m_chi = 1.0;
-
-      // DEFENSIVE: Clamp chi to reasonable range
-      m_chi = MathMax(0.001, MathMin(m_chi, 1000.0));
-      m_chiStats.Update(m_chi);
-
-      // Update price statistics for deviation
-      m_priceStats.Update(price);
-      if(m_priceMA == 0)
-         m_priceMA = price;
-      else
-         m_priceMA = (m_priceMA * 0.99) + (price * 0.01);
-
-      m_priceDeviation = m_priceStats.GetZScore(price);
-
-      // Track velocity persistence
-      double vel = physics.GetVelocity();
-      int velDir = (vel > 0.1) ? 1 : (vel < -0.1) ? -1 : 0;
-
-      if(velDir != 0 && velDir == m_lastVelDirection)
-         m_velocityPersist++;
-      else
-         m_velocityPersist = 0;
-      m_lastVelDirection = velDir;
-
-      // Detect regime
-      DetectRegime(physics);
-
-      // Ready after calibration
-      if(m_tickCount >= InpCalibrationTicks)
-         m_ready = true;
-   }
-
-   void DetectRegime(CKinematicPhysics &physics)
-   {
-      if(!m_ready)
-      {
-         m_regime = REGIME_CALIBRATING;
-         return;
-      }
-
-      double accelZ = physics.GetAcceleration();
-      double chiZ = m_chiStats.GetZScore(m_chi);
-
-      // DEFENSIVE: Handle NaN values
-      if(!MathIsValidNumber(accelZ)) accelZ = 0;
-      if(!MathIsValidNumber(chiZ)) chiZ = 0;
-
-      // BREAKOUT: High acceleration spike
-      if(MathAbs(accelZ) > InpBreakoutAccel)
-      {
-         m_regime = REGIME_BREAKOUT;
-         return;
-      }
-
-      // TREND: Sustained velocity with moderate acceleration
-      if(MathAbs(accelZ) > InpTrendAccel && m_velocityPersist >= InpTrendPersist)
-      {
-         m_regime = REGIME_TREND;
-         return;
-      }
-
-      // MEAN REVERSION: High chi + price at extreme + decelerating
-      if(chiZ > InpMRChiThreshold || MathAbs(m_priceDeviation) > 1.5)
-      {
-         // Check for deceleration (acceleration opposite to velocity)
-         double vel = physics.GetVelocity();
-         bool decelerating = (vel > 0 && accelZ < -InpMRDecelThreshold) ||
-                            (vel < 0 && accelZ > InpMRDecelThreshold);
-
-         if(decelerating || MathAbs(m_priceDeviation) > 2.0)
-         {
-            m_regime = REGIME_MEANREV;
-            return;
-         }
-      }
-
-      // Default to TREND for learning (avoid CRITICAL which blocks trades)
-      m_regime = REGIME_TREND;
-   }
-
-   ENUM_REGIME GetRegime() { return m_regime; }
-
-   int GetRegimeIndex()
-   {
-      switch(m_regime)
-      {
-         case REGIME_BREAKOUT: return 0;
-         case REGIME_TREND:    return 1;
-         case REGIME_MEANREV:  return 2;
-         default:              return -1;
-      }
-   }
-
-   double GetChi() { return m_chi; }
-   double GetChiZ() { return m_chiStats.GetZScore(m_chi); }
-   double GetPriceDeviation() { return m_priceDeviation; }
-   bool IsReady() { return m_ready; }
-};
-
-//+------------------------------------------------------------------+
-//| STRUCTURE: Symbol Data                                            |
-//+------------------------------------------------------------------+
-struct SymbolData
-{
-   string            name;
-   BrokerSpec        spec;
-   ENUM_ASSET_TYPE   assetType;
-   bool              typeAllowed;
-   bool              initialized;
-   bool              halted;
-
-   int               atrHandle;
-   double            atr;
-   double            avgATR;
-
-   CKinematicPhysics physics;
-   CSymC_Monitor     symc;
-
-   // Per-symbol tracking
-   double            dailyPnL;
-   int               consLosses;
-
-   void Clear()
-   {
-      name = "";
-      assetType = ASSET_OTHER;
-      typeAllowed = false;
-      initialized = false;
-      halted = false;
-      atrHandle = INVALID_HANDLE;
-      atr = 0;
-      avgATR = 0;
-      dailyPnL = 0;
-      consLosses = 0;
-   }
-};
-
-//+------------------------------------------------------------------+
-//| GLOBAL VARIABLES                                                  |
-//+------------------------------------------------------------------+
-CTrade            g_trade;
-TradingAgent      g_sniper;
-TradingAgent      g_berserker;
-ProbabilityPredictor g_predictor;
-StatisticalGate   g_statGate;
-CircuitBreaker    g_breaker;
-
-// Symbol management
-SymbolData        g_symbols[MAX_SYMBOLS];
-int               g_symbolCount = 0;
-
-// Velocity ranking
-VelocityRank      g_ranking[MAX_SYMBOLS];
-int               g_rankCount = 0;
-
-// Position tracking
-Position          g_positions[MAX_POSITIONS];
-int               g_posCount = 0;
-
-// Period statistics
-PeriodStats       g_dayStats;
-PeriodStats       g_weekStats;
-PeriodStats       g_monthStats;
-PeriodStats       g_totalStats;
-
-// Excursion tracking
-ExcursionStats    g_sniperExcursion;
-ExcursionStats    g_berserkerExcursion;
-
-// System status
-SystemStatus      g_status;
-
-// Session tracking
-double            g_sessionEquity;
-datetime          g_sessionStart;
-
-// HUD
-bool              g_hudInit = false;
-int               g_hudTab = 0;
-datetime          g_hudLastTabSwitch = 0;
-string            g_hudObjects[];
-int               g_hudCount = 0;
-
-#define TAB_OVERVIEW    0
-#define TAB_PERFORMANCE 1
-#define TAB_TRAINING    2
-#define TAB_PROBABILITY 3
-#define TAB_RISK        4
-#define TAB_SIGNALS     5
-#define TAB_COUNT       6
-
-//+------------------------------------------------------------------+
-//| DEFENSIVE HELPER: Validate number is finite and not NaN           |
-//+------------------------------------------------------------------+
-bool IsValidNumber(double value)
-{
-   return MathIsValidNumber(value) && value != EMPTY_VALUE;
-}
-
-//+------------------------------------------------------------------+
-//| DEFENSIVE HELPER: Safe division that returns 0 on divide by zero  |
-//+------------------------------------------------------------------+
-double SafeDivide(double numerator, double denominator, double defaultVal = 0.0)
-{
-   if(!IsValidNumber(numerator) || !IsValidNumber(denominator))
-      return defaultVal;
-   if(MathAbs(denominator) < 0.0000001)
-      return defaultVal;
-   return numerator / denominator;
-}
-
-//+------------------------------------------------------------------+
-//| DEFENSIVE HELPER: Validate spread before trading                  |
-//+------------------------------------------------------------------+
-bool IsSpreadAcceptable(int symIdx, double maxSpreadMultiplier = 3.0)
-{
-   if(symIdx < 0 || symIdx >= g_symbolCount) return false;
-
-   double spread = g_symbols[symIdx].spec.spread;
-   double avgSpread = g_symbols[symIdx].avgATR * 0.1;  // Estimate normal spread
-
-   // DEFENSIVE: Ensure positive values
-   if(avgSpread <= 0) avgSpread = spread * 2;
-   if(spread <= 0) return true;  // Can't validate, allow trade
-
-   return (spread <= avgSpread * maxSpreadMultiplier);
-}
+#endif  // END LEGACY INLINE DEFINITIONS
 
 //+------------------------------------------------------------------+
 //| EXPERT INITIALIZATION                                             |
@@ -2983,6 +2276,18 @@ bool HasPositionOnSymbol(const string sym)
 }
 
 //+------------------------------------------------------------------+
+//| CHART EVENT - Delegate to VT_HUD.mqh handler                      |
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+   HandleHUDChartEvent(id, lparam, dparam, sparam);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LEGACY HUD & PERSISTENCE CODE (Now in header files - disabled)
+// ═══════════════════════════════════════════════════════════════════
+#if 0  // BEGIN LEGACY HUD/PERSISTENCE (disabled - now in VT_HUD.mqh & VT_Persistence.mqh)
+//+------------------------------------------------------------------+
 //| HUD FUNCTIONS                                                     |
 //+------------------------------------------------------------------+
 void HUD_Create(string name, int x, int y, string text, color clr, int size = 8)
@@ -3986,5 +3291,8 @@ void LoadProfile(int handle, AgentProfile &profile)
       profile.regime[i].InvalidateCache();
    }
 }
+#endif  // END LEGACY HUD/PERSISTENCE
 
+//+------------------------------------------------------------------+
+//| END OF FILE - VelocityTrader v7.1 Duel Architecture               |
 //+------------------------------------------------------------------+

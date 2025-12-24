@@ -1,0 +1,30 @@
+{
+  "description": "Comprehensive backtest with multiple instruments",
+  "instruments": [
+    {
+      "symbol": "EURUSD",
+      "timeframe": "PERIOD_H1",
+      "start_date": "2022.01.01",
+      "end_date": "2023.12.31"
+    },
+    {
+      "symbol": "GBPUSD",
+      "timeframe": "PERIOD_H1",
+      "start_date": "2022.01.01",
+      "end_date": "2023.12.31"
+    },
+    {
+      "symbol": "USDJPY",
+      "timeframe": "PERIOD_H1",
+      "start_date": "2022.01.01",
+      "end_date": "2023.12.31"
+    }
+  ],
+  "initial_deposit": 10000,
+  "leverage": 100,
+  "optimization_mode": false,
+  "visual_mode": false,
+  "forward_testing": true,
+  "forward_split": 0.7,
+  "execution_mode": "every_tick"
+}

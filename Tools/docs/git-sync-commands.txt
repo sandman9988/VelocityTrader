@@ -1,0 +1,15 @@
+=== Git Commands for Manual Push ===
+
+# 1. First, ensure you're on the development branch:
+git checkout development
+
+# 2. Push the development branch to GitHub:
+git push -u origin development
+
+# 3. Push the updated main branch:
+git checkout main
+git push origin main
+
+# 4. Delete old review branches (optional):
+git push origin --delete claude/review-changes-mjeksddjseifyl9w-oYvnW
+git push origin --delete claude/review-changes-mjepzyhrxnn92xhh-JNaT6

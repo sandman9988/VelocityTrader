@@ -1,0 +1,203 @@
+{
+  "audit_results": {
+    "development": {
+      "exists": true,
+      "standard_folders": {
+        "Experts": {
+          "exists": true,
+          "file_count": 102,
+          "description": "Expert Advisors (.mq5)"
+        },
+        "Include": {
+          "exists": true,
+          "file_count": 439,
+          "description": "Header files (.mqh)"
+        },
+        "Indicators": {
+          "exists": true,
+          "file_count": 173,
+          "description": "Custom indicators (.mq5)"
+        },
+        "Scripts": {
+          "exists": true,
+          "file_count": 92,
+          "description": "Scripts (.mq5)"
+        },
+        "Libraries": {
+          "exists": true,
+          "file_count": 0,
+          "description": "Libraries (.mq5/.ex5)"
+        },
+        "Files": {
+          "exists": true,
+          "file_count": 4,
+          "description": "Data files"
+        },
+        "Images": {
+          "exists": false
+        }
+      },
+      "unexpected_folders": [
+        "SharedIncludes"
+      ],
+      "file_counts": {},
+      "duplicates": [],
+      "wrong_level_items": []
+    },
+    "terminals": {
+      "8A503E260F28D3DD9CC9A37AA3CE29BC": {
+        "exists": true,
+        "standard_folders": {
+          "Experts": {
+            "exists": true,
+            "file_count": 117,
+            "description": "Expert Advisors (.mq5)"
+          },
+          "Include": {
+            "exists": true,
+            "file_count": 718,
+            "description": "Header files (.mqh)"
+          },
+          "Indicators": {
+            "exists": true,
+            "file_count": 252,
+            "description": "Custom indicators (.mq5)"
+          },
+          "Scripts": {
+            "exists": true,
+            "file_count": 96,
+            "description": "Scripts (.mq5)"
+          },
+          "Libraries": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Libraries (.mq5/.ex5)"
+          },
+          "Files": {
+            "exists": true,
+            "file_count": 162,
+            "description": "Data files"
+          },
+          "Images": {
+            "exists": true,
+            "file_count": 132,
+            "description": "Image resources"
+          }
+        },
+        "unexpected_folders": [
+          ".git",
+          "Logs",
+          "ML",
+          "Profiles",
+          "Services",
+          "Shared Projects"
+        ],
+        "file_counts": {},
+        "duplicates": [],
+        "wrong_level_items": []
+      },
+      "29BC03B6BB995A90C75D3603F5C8A659": {
+        "exists": false
+      },
+      "95E092767220F643BF1B1CCEEF7AD317": {
+        "exists": true,
+        "standard_folders": {
+          "Experts": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Expert Advisors (.mq5)"
+          },
+          "Include": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Header files (.mqh)"
+          },
+          "Indicators": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Custom indicators (.mq5)"
+          },
+          "Scripts": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Scripts (.mq5)"
+          },
+          "Libraries": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Libraries (.mq5/.ex5)"
+          },
+          "Files": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Data files"
+          },
+          "Images": {
+            "exists": false
+          }
+        },
+        "unexpected_folders": [
+          "Logs",
+          "Services",
+          "Shared Projects"
+        ],
+        "file_counts": {},
+        "duplicates": [],
+        "wrong_level_items": []
+      },
+      "D0E8209F77C8CF37AD8BF550E51FF075": {
+        "exists": true,
+        "standard_folders": {
+          "Experts": {
+            "exists": true,
+            "file_count": 99,
+            "description": "Expert Advisors (.mq5)"
+          },
+          "Include": {
+            "exists": true,
+            "file_count": 262,
+            "description": "Header files (.mqh)"
+          },
+          "Indicators": {
+            "exists": true,
+            "file_count": 73,
+            "description": "Custom indicators (.mq5)"
+          },
+          "Scripts": {
+            "exists": true,
+            "file_count": 57,
+            "description": "Scripts (.mq5)"
+          },
+          "Libraries": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Libraries (.mq5/.ex5)"
+          },
+          "Files": {
+            "exists": true,
+            "file_count": 0,
+            "description": "Data files"
+          },
+          "Images": {
+            "exists": true,
+            "file_count": 2,
+            "description": "Image resources"
+          }
+        },
+        "unexpected_folders": [
+          "Logs",
+          "Profiles",
+          "Services",
+          "Shared Projects"
+        ],
+        "file_counts": {},
+        "duplicates": [],
+        "wrong_level_items": []
+      }
+    }
+  },
+  "issues": [
+    "Terminal-29BC03B6BB995A90C75D3603F5C8A659: Directory not found"
+  ],
+  "recommendations": []
+}
