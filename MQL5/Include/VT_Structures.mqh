@@ -389,7 +389,9 @@ struct TradingAgent
 
    void RecordTrade(double pnl)
    {
-      rollingPnL[rollingIdx] = pnl;
+      // Bounds check for rolling window
+      if(rollingIdx >= 0 && rollingIdx < ROLLING_WINDOW)
+         rollingPnL[rollingIdx] = pnl;
       rollingIdx = (rollingIdx + 1) % ROLLING_WINDOW;
 
       if(pnl < 0)

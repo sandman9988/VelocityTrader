@@ -78,13 +78,13 @@ struct SymbolReturns
       double sum = 0.0;
       for(int i = 0; i < count; i++)
          sum += returns[i];
-      mean = sum / count;
+      mean = SafeDivide(sum, (double)count, 0.0);
 
       // Std Dev
       double sumSq = 0.0;
       for(int i = 0; i < count; i++)
          sumSq += MathPow(returns[i] - mean, 2);
-      stdDev = MathSqrt(sumSq / count);
+      stdDev = MathSqrt(SafeDivide(sumSq, (double)count, 0.0));
    }
 };
 
@@ -243,7 +243,7 @@ public:
       // Calculate return
       if(m_lastPrices[idx] > 0)
       {
-         double ret = (price - m_lastPrices[idx]) / m_lastPrices[idx];
+         double ret = SafeDivide(price - m_lastPrices[idx], m_lastPrices[idx], 0.0);
          m_symbolData[idx].AddReturn(ret);
       }
 
