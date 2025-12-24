@@ -74,11 +74,13 @@ python3 Tools/mql5_enhanced_linter.py --file MQL5/Experts/VelocityTrader_v7_1_Du
 
 ---
 
-## Current Audit Status (2024-12-24) - REMEDIATION SUBSTANTIALLY COMPLETE
+## Current Audit Status (2024-12-24) - MAJOR CLEANUP COMPLETE
 
-**Total Findings: ~500** | CRITICAL: ~80 | HIGH: ~100 | MEDIUM: ~280 | LOW: ~40
+**Total Findings: 765** | CRITICAL: 232 | HIGH: 159 | MEDIUM: 319 | LOW: 55
 
-**PRODUCTION STATUS: NOT READY (75% readiness) - UP FROM 65%**
+**Legacy code removed**: ~1970 lines of disabled code deleted from main EA.
+
+**PRODUCTION STATUS: NOT READY (70% readiness)**
 
 See `PROJECT_AUDIT.md` for comprehensive audit report.
 
@@ -101,21 +103,30 @@ See `PROJECT_AUDIT.md` for comprehensive audit report.
 | VT_Persistence.mqh | Already clean | No division issues | VERIFIED |
 | Main EA bounds | 200+ | Bounded loops | FIXED |
 | Main EA divisions | 15+ | SafeDivide | FIXED |
-| Critical violations | 310 | ~80 | -230 (-74%) |
-| Total violations | 988 | ~500 | -488 (-49%) |
+| Critical violations | 310 | 232 | -78 (-25%) |
+| Total violations | 988 | 765 | -223 (-23%) |
+| Legacy code removed | 1970 lines | 0 | -100% |
 
-### Violations by Category (Updated)
+### Violations by Category (After Cleanup)
 
-| Category | Before | After | Status |
+| Category | Before | After | Change |
 |----------|--------|-------|--------|
-| Memory Safety | 279 | ~60 | -78% |
-| Data Integrity | 265 | ~100 | -62% |
-| Numerical Safety | 125 | ~20 | -84% |
-| Regulatory Compliance | 75 | ~75 | Pending |
-| Code Quality | 73 | ~73 | Pending |
-| Defensive Programming | 72 | ~40 | -44% |
-| Execution Safety | 39 | ~20 | -49% |
-| Risk Controls | 20 | ~10 | -50% |
+| Memory Safety | 279 | 252 | -27 (-10%) |
+| Data Integrity | 265 | 187 | -78 (-29%) |
+| Numerical Safety | 125 | 82 | -43 (-34%) |
+| Regulatory Compliance | 75 | 58 | -17 (-23%) |
+| Code Quality | 73 | 55 | -18 (-25%) |
+| Defensive Programming | 72 | 71 | -1 |
+| Execution Safety | 39 | 40 | +1 |
+| Risk Controls | 20 | 20 | -- |
+
+**Key Improvements**:
+- Removed ~1970 lines of disabled legacy code
+- All core include files use SafeDivide for division safety
+- Physics engine fully functional (was stub returning zeros)
+- Regime detection integrated and producing real classifications
+- Main EA loops have proper MathMin bounds on array iteration
+- Main EA file reduced from 3559 to 1589 lines (-55%)
 
 ### Critical Issues - FIXED
 

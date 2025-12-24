@@ -2,9 +2,9 @@
 
 > **WARNING: NOT PRODUCTION READY**
 >
-> This system has **~80 CRITICAL safety violations** (down from 310). Core physics components are now functional. See `PROJECT_AUDIT.md` for details.
+> This system has **232 CRITICAL safety violations** (down from 310). Core physics components are now functional. ~1970 lines of legacy code removed. See `PROJECT_AUDIT.md` for details.
 >
-> **Production Readiness: 75%** (up from 65%) | Do not deploy to live trading without completing remediation.
+> **Production Readiness: 70%** | Do not deploy to live trading without completing remediation.
 
 A sophisticated MetaTrader 5 Expert Advisor implementing a 2-Agent / 3-Regime Evolutionary Reinforcement Learning Trading System with physics-based kinematic market analysis.
 
