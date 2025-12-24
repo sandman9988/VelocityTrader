@@ -741,23 +741,23 @@ public:
       if(MathAbs(det) < 1e-10)
          return;  // Singular matrix
 
-      // Calculate c (constant)
+      // Calculate c (constant) - DEFENSE IN DEPTH: SafeDivide even with det check
       double detC = sumY * (sumX2 * sumX4 - sumX3 * sumX3)
                   - sumX * (sumXY * sumX4 - sumX3 * sumX2Y)
                   + sumX2 * (sumXY * sumX3 - sumX2 * sumX2Y);
-      reg.c = detC / det;
+      reg.c = SafeDivide(detC, det, 0.0);
 
       // Calculate b (linear coefficient)
       double detB = n * (sumXY * sumX4 - sumX3 * sumX2Y)
                   - sumY * (sumX * sumX4 - sumX3 * sumX2)
                   + sumX2 * (sumX * sumX2Y - sumX2 * sumXY);
-      reg.b = detB / det;
+      reg.b = SafeDivide(detB, det, 0.0);
 
       // Calculate a (quadratic coefficient)
       double detA = n * (sumX2 * sumX2Y - sumXY * sumX3)
                   - sumX * (sumX * sumX2Y - sumXY * sumX2)
                   + sumY * (sumX * sumX3 - sumX2 * sumX2);
-      reg.a = detA / det;
+      reg.a = SafeDivide(detA, det, 0.0);
 
       // Calculate R² (coefficient of determination)
       double meanY = SafeDivide(sumY, (double)n, 0.0);

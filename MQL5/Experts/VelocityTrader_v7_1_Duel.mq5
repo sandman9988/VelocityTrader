@@ -268,6 +268,7 @@ void OnTimer()
    // ════════════════════════════════════════════════════════════════
    // TIMER: Non-critical operations moved here for better OnTick perf
    // Runs every TIMER_INTERVAL_MS (250ms default)
+   // DEFENSE IN DEPTH: Drawdown checked via g_breaker.Update() + OnTick
    // ════════════════════════════════════════════════════════════════
 
    static datetime lastSecond = 0;
@@ -437,11 +438,40 @@ void CheckPeriodResets()
 }
 
 //+------------------------------------------------------------------+
+//| DEFENSE IN DEPTH: Explicit drawdown check                         |
+//| Returns true if drawdown exceeds limit (trading should stop)      |
+//+------------------------------------------------------------------+
+bool IsDrawdownExceeded()
+{
+   static double peakEquity = 0;
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+
+   if(equity > peakEquity) peakEquity = equity;
+   if(peakEquity <= 0) return false;
+
+   // DEFENSE IN DEPTH: Use SafeDivide even though we checked peakEquity > 0
+   double drawdown = SafeDivide(peakEquity - equity, peakEquity, 0.0);
+   return (drawdown > InpMaxDrawdown);
+}
+
+//+------------------------------------------------------------------+
 //| TICK FUNCTION - Performance Optimized with Tiered Updates         |
 //| Critical path only - non-critical work deferred to OnTimer        |
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   // DEFENSE IN DEPTH: Explicit drawdown check (redundant with circuit breaker)
+   if(IsDrawdownExceeded())
+   {
+      static datetime lastWarn = 0;
+      if(TimeCurrent() - lastWarn > 60)  // Warn once per minute
+      {
+         Print("WARNING: Drawdown exceeded ", InpMaxDrawdown * 100, "% - trading suspended");
+         lastWarn = TimeCurrent();
+      }
+      return;
+   }
+
    // Notify performance manager
    g_perfManager.OnTickStart();
    int tickCount = g_perfManager.tickCounter;
