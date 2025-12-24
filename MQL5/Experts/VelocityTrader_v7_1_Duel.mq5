@@ -139,6 +139,7 @@ input bool      InpShadowOnly = false;           // Shadow only mode
 #include <VT_Globals.mqh>              // All structs and global variables
 #include <VT_HUD.mqh>                  // HUD rendering functions
 #include <VT_Persistence.mqh>          // State save/load functions
+#include <VT_Performance.mqh>          // Performance optimizations (ring buffers, caches)
 
 // ═══════════════════════════════════════════════════════════════════
 // LEGACY INLINE DEFINITIONS (Now in header files - kept for reference)
@@ -1175,10 +1176,14 @@ int OnInit()
    
    // Load state
    LoadState();
-   
-   // Timer for updates
-   EventSetTimer(1);
-   
+
+   // Initialize performance manager (ring buffers, caches)
+   InitPerformance();
+
+   // Timer for updates - use milliseconds for finer control
+   // 250ms interval for smooth HUD updates and deferred processing
+   EventSetMillisecondTimer(TIMER_INTERVAL_MS);
+
    Print("Initialization complete. Symbols: ", g_symbolCount);
    Print("System State: ", g_breaker.GetStateString());
    Print("Sniper threshold: ", InpSniperThreshold, " Berserker: ", InpBerserkerThreshold);
@@ -1216,33 +1221,103 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-   // Update circuit breaker state
-   g_breaker.Update();
+   // ════════════════════════════════════════════════════════════════
+   // TIMER: Non-critical operations moved here for better OnTick perf
+   // Runs every TIMER_INTERVAL_MS (250ms default)
+   // ════════════════════════════════════════════════════════════════
 
-   // Check for period resets (day/week/month)
-   CheckPeriodResets();
+   static datetime lastSecond = 0;
+   static datetime lastHUDRefresh = 0;
+   static int timerTicks = 0;
+   datetime now = TimeCurrent();
+   timerTicks++;
 
-   // Check for agent swaps
-   CheckAgentSwaps();
-
-   // Update capital allocation periodically
-   static int lastAllocUpdate = 0;
-   int totalTrades = g_sniper.real.totalTrades + g_berserker.real.totalTrades;
-   if(totalTrades - lastAllocUpdate >= InpAllocationPeriod)
+   // ─── Every Timer Tick (250ms) ───
+   // Process deferred symbol updates from queue
+   int symbolIdx;
+   while(g_perfManager.updateQueue.Dequeue(symbolIdx))
    {
-      UpdateCapitalAllocation();
-      lastAllocUpdate = totalTrades;
+      if(symbolIdx >= 0 && symbolIdx < g_symbolCount && g_symbols[symbolIdx].initialized)
+      {
+         UpdateSymbol(symbolIdx);
+         g_perfManager.OnSymbolUpdated();
+      }
    }
 
-   // Update edge status
-   UpdateEdgeStatus();
-
-   // Save state periodically
-   static datetime lastSave = 0;
-   if(TimeCurrent() - lastSave > 300)  // Every 5 minutes
+   // ─── Every 4 Timer Ticks (~1 second) ───
+   if(timerTicks % 4 == 0 || now != lastSecond)
    {
+      lastSecond = now;
+
+      // Update circuit breaker state
+      g_breaker.Update();
+
+      // Check for period resets (day/week/month)
+      CheckPeriodResets();
+
+      // Update system status
+      g_status.Update();
+   }
+
+   // ─── Every 20 Timer Ticks (~5 seconds) ───
+   if(timerTicks % 20 == 0)
+   {
+      // Check for agent swaps
+      CheckAgentSwaps();
+
+      // Update edge status
+      UpdateEdgeStatus();
+
+      // Update capital allocation periodically
+      static int lastAllocUpdate = 0;
+      int totalTrades = g_sniper.real.totalTrades + g_berserker.real.totalTrades;
+      if(totalTrades - lastAllocUpdate >= InpAllocationPeriod)
+      {
+         UpdateCapitalAllocation();
+         lastAllocUpdate = totalTrades;
+      }
+
+      // Update velocity ranking (moved from OnTick)
+      UpdateRanking();
+
+      // Invalidate HUD cache to force refresh
+      g_perfManager.hudCache.Invalidate();
+   }
+
+   // ─── HUD Refresh (throttled to avoid flicker) ───
+   if(InpShowHUD && (now != lastHUDRefresh || timerTicks % 4 == 0))
+   {
+      if(g_perfManager.hudCache.NeedsRefresh())
+      {
+         DrawHUD();
+         g_perfManager.hudCache.MarkRefreshed();
+         lastHUDRefresh = now;
+      }
+   }
+
+   // ─── Every 240 Timer Ticks (~60 seconds) ───
+   if(timerTicks % 240 == 0)
+   {
+      // Update low-priority symbols that weren't updated via OnTick
+      for(int i = 0; i < g_symbolCount; i++)
+      {
+         if(g_perfManager.symbolData[i].priority == PRIORITY_IDLE)
+         {
+            if(g_symbols[i].initialized && g_symbols[i].typeAllowed)
+               UpdateSymbol(i);
+         }
+      }
+   }
+
+   // ─── Every 1200 Timer Ticks (~5 minutes) ───
+   if(timerTicks % 1200 == 0)
+   {
+      // Save state periodically
       SaveState();
-      lastSave = TimeCurrent();
+
+      // Print performance stats
+      Print("Perf: ", GetPerfStatsString(),
+            " Queue:", g_perfManager.updateQueue.Count());
    }
 }
 
@@ -1317,56 +1392,96 @@ void CheckPeriodResets()
 }
 
 //+------------------------------------------------------------------+
-//| TICK FUNCTION - Performance Optimized                             |
+//| TICK FUNCTION - Performance Optimized with Tiered Updates         |
+//| Critical path only - non-critical work deferred to OnTimer        |
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   static datetime lastFullUpdate = 0;
-   static datetime lastHUDUpdate = 0;
-   static int tickCounter = 0;
-   
-   datetime now = TimeCurrent();
-   tickCounter++;
-   
-   // Always update current chart symbol immediately
+   // Notify performance manager
+   g_perfManager.OnTickStart();
+   int tickCount = g_perfManager.tickCounter;
+
+   // ════════════════════════════════════════════════════════════════
+   // CRITICAL PATH: Minimum work on every tick
+   // ════════════════════════════════════════════════════════════════
+
+   // 1. Always update current chart symbol immediately (CRITICAL)
    int currentIdx = FindSymbolIndex(_Symbol);
    if(currentIdx >= 0 && g_symbols[currentIdx].initialized)
-      UpdateSymbol(currentIdx);
-   
-   // Throttle full symbol updates (every 500ms or every 10 ticks)
-   bool doFullUpdate = (now - lastFullUpdate >= 1) || (tickCounter % 10 == 0);
-   
-   if(doFullUpdate)
    {
-      lastFullUpdate = now;
-      
-      // Update other symbols (skip current, already updated)
-      for(int i = 0; i < g_symbolCount; i++)
-      {
-         if(i == currentIdx) continue;
-         if(g_symbols[i].initialized && g_symbols[i].typeAllowed)
-            UpdateSymbol(i);
-      }
-      
-      // Update velocity ranking
-      UpdateRanking();
+      UpdateSymbol(currentIdx);
+      g_perfManager.symbolData[currentIdx].priority = PRIORITY_CRITICAL;
+      g_perfManager.OnSymbolUpdated();
    }
-   
-   // Always manage positions (critical path)
+
+   // 2. Always manage positions (CRITICAL)
    ManagePositions();
-   
-   // Check for new signals (if allowed)
+
+   // 3. Check for new signals if allowed (CRITICAL when trading)
    if(g_breaker.CanTradeShadow())
    {
       ProcessSignals();
    }
-   
-   // Throttle HUD updates (every 250ms max)
-   if(now - lastHUDUpdate >= 1 || tickCounter % 5 == 0)
+
+   // ════════════════════════════════════════════════════════════════
+   // TIERED UPDATES: Priority-based symbol updates
+   // ════════════════════════════════════════════════════════════════
+
+   // Update symbols based on their priority level
+   for(int i = 0; i < g_symbolCount; i++)
    {
-      lastHUDUpdate = now;
-      DrawHUD();
+      if(i == currentIdx) continue;  // Already updated above
+      if(!g_symbols[i].initialized || !g_symbols[i].typeAllowed) continue;
+
+      ENUM_UPDATE_PRIORITY priority = g_perfManager.symbolData[i].priority;
+
+      // Check if this symbol should be updated this tick
+      if(g_perfManager.symbolData[i].ShouldUpdate(tickCount))
+      {
+         // HIGH priority: update immediately
+         if(priority <= PRIORITY_HIGH)
+         {
+            UpdateSymbol(i);
+            g_perfManager.OnSymbolUpdated();
+         }
+         // MEDIUM/LOW priority: queue for deferred processing
+         else if(priority <= PRIORITY_LOW)
+         {
+            g_perfManager.updateQueue.Enqueue(i, (int)priority);
+         }
+         // IDLE priority: skip, will be updated in OnTimer
+      }
    }
+
+   // ════════════════════════════════════════════════════════════════
+   // UPDATE PRIORITIES: Based on current state
+   // Every 50 ticks, reassess symbol priorities
+   // ════════════════════════════════════════════════════════════════
+   if(tickCount % 50 == 0)
+   {
+      // Build lists of symbols with positions and top-ranked
+      int posSymbols[MAX_POSITIONS];
+      int posCount = 0;
+      for(int i = 0; i < g_posCount && i < MAX_POSITIONS; i++)
+      {
+         if(g_positions[i].active)
+         {
+            int symIdx = FindSymbolIndex(g_positions[i].symbol);
+            if(symIdx >= 0)
+               posSymbols[posCount++] = symIdx;
+         }
+      }
+
+      int topSymbols[10];
+      int topCount = MathMin(10, g_rankCount);
+      for(int i = 0; i < topCount; i++)
+         topSymbols[i] = g_ranking[i].symbolIdx;
+
+      g_perfManager.UpdatePriorities(posSymbols, posCount, topSymbols, topCount, currentIdx);
+   }
+
+   // NOTE: HUD updates moved to OnTimer for smoother rendering
+   // NOTE: Ranking updates moved to OnTimer (every 5 seconds)
 }
 
 //+------------------------------------------------------------------+
@@ -1486,15 +1601,25 @@ bool IsTypeAllowed(ENUM_ASSET_TYPE type)
 void UpdateSymbol(int idx)
 {
    if(!g_symbols[idx].initialized) return;
-   
-   // Refresh spec
-   g_symbols[idx].spec.bid = SymbolInfoDouble(g_symbols[idx].name, SYMBOL_BID);
+   if(!IsValidIndex(idx, MAX_SYMBOLS)) return;
+
+   // Refresh spec (always needed for trading)
+   double bid = SymbolInfoDouble(g_symbols[idx].name, SYMBOL_BID);
+   g_symbols[idx].spec.bid = bid;
    g_symbols[idx].spec.ask = SymbolInfoDouble(g_symbols[idx].name, SYMBOL_ASK);
    g_symbols[idx].spec.spread = g_symbols[idx].spec.ask - g_symbols[idx].spec.bid;
-   
+
+   // Record price in ring buffer for history
+   g_perfManager.symbolData[idx].RecordPrice(bid);
+
    // Update physics
    g_symbols[idx].physics.Update();
-   
+
+   // Record velocity/acceleration in ring buffer
+   double velocity = g_symbols[idx].physics.GetVelocity();
+   double accel = g_symbols[idx].physics.GetAcceleration();
+   g_perfManager.symbolData[idx].RecordVelocity(velocity, accel);
+
    // Get flow estimate
    MqlTick tick;
    double flow = 1.0;
@@ -1504,7 +1629,7 @@ void UpdateSymbol(int idx)
       if(flow == 0) flow = (double)tick.volume;
    }
    flow = MathMax(flow, 1.0);
-   
+
    // Update SymC
    g_symbols[idx].symc.Update(
       g_symbols[idx].physics.GetMass(),
@@ -1512,17 +1637,28 @@ void UpdateSymbol(int idx)
       g_symbols[idx].spec.bid,
       g_symbols[idx].physics
    );
-   
-   // Update ATR
+
+   // Update ATR with ring buffer storage
    double atrBuf[];
    if(CopyBuffer(g_symbols[idx].atrHandle, 0, 0, 1, atrBuf) > 0)
    {
       g_symbols[idx].atr = atrBuf[0];
-      if(g_symbols[idx].avgATR == 0)
+
+      // Store in ring buffer for rolling average
+      g_perfManager.symbolData[idx].RecordATR(atrBuf[0]);
+
+      // Use ring buffer average instead of EMA (more stable)
+      if(g_perfManager.symbolData[idx].atrHistory.Count() >= 5)
+         g_symbols[idx].avgATR = g_perfManager.symbolData[idx].GetAvgATR();
+      else if(g_symbols[idx].avgATR == 0)
          g_symbols[idx].avgATR = g_symbols[idx].atr;
       else
          g_symbols[idx].avgATR = (g_symbols[idx].avgATR * 0.98) + (g_symbols[idx].atr * 0.02);
    }
+
+   // Mark as updated
+   g_perfManager.symbolData[idx].lastUpdate = TimeCurrent();
+   g_perfManager.symbolData[idx].needsUpdate = false;
 }
 
 //+------------------------------------------------------------------+
