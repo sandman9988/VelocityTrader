@@ -88,7 +88,7 @@ struct CircuitBreaker
       // Update drawdown
       double equity = AccountInfoDouble(ACCOUNT_EQUITY);
       if(equity > peakEquity) peakEquity = equity;
-      currentDD = (peakEquity > 0) ? ((peakEquity - equity) / peakEquity) : 0;
+      currentDD = SafeDivide(peakEquity - equity, peakEquity, 0.0);
    }
 
    bool CheckTriggers(double rollingWR, int consLosses)
@@ -98,8 +98,7 @@ struct CircuitBreaker
       UpdateDaily();
 
       double equity = AccountInfoDouble(ACCOUNT_EQUITY);
-      double dailyLossPct = (dailyStartEquity > 0) ?
-                           (-dailyPnL / dailyStartEquity) : 0;
+      double dailyLossPct = SafeDivide(-dailyPnL, dailyStartEquity, 0.0);
 
       // Check triggers
       if(dailyLossPct > InpMaxDailyLoss)
@@ -173,8 +172,8 @@ struct CircuitBreaker
          // Check if retrain criteria met
          if(retrainTrades >= InpRetrainMinTrades)
          {
-            double wr = (retrainTrades > 0) ? ((double)retrainWins / retrainTrades) : 0;
-            double pf = (retrainDownside > 0.01) ? (retrainUpside / retrainDownside) : 0;
+            double wr = SafeDivide((double)retrainWins, (double)retrainTrades, 0.0);
+            double pf = SafeDivide(retrainUpside, retrainDownside, 0.0);
 
             if(wr >= InpRetrainMinWR && pf >= InpRetrainMinPF)
             {

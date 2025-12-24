@@ -294,8 +294,9 @@ void DrawTab_Dashboard(int x, int &y, int h, int sec)
    // Open positions status - find oldest
    int oldestAge = 0;
    int openCount = 0;
-   for(int i = 0; i < g_posCount; i++)
+   for(int i = 0; i < g_posCount && i < MAX_POSITIONS; i++)
    {
+      if(!IsValidIndex(i, MAX_POSITIONS)) continue;
       if(g_positions[i].active && g_positions[i].isShadow)
       {
          openCount++;
@@ -314,8 +315,9 @@ void DrawTab_Dashboard(int x, int &y, int h, int sec)
 
    // Regime distribution
    int nBrk=0, nTrd=0, nMR=0;
-   for(int i = 0; i < g_symbolCount; i++)
+   for(int i = 0; i < g_symbolCount && i < MAX_SYMBOLS; i++)
    {
+      if(!IsValidIndex(i, MAX_SYMBOLS)) continue;
       if(!g_symbols[i].initialized) continue;
       ENUM_REGIME reg = g_symbols[i].symc.GetRegime();
       if(reg == REGIME_BREAKOUT) nBrk++;
@@ -339,8 +341,7 @@ void DrawTab_Performance(int x, int &y, int h, int sec)
    y += h;
 
    // SNIPER Shadow
-   double sniSO = (g_sniper.shadow.sessTotalDownside > 0.01) ?
-      g_sniper.shadow.sessTotalUpside / g_sniper.shadow.sessTotalDownside : 1.0;
+   double sniSO = SafeDivide(g_sniper.shadow.sessTotalUpside, g_sniper.shadow.sessTotalDownside, 1.0);
    color sniSC = (g_sniper.shadow.sessTotalPnL >= 0) ? CLR_SHADOW : clrDarkGray;
    HUD_Create("H_PSS", x+8, y, StringFormat("SNI.S   %4d %4.0f%% %+5.0f  %4.1f |%4d %4.0f%% %+6.0f %5.2f",
       g_sniper.shadow.sessTotalTrades, g_sniper.shadow.GetSessWinRate()*100,
@@ -350,8 +351,7 @@ void DrawTab_Performance(int x, int &y, int h, int sec)
    y += h;
 
    // SNIPER Real
-   double sniRO = (g_sniper.real.sessTotalDownside > 0.01) ?
-      g_sniper.real.sessTotalUpside / g_sniper.real.sessTotalDownside : 1.0;
+   double sniRO = SafeDivide(g_sniper.real.sessTotalUpside, g_sniper.real.sessTotalDownside, 1.0);
    color sniRC = (g_sniper.real.totalPnL >= 0) ? CLR_SNIPER : CLR_NEGATIVE;
    HUD_Create("H_PSR", x+8, y, StringFormat("SNI.R   %4d %4.0f%% %+5.0f  %4.1f |%4d %4.0f%% %+6.0f %5.2f",
       g_sniper.real.sessTotalTrades, g_sniper.real.GetSessWinRate()*100,
@@ -361,8 +361,7 @@ void DrawTab_Performance(int x, int &y, int h, int sec)
    y += h;
 
    // BERSERKER Shadow
-   double berSO = (g_berserker.shadow.sessTotalDownside > 0.01) ?
-      g_berserker.shadow.sessTotalUpside / g_berserker.shadow.sessTotalDownside : 1.0;
+   double berSO = SafeDivide(g_berserker.shadow.sessTotalUpside, g_berserker.shadow.sessTotalDownside, 1.0);
    color berSC = (g_berserker.shadow.sessTotalPnL >= 0) ? CLR_SHADOW : clrDarkGray;
    HUD_Create("H_PBS", x+8, y, StringFormat("BER.S   %4d %4.0f%% %+5.0f  %4.1f |%4d %4.0f%% %+6.0f %5.2f",
       g_berserker.shadow.sessTotalTrades, g_berserker.shadow.GetSessWinRate()*100,
@@ -372,8 +371,7 @@ void DrawTab_Performance(int x, int &y, int h, int sec)
    y += h;
 
    // BERSERKER Real
-   double berRO = (g_berserker.real.sessTotalDownside > 0.01) ?
-      g_berserker.real.sessTotalUpside / g_berserker.real.sessTotalDownside : 1.0;
+   double berRO = SafeDivide(g_berserker.real.sessTotalUpside, g_berserker.real.sessTotalDownside, 1.0);
    color berRC = (g_berserker.real.totalPnL >= 0) ? CLR_BERSERKER : CLR_NEGATIVE;
    HUD_Create("H_PBR", x+8, y, StringFormat("BER.R   %4d %4.0f%% %+5.0f  %4.1f |%4d %4.0f%% %+6.0f %5.2f",
       g_berserker.real.sessTotalTrades, g_berserker.real.GetSessWinRate()*100,
@@ -389,8 +387,7 @@ void DrawTab_Performance(int x, int &y, int h, int sec)
    HUD_Create("H_P4", x+8, y, "         AvgMAE  MaxMAE  AvgMFE  MaxMFE   ETD", CLR_MUTED);
    y += h;
 
-   double sniAvgPnL = (g_sniper.shadow.totalTrades > 0) ?
-      g_sniper.shadow.totalPnL / g_sniper.shadow.totalTrades : 0;
+   double sniAvgPnL = SafeDivide(g_sniper.shadow.totalPnL, (double)g_sniper.shadow.totalTrades, 0.0);
    double sniETD = g_sniperExcursion.GetAvgETD(sniAvgPnL);
 
    HUD_Create("H_P5", x+8, y, StringFormat("SNIPER  %6.0f  %6.0f  %6.0f  %6.0f  %5.0f",
@@ -398,8 +395,7 @@ void DrawTab_Performance(int x, int &y, int h, int sec)
       g_sniperExcursion.avgMFE, g_sniperExcursion.maxMFE, sniETD), CLR_SNIPER);
    y += h;
 
-   double berAvgPnL = (g_berserker.shadow.totalTrades > 0) ?
-      g_berserker.shadow.totalPnL / g_berserker.shadow.totalTrades : 0;
+   double berAvgPnL = SafeDivide(g_berserker.shadow.totalPnL, (double)g_berserker.shadow.totalTrades, 0.0);
    double berETD = g_berserkerExcursion.GetAvgETD(berAvgPnL);
 
    HUD_Create("H_P6", x+8, y, StringFormat("BERSER  %6.0f  %6.0f  %6.0f  %6.0f  %5.0f",
@@ -475,8 +471,8 @@ void DrawTab_Training(int x, int &y, int h, int sec)
    y += h + sec;
 
    // Convergence
-   double convSni = (1.0 - sniAvg / InpLearningRateInit) * 100;
-   double convBer = (1.0 - berAvg / InpLearningRateInit) * 100;
+   double convSni = (1.0 - SafeDivide(sniAvg, InpLearningRateInit, 1.0)) * 100;
+   double convBer = (1.0 - SafeDivide(berAvg, InpLearningRateInit, 1.0)) * 100;
    string status = (convSni > 80 && convBer > 80) ? "CONVERGED" :
                    (convSni > 50 || convBer > 50) ? "LEARNING" : "EXPLORING";
    color statClr = (convSni > 80 && convBer > 80) ? CLR_POSITIVE :
@@ -576,7 +572,7 @@ void DrawTab_Risk(int x, int &y, int h, int sec)
    y += h;
 
    double sessionPnL = equity - g_sessionEquity;
-   double dailyLossPct = (g_sessionEquity > 0) ? MathMin(0, sessionPnL) / g_sessionEquity * 100 : 0;
+   double dailyLossPct = SafeDivide(MathMin(0, sessionPnL), g_sessionEquity, 0.0) * 100;
 
    color dayClr = (MathAbs(dailyLossPct) < InpMaxDailyLoss * 50) ? CLR_POSITIVE :
                   (MathAbs(dailyLossPct) < InpMaxDailyLoss * 100) ? CLR_NEUTRAL : CLR_NEGATIVE;
@@ -637,10 +633,11 @@ void DrawTab_Instruments(int x, int &y, int h, int sec)
    ArrayInitialize(brkScore, -999);
    ArrayInitialize(mrScore, -999);
 
-   for(int i = 0; i < g_rankCount && i < 50; i++)
+   for(int i = 0; i < g_rankCount && i < 50 && i < MAX_SYMBOLS; i++)
    {
+      if(!IsValidIndex(i, MAX_SYMBOLS)) continue;
       int idx = g_ranking[i].symbolIdx;
-      if(idx < 0 || idx >= g_symbolCount) continue;
+      if(!IsValidIndex(idx, MAX_SYMBOLS)) continue;
       if(!g_symbols[idx].initialized) continue;
 
       ENUM_REGIME regime = g_symbols[idx].symc.GetRegime();
@@ -672,7 +669,7 @@ void DrawTab_Instruments(int x, int &y, int h, int sec)
    y += h;
    for(int i = 0; i < 5; i++)
    {
-      if(trdIdx[i] >= 0)
+      if(trdIdx[i] >= 0 && IsValidIndex(trdIdx[i], MAX_SYMBOLS))
       {
          string dir = (trdScore[i] > 0) ? "^" : "v";
          double chi = g_symbols[trdIdx[i]].symc.GetChi();
@@ -691,7 +688,7 @@ void DrawTab_Instruments(int x, int &y, int h, int sec)
    y += h;
    for(int i = 0; i < 3; i++)  // Just 3 for space
    {
-      if(brkIdx[i] >= 0)
+      if(brkIdx[i] >= 0 && IsValidIndex(brkIdx[i], MAX_SYMBOLS))
       {
          string dir = (brkScore[i] > 0) ? "^" : "v";
          double chi = g_symbols[brkIdx[i]].symc.GetChi();
@@ -710,7 +707,7 @@ void DrawTab_Instruments(int x, int &y, int h, int sec)
    y += h;
    for(int i = 0; i < 3; i++)  // Just 3 for space
    {
-      if(mrIdx[i] >= 0)
+      if(mrIdx[i] >= 0 && IsValidIndex(mrIdx[i], MAX_SYMBOLS))
       {
          string dir = (mrScore[i] > 0) ? "^" : "v";
          double chi = g_symbols[mrIdx[i]].symc.GetChi();

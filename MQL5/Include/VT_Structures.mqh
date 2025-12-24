@@ -51,7 +51,7 @@ struct WelfordStats
       }
 
       double delta = value - mean;
-      mean += delta / count;
+      mean += SafeDivide(delta, (double)count, 0.0);
       double delta2 = value - mean;
       m2 += delta * delta2;
    }
@@ -59,7 +59,7 @@ struct WelfordStats
    double GetVariance()
    {
       if(count < 2) return 1.0;
-      return m2 / (count - 1);
+      return SafeDivide(m2, (double)(count - 1), 1.0);
    }
 
    double GetStdDev()
@@ -71,7 +71,7 @@ struct WelfordStats
    {
       double std = GetStdDev();
       if(std < 0.0001) return 0;
-      return (value - mean) / std;
+      return SafeDivide(value - mean, std, 0.0);
    }
 };
 
@@ -158,24 +158,24 @@ struct StrategyStats
 
    double GetSessWinRate()
    {
-      return (sessTrades > 0) ? ((double)sessWins / sessTrades) : 0;
+      return SafeDivide((double)sessWins, (double)sessTrades, 0.0);
    }
 
    double GetSessPF()
    {
-      return (sessDownside > 0.01) ? (sessUpside / sessDownside) : 0;
+      return SafeDivide(sessUpside, sessDownside, 0.0);
    }
 
    void UpdateCache()
    {
-      cachedWR = (trades > 0) ? ((double)wins / trades) : 0;
-      cachedPF = (downside > 0.01) ? (upside / downside) : 0;
+      cachedWR = SafeDivide((double)wins, (double)trades, 0.0);
+      cachedPF = SafeDivide(upside, downside, 0.0);
       cacheValid = true;
    }
 
    double GetOmega()
    {
-      if(downside > 0.01) return upside / downside;
+      if(downside > 0.01) return SafeDivide(upside, downside, 5.0);
       if(upside > 0) return 5.0;
       return 1.0;
    }
@@ -268,23 +268,23 @@ struct AgentProfile
    // Cumulative metrics
    double GetWinRate()
    {
-      return (totalTrades > 0) ? ((double)totalWins / totalTrades) : 0;
+      return SafeDivide((double)totalWins, (double)totalTrades, 0.0);
    }
 
    double GetPF()
    {
-      return (totalDownside > 0.01) ? (totalUpside / totalDownside) : 0;
+      return SafeDivide(totalUpside, totalDownside, 0.0);
    }
 
    // Session metrics
    double GetSessWinRate()
    {
-      return (sessTotalTrades > 0) ? ((double)sessTotalWins / sessTotalTrades) : 0;
+      return SafeDivide((double)sessTotalWins, (double)sessTotalTrades, 0.0);
    }
 
    double GetSessPF()
    {
-      return (sessTotalDownside > 0.01) ? (sessTotalUpside / sessTotalDownside) : 0;
+      return SafeDivide(sessTotalUpside, sessTotalDownside, 0.0);
    }
 
    void UpdateTrade(int regimeIdx, double netPnL, double reward, int action)
@@ -409,7 +409,7 @@ struct TradingAgent
             if(rollingPnL[i] > 0) wins++;
          }
       }
-      return (total > 0) ? ((double)wins / total) : 0.5;
+      return SafeDivide((double)wins, (double)total, 0.5);
    }
 
    void ResetSession()
@@ -424,9 +424,7 @@ struct TradingAgent
       if(real.totalTrades < 10) return false;
 
       double shadowPF = shadow.GetPF();
-      double realPF = real.GetPF();
-
-      if(realPF < 0.01) realPF = 0.01;
+      double realPF = MathMax(real.GetPF(), 0.01);
 
       return (shadowPF > realPF * InpSwapThreshold);
    }
@@ -513,7 +511,7 @@ struct PeriodStats
 
    double GetWR()
    {
-      return (trades > 0) ? ((double)wins / trades * 100) : 0;
+      return SafeDivide((double)wins, (double)trades, 0.0) * 100;
    }
 };
 
@@ -540,8 +538,8 @@ struct ExcursionStats
    void Update(double mae, double mfe)
    {
       count++;
-      avgMAE = avgMAE + (mae - avgMAE) / count;
-      avgMFE = avgMFE + (mfe - avgMFE) / count;
+      avgMAE = avgMAE + SafeDivide(mae - avgMAE, (double)count, 0.0);
+      avgMFE = avgMFE + SafeDivide(mfe - avgMFE, (double)count, 0.0);
       if(mae < maxMAE) maxMAE = mae;  // MAE is negative
       if(mfe > maxMFE) maxMFE = mfe;
    }
@@ -549,8 +547,7 @@ struct ExcursionStats
    double GetAvgETD(double avgPnL)
    {
       // Edge to Drawdown ratio
-      if(avgMAE == 0) return 0;
-      return avgPnL / MathAbs(avgMAE);
+      return SafeDivide(avgPnL, MathAbs(avgMAE), 0.0);
    }
 };
 

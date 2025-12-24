@@ -136,9 +136,9 @@ input bool      InpShadowOnly = false;           // Shadow only mode
 // ═══════════════════════════════════════════════════════════════════
 // INCLUDE MODULAR COMPONENTS
 // ═══════════════════════════════════════════════════════════════════
-#include "Include/VT_Globals.mqh"      // All structs and global variables
-#include "Include/VT_HUD.mqh"          // HUD rendering functions
-#include "Include/VT_Persistence.mqh"  // State save/load functions
+#include <VT_Globals.mqh>              // All structs and global variables
+#include <VT_HUD.mqh>                  // HUD rendering functions
+#include <VT_Persistence.mqh>          // State save/load functions
 
 // ═══════════════════════════════════════════════════════════════════
 // LEGACY INLINE DEFINITIONS (Now in header files - kept for reference)
@@ -1218,10 +1218,13 @@ void OnTimer()
 {
    // Update circuit breaker state
    g_breaker.Update();
-   
+
+   // Check for period resets (day/week/month)
+   CheckPeriodResets();
+
    // Check for agent swaps
    CheckAgentSwaps();
-   
+
    // Update capital allocation periodically
    static int lastAllocUpdate = 0;
    int totalTrades = g_sniper.real.totalTrades + g_berserker.real.totalTrades;
@@ -1230,16 +1233,86 @@ void OnTimer()
       UpdateCapitalAllocation();
       lastAllocUpdate = totalTrades;
    }
-   
+
    // Update edge status
    UpdateEdgeStatus();
-   
+
    // Save state periodically
    static datetime lastSave = 0;
    if(TimeCurrent() - lastSave > 300)  // Every 5 minutes
    {
       SaveState();
       lastSave = TimeCurrent();
+   }
+}
+
+//+------------------------------------------------------------------+
+//| CHECK PERIOD RESETS - Reset daily/weekly/monthly stats            |
+//+------------------------------------------------------------------+
+void CheckPeriodResets()
+{
+   static datetime lastDayCheck = 0;
+   datetime now = TimeCurrent();
+
+   // Only check once per minute to avoid overhead
+   if(now - lastDayCheck < 60) return;
+   lastDayCheck = now;
+
+   MqlDateTime dt;
+   TimeToStruct(now, dt);
+
+   MqlDateTime dtStart;
+   TimeToStruct(g_dayStats.startTime, dtStart);
+
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+
+   // Daily reset - new day started
+   if(dt.day != dtStart.day || dt.mon != dtStart.mon || dt.year != dtStart.year)
+   {
+      // Log yesterday's stats before reset
+      if(g_dayStats.trades > 0)
+      {
+         Print("DAY END: PnL=", DoubleToString(g_dayStats.pnl, 2),
+               " Trades=", g_dayStats.trades,
+               " WR=", DoubleToString(g_dayStats.GetWR(), 1), "%");
+      }
+
+      g_dayStats.Reset(equity);
+      g_sessionEquity = equity;  // Reset session equity too
+
+      // Also reset agent session stats for fresh daily comparison
+      g_sniper.ResetSession();
+      g_berserker.ResetSession();
+
+      Print("New trading day started - stats reset");
+   }
+
+   // Weekly reset - Monday (day_of_week == 1)
+   TimeToStruct(g_weekStats.startTime, dtStart);
+   if(dt.day_of_week == 1 && (dt.day != dtStart.day || dt.mon != dtStart.mon))
+   {
+      if(g_weekStats.trades > 0)
+      {
+         Print("WEEK END: PnL=", DoubleToString(g_weekStats.pnl, 2),
+               " Trades=", g_weekStats.trades,
+               " WR=", DoubleToString(g_weekStats.GetWR(), 1), "%");
+      }
+      g_weekStats.Reset(equity);
+      Print("New trading week started - weekly stats reset");
+   }
+
+   // Monthly reset - 1st of month
+   TimeToStruct(g_monthStats.startTime, dtStart);
+   if(dt.day == 1 && (dt.mon != dtStart.mon || dt.year != dtStart.year))
+   {
+      if(g_monthStats.trades > 0)
+      {
+         Print("MONTH END: PnL=", DoubleToString(g_monthStats.pnl, 2),
+               " Trades=", g_monthStats.trades,
+               " WR=", DoubleToString(g_monthStats.GetWR(), 1), "%");
+      }
+      g_monthStats.Reset(equity);
+      Print("New trading month started - monthly stats reset");
    }
 }
 
@@ -1642,37 +1715,42 @@ int GetAgentAction(TradingAgent &agent, ENUM_REGIME regime, double accel, double
 //+------------------------------------------------------------------+
 double CalculateLots(int symIdx, double pWin, double agentAlloc, int agentId, int regimeIdx)
 {
+   // Validate symIdx
+   if(!IsValidIndex(symIdx, MAX_SYMBOLS)) return 0;
+
    double equity = AccountInfoDouble(ACCOUNT_EQUITY);
    double riskAmount = equity * (InpRiskPercent / 100.0) * agentAlloc;
-   
+
    // Omega-based sizing if enabled
    if(InpUseOmegaSizing)
    {
       // Get Omega from the agent's shadow for this regime
       double omega = 1.0;  // Default (break-even)
-      
+
       if(agentId == AGENT_SNIPER && regimeIdx >= 0 && regimeIdx < 3)
          omega = g_sniper.shadow.regime[regimeIdx].GetOmega();
       else if(agentId == AGENT_BERSERKER && regimeIdx >= 0 && regimeIdx < 3)
          omega = g_berserker.shadow.regime[regimeIdx].GetOmega();
-      
+
       double omegaScale = g_predictor.GetOmegaSize(omega, pWin);
       riskAmount *= omegaScale;
    }
-   
+
    double atr = g_symbols[symIdx].atr;
    if(atr <= 0) return 0;
-   
+
    double slDistance = atr * 2.0;
    double tickSize = g_symbols[symIdx].spec.tickSize;
    double tickValue = g_symbols[symIdx].spec.tickValue;
-   
+
    if(tickSize <= 0) tickSize = g_symbols[symIdx].spec.point;
    if(tickValue <= 0) tickValue = 1.0;
-   
-   double slTicks = slDistance / tickSize;
-   double lots = riskAmount / (slTicks * tickValue);
-   
+
+   double slTicks = SafeDivide(slDistance, tickSize, 0.0);
+   if(slTicks <= 0) return 0;
+
+   double lots = SafeDivide(riskAmount, slTicks * tickValue, 0.0);
+
    return NormalizeLot(g_symbols[symIdx].spec, lots);
 }
 
@@ -1696,39 +1774,45 @@ double NormalizeLot(const BrokerSpec &spec, double lots)
 //+------------------------------------------------------------------+
 double CalculateFriction(int symIdx, double lots)
 {
+   // Validate symIdx
+   if(!IsValidIndex(symIdx, MAX_SYMBOLS)) return 0;
+
    double spread = g_symbols[symIdx].spec.spread;
    double tickSize = g_symbols[symIdx].spec.tickSize;
    double tickValue = g_symbols[symIdx].spec.tickValue;
-   
+
    if(tickSize <= 0) tickSize = g_symbols[symIdx].spec.point;
    if(tickValue <= 0) tickValue = 1.0;
-   
-   double spreadCost = (spread / tickSize) * tickValue * lots;
+
+   double spreadCost = SafeDivide(spread, tickSize, 0.0) * tickValue * lots;
    double commission = g_symbols[symIdx].spec.commission * lots * 2;  // Round trip
-   
+
    return spreadCost + commission;
 }
 
 //+------------------------------------------------------------------+
 //| EXECUTE SHADOW TRADE                                              |
 //+------------------------------------------------------------------+
-void ExecuteShadowTrade(int symIdx, int direction, double lots, int agentId, 
+void ExecuteShadowTrade(int symIdx, int direction, double lots, int agentId,
                         int regimeIdx, double pWin)
 {
+   // Validate indices
+   if(!IsValidIndex(symIdx, MAX_SYMBOLS)) return;
    if(g_posCount >= MAX_POSITIONS) return;
-   
-   double entryPrice = (direction > 0) ? 
-                       g_symbols[symIdx].spec.ask : 
+
+   double entryPrice = (direction > 0) ?
+                       g_symbols[symIdx].spec.ask :
                        g_symbols[symIdx].spec.bid;
-   
+
    if(entryPrice <= 0) return;  // Invalid price
-   
+
    double slDistance = g_symbols[symIdx].atr * InpShadowSL_ATR;
    if(slDistance <= 0) slDistance = entryPrice * 0.01;  // 1% fallback
-   
+
    double sl = (direction > 0) ? (entryPrice - slDistance) : (entryPrice + slDistance);
-   
+
    int slot = g_posCount++;
+   if(!IsValidIndex(slot, MAX_POSITIONS)) { g_posCount--; return; }
    g_positions[slot].ticket = 0;  // No real ticket
    g_positions[slot].symbol = g_symbols[symIdx].name;
    g_positions[slot].direction = direction;
@@ -1766,30 +1850,33 @@ void ExecuteShadowTrade(int symIdx, int direction, double lots, int agentId,
 void ExecuteRealTrade(int symIdx, int direction, double lots, int agentId,
                       int regimeIdx, double pWin)
 {
+   // Validate indices
+   if(!IsValidIndex(symIdx, MAX_SYMBOLS)) return;
    if(g_posCount >= MAX_POSITIONS) return;
-   
-   double entryPrice = (direction > 0) ? 
-                       g_symbols[symIdx].spec.ask : 
+
+   double entryPrice = (direction > 0) ?
+                       g_symbols[symIdx].spec.ask :
                        g_symbols[symIdx].spec.bid;
-   
+
    double slDistance = g_symbols[symIdx].atr * 2.0;
    double sl = (direction > 0) ? (entryPrice - slDistance) : (entryPrice + slDistance);
    sl = NormalizeDouble(sl, g_symbols[symIdx].spec.digits);
-   
+
    // MQL5 GOTCHA: Cannot use pointers to structs
    // Use direct access instead of: TradingAgent *agent = &g_sniper
    string agentName = (agentId == AGENT_SNIPER) ? g_sniper.name : g_berserker.name;
    string comment = "Vel" + agentName;
-   
+
    bool result = false;
    if(direction > 0)
       result = g_trade.Buy(lots, g_symbols[symIdx].name, 0, sl, 0, comment);
    else
       result = g_trade.Sell(lots, g_symbols[symIdx].name, 0, sl, 0, comment);
-   
+
    if(result)
    {
       int slot = g_posCount++;
+      if(!IsValidIndex(slot, MAX_POSITIONS)) { g_posCount--; return; }
       g_positions[slot].ticket = g_trade.ResultDeal();
       g_positions[slot].symbol = g_symbols[symIdx].name;
       g_positions[slot].direction = direction;
@@ -1819,21 +1906,23 @@ void ManagePositions()
 {
    for(int i = g_posCount - 1; i >= 0; i--)
    {
+      if(!IsValidIndex(i, MAX_POSITIONS)) continue;
       if(!g_positions[i].active) continue;
-      
+
       if(g_positions[i].isShadow)
          ManageShadowPosition(i);
       else
          ManageRealPosition(i);
    }
-   
+
    // Compact array
    int w = 0;
-   for(int i = 0; i < g_posCount; i++)
+   for(int i = 0; i < g_posCount && i < MAX_POSITIONS; i++)
    {
+      if(!IsValidIndex(i, MAX_POSITIONS)) continue;
       if(g_positions[i].active)
       {
-         if(w != i) g_positions[w] = g_positions[i];
+         if(w != i && IsValidIndex(w, MAX_POSITIONS)) g_positions[w] = g_positions[i];
          w++;
       }
    }
@@ -1845,18 +1934,21 @@ void ManagePositions()
 //+------------------------------------------------------------------+
 void ManageShadowPosition(int idx)
 {
+   // Validate index
+   if(!IsValidIndex(idx, MAX_POSITIONS)) return;
+
    string sym = g_positions[idx].symbol;
    double bid = SymbolInfoDouble(sym, SYMBOL_BID);
    double ask = SymbolInfoDouble(sym, SYMBOL_ASK);
-   
+
    // Calculate current P&L for MAE/MFE tracking
    double currentPrice = (g_positions[idx].direction > 0) ? bid : ask;
    double pnlPoints = (g_positions[idx].direction > 0) ?
                       (currentPrice - g_positions[idx].entryPrice) :
                       (g_positions[idx].entryPrice - currentPrice);
-   
+
    double point = SymbolInfoDouble(sym, SYMBOL_POINT);
-   double pnlPips = (point > 0) ? pnlPoints / point : 0;
+   double pnlPips = SafeDivide(pnlPoints, point, 0.0);
    g_positions[idx].currentPnL = pnlPips;
    
    // Update MAE (worst drawdown)
