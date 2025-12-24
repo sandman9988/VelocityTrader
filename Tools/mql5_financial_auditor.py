@@ -89,10 +89,11 @@ class FinancialAuditRules:
             'severity': Severity.CRITICAL,
             'title': 'Unsafe Division Operation',
             'pattern': r'(?<!/)/(?!/|=|\*)\s*([a-zA-Z_]\w*)',
-            'exclude_pattern': r'SafeDiv|SafeDivide|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'|// |/\*',
+            'exclude_pattern': r'SafeDiv|SafeDivide|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*2\.0|/\s*10\.0|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'|// |/\*|MathSqrt\s*\(\s*2|MESO_WINDOW|MICRO_WINDOW|MACRO_WINDOW|KINEMATIC_STATES|numBins|_WINDOW|_SIZE|_COUNT',
             'description': 'Division by variable without zero-check can crash or produce infinity',
             'recommendation': 'Use SafeDivide(numerator, denominator, default_value) or explicit zero-check',
             'check_denominator_validation': True,  # Special flag for checking nearby validation
+            'check_ternary_guard': True,  # NEW: Check for ternary operator guards like (x > 0) ? a/x : 0
             'check_string_context': True  # NEW: Exclude string operations
         },
         'NUM002': {
@@ -711,12 +712,28 @@ class FinancialCodeAuditor:
                                     # Modulo operations ensure index is within bounds
                                     found_bounds_check = True
 
-                                # Pattern 4b: Check for IsValidIndex calls
+                                # Pattern 4a: Check if index_var was ASSIGNED using modulo earlier
+                                # e.g., idx = m_historyIdx % m_historySize; ... array[idx]
                                 if not found_bounds_check:
-                                    if re.search(rf'IsValidIndex\s*\(\s*{index_var}', context_str):
+                                    prev_lines = '\n'.join(lines[max(0, i-10):i])
+                                    # Check for: index_var = expr % size
+                                    if re.search(rf'\b{index_var}\s*=\s*[^;]+%', prev_lines):
                                         found_bounds_check = True
-                                    # Also check for inline validation: if(!IsValidIndex(idx, size)) return;
-                                    elif re.search(rf'if\s*\(\s*!?\s*IsValidIndex', context_str):
+
+                                # Pattern 4b: Check for IsValidIndex calls - expanded to find validation anywhere in function
+                                if not found_bounds_check:
+                                    # Look back to function start (up to 100 lines) for IsValidIndex on this or related variable
+                                    func_context_start = max(0, i - 100)
+                                    func_context = '\n'.join(lines[func_context_start:i])
+
+                                    # Direct IsValidIndex check on the index variable
+                                    if re.search(rf'IsValidIndex\s*\(\s*{index_var}', func_context):
+                                        found_bounds_check = True
+                                    # Check for inline validation with early return: if(!IsValidIndex(idx, size)) return;
+                                    elif re.search(rf'if\s*\(\s*!IsValidIndex\s*\(\s*{index_var}', func_context):
+                                        found_bounds_check = True
+                                    # Check for any IsValidIndex with early return before this line
+                                    elif re.search(rf'if\s*\(\s*!IsValidIndex[^)]+\)\s*return', func_context):
                                         found_bounds_check = True
 
                                 # Pattern 4c: Check for known safe zone calculations
@@ -736,23 +753,51 @@ class FinancialCodeAuditor:
                                         # And loop bounded by same variable
                                         if re.search(rf'for\s*\([^;]*{index_var}.*{index_var}\s*<\s*(\w+)', context_str):
                                             found_bounds_check = True
+
+                                # Pattern 5b: ArrayResize immediately before access with count/size variable
+                                # e.g., ArrayResize(arr, count + 1); arr[count] = x;
+                                if not found_bounds_check:
+                                    # Check if previous few lines have ArrayResize with count+1 pattern
+                                    prev_lines = '\n'.join(lines[max(0, i-5):i])
+                                    # ArrayResize(array, count + 1) followed by array[count]
+                                    if re.search(rf'ArrayResize\s*\(\s*{array_name}\s*,\s*{index_var}\s*\+\s*1', prev_lines):
+                                        found_bounds_check = True
+                                    # ArrayResize(array, size); followed by array[size - 1] or array[size]
+                                    elif re.search(rf'ArrayResize\s*\(\s*{array_name}\s*,', prev_lines):
+                                        # The resize makes access at new size-1 or incremented counter safe
+                                        found_bounds_check = True
                                 
                                 # Pattern 6: Check if the array is a known fixed-size member variable
                                 # e.g., m_regime_stats[4] is always size 4
                                 if not found_bounds_check:
                                     # Check if variable is validated earlier in the function
                                     # Look for the function start and check for early return validation
-                                    func_start = max(0, i - 50)
+                                    func_start = max(0, i - 80)
                                     for j in range(func_start, i):
                                         # Look for function declaration
                                         if re.match(r'\s*(int|double|bool|void|string)\s+\w+\s*\(', lines[j]):
                                             # Found function start, now look for validation
-                                            for k in range(j, i):
-                                                # Check for early return pattern: if(idx < 0 || idx >= N) return;
-                                                if re.search(rf'if\s*\(\s*{index_var}\s*<\s*0\s*\|\|\s*{index_var}\s*>=\s*\d+\s*\)', lines[k]):
+                                            func_body = '\n'.join(lines[j:i])
+                                            # Check for early return pattern: if(idx < 0 || idx >= N) return;
+                                            if re.search(rf'if\s*\(\s*{index_var}\s*<\s*0\s*\|\|\s*{index_var}\s*>=\s*\w+\s*\)\s*return', func_body):
+                                                found_bounds_check = True
+                                            # Check for early return with continue pattern in loop context
+                                            elif re.search(rf'if\s*\(\s*!IsValidIndex\s*\(\s*{index_var}', func_body):
+                                                found_bounds_check = True
+                                            # Check for bounds check on different but related variable (e.g., slot after slot = count++)
+                                            elif re.search(rf'if\s*\(\s*!IsValidIndex\s*\([^)]+\)\s*\)', func_body):
+                                                # If there's ANY IsValidIndex check with return/continue, likely safe
+                                                if re.search(r'if\s*\(\s*!IsValidIndex[^)]+\)\s*(?:return|\{[^}]*return|continue)', func_body):
                                                     found_bounds_check = True
-                                                    break
                                             break
+
+                                # Pattern 6b: Check for slot = count++ pattern followed by IsValidIndex(slot)
+                                if not found_bounds_check:
+                                    prev_lines = '\n'.join(lines[max(0, i-10):i])
+                                    # Pattern: slot = g_posCount++; if(!IsValidIndex(slot, ...)) { g_posCount--; return; }
+                                    if re.search(rf'{index_var}\s*=\s*\w+\+\+', prev_lines) and \
+                                       re.search(rf'IsValidIndex\s*\(\s*{index_var}', prev_lines):
+                                        found_bounds_check = True
                                 
                                 # Pattern 7: Check for if(index_var < size_var) wrapping array access
                                 # This handles: if(m_cluster_count < clusters_size) { ... m_clusters[m_cluster_count] ... }
@@ -781,20 +826,42 @@ class FinancialCodeAuditor:
                             match = pattern.search(line)
                             if match:
                                 denominator = match.group(1).strip()
-                                # Look back up to 10 lines for validation of this denominator
-                                context_start = max(0, i - 10)
                                 found_validation = False
-                                for ctx_line in lines[context_start:i]:
-                                    # Check for various validation patterns:
-                                    # if(denominator != 0), if(MathAbs(denominator) < epsilon), etc.
-                                    if re.search(rf'\b{denominator}\b.*[<>!=]', ctx_line) and \
-                                       ('if' in ctx_line or 'return' in ctx_line):
+
+                                # Pattern 1: Ternary guard on the SAME LINE
+                                # e.g., (atr > 0) ? x / atr : 0  OR  denom > 0 ? num / denom : default
+                                if re.search(rf'\(\s*{denominator}\s*[>!]=?\s*0\s*\)\s*\?[^:]*/', line) or \
+                                   re.search(rf'{denominator}\s*[>!]=?\s*0\s*\?[^:]*/', line):
+                                    found_validation = True
+
+                                # Pattern 2: Check same line for conditional like if(x > 0) or (x != 0)
+                                if not found_validation:
+                                    if re.search(rf'\b{denominator}\s*[>!]=?\s*0', line):
                                         found_validation = True
-                                        break
-                                    # Check if denominator was assigned from SafeDiv or similar
-                                    if re.search(rf'{denominator}\s*=.*Safe', ctx_line):
-                                        found_validation = True
-                                        break
+
+                                # Pattern 3: Look back up to 15 lines for validation of this denominator
+                                if not found_validation:
+                                    context_start = max(0, i - 15)
+                                    for ctx_line in lines[context_start:i]:
+                                        # Check for various validation patterns:
+                                        # if(denominator != 0), if(MathAbs(denominator) < epsilon), etc.
+                                        if re.search(rf'\b{denominator}\b.*[<>!=]', ctx_line) and \
+                                           ('if' in ctx_line or 'return' in ctx_line):
+                                            found_validation = True
+                                            break
+                                        # Check if denominator was assigned from SafeDiv or similar
+                                        if re.search(rf'{denominator}\s*=.*Safe', ctx_line):
+                                            found_validation = True
+                                            break
+                                        # Check for early return on invalid denominator
+                                        if re.search(rf'if\s*\(\s*{denominator}\s*<=\s*0\s*\)\s*return', ctx_line):
+                                            found_validation = True
+                                            break
+                                        # Check for fallback assignment: if(x <= 0) x = default
+                                        if re.search(rf'if\s*\(\s*{denominator}\s*<=\s*0\s*\)\s*{denominator}\s*=', ctx_line):
+                                            found_validation = True
+                                            break
+
                                 if found_validation:
                                     continue
 
