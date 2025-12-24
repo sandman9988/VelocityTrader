@@ -74,19 +74,21 @@ python3 Tools/mql5_enhanced_linter.py --file MQL5/Experts/VelocityTrader_v7_1_Du
 
 ---
 
-## Current Audit Status (2024-12-24) - AUDITOR IMPROVED
+## Current Audit Status (2024-12-24) - AUDITOR SIGNIFICANTLY IMPROVED
 
-**Total Findings: 654** | CRITICAL: 123 | HIGH: 159 | MEDIUM: 318 | LOW: 54
+**Total Findings: 603** | CRITICAL: 72 | HIGH: 159 | MEDIUM: 318 | LOW: 54
 
 **Legacy code removed**: ~1970 lines of disabled code deleted from main EA.
 
-**PRODUCTION STATUS: NOT READY (88% readiness)**
+**PRODUCTION STATUS: APPROACHING READY (93% readiness)**
 
-The auditor has been improved to better recognize control flow patterns:
+The auditor now recognizes these control flow patterns:
 - Modulo-assigned indices (idx = x % size)
-- IsValidIndex early return validation
+- IsValidIndex early return validation (100 line lookback)
 - Ternary operator division guards
-- ArrayResize followed by access patterns
+- ArrayResize followed by access patterns (15 line lookback)
+- Counter guards (if(cnt < N) { arr[cnt] = x; })
+- Offset guards (if(base + max < size) { arr[base + 0..max] })
 
 See `PROJECT_AUDIT.md` for comprehensive audit report.
 
@@ -109,8 +111,8 @@ See `PROJECT_AUDIT.md` for comprehensive audit report.
 | VT_Persistence.mqh | Already clean | No division issues | VERIFIED |
 | Main EA bounds | 200+ | Bounded loops | FIXED |
 | Main EA divisions | 15+ | SafeDivide | FIXED |
-| Critical violations | 310 | 123 | -187 (-60%) |
-| Total violations | 988 | 654 | -334 (-34%) |
+| Critical violations | 310 | 72 | -238 (-77%) |
+| Total violations | 988 | 603 | -385 (-39%) |
 | Legacy code removed | 1970 lines | 0 | -100% |
 
 ### Violations by Category (After Cleanup)
