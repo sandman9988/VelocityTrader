@@ -1140,7 +1140,10 @@ int OnInit()
    
    // Initialize RL parameters (normalized 0-1)
    g_rlParams.Init();
-   
+
+   // Initialize divergent agent profiles (Sniper vs Berserker)
+   InitAgentProfiles();
+
    // Initialize session tracking
    g_sessionEquity = AccountInfoDouble(ACCOUNT_EQUITY);
    g_sessionStart = TimeCurrent();
@@ -1612,8 +1615,31 @@ void UpdateSymbol(int idx)
    // Record price in ring buffer for history
    g_perfManager.symbolData[idx].RecordPrice(bid);
 
-   // Update physics
-   g_symbols[idx].physics.Update();
+   // Get ATR FIRST (needed for physics update)
+   double atr = g_symbols[idx].atr;  // Use cached value initially
+   double atrBuf[];
+   if(CopyBuffer(g_symbols[idx].atrHandle, 0, 0, 1, atrBuf) > 0)
+   {
+      atr = atrBuf[0];
+      g_symbols[idx].atr = atr;
+
+      // Store in ring buffer for rolling average
+      g_perfManager.symbolData[idx].RecordATR(atr);
+
+      // Use ring buffer average instead of EMA (more stable)
+      if(g_perfManager.symbolData[idx].atrHistory.Count() >= 5)
+         g_symbols[idx].avgATR = g_perfManager.symbolData[idx].GetAvgATR();
+      else if(g_symbols[idx].avgATR == 0)
+         g_symbols[idx].avgATR = atr;
+      else
+         g_symbols[idx].avgATR = (g_symbols[idx].avgATR * 0.98) + (atr * 0.02);
+   }
+
+   // Ensure we have a valid ATR for physics
+   if(atr <= 0) atr = bid * 0.001;  // Fallback to 0.1% of price
+
+   // Update physics with price and ATR (real kinematic calculations)
+   g_symbols[idx].physics.UpdateWithATR(bid, atr);
 
    // Record velocity/acceleration in ring buffer
    double velocity = g_symbols[idx].physics.GetVelocity();
@@ -1630,31 +1656,13 @@ void UpdateSymbol(int idx)
    }
    flow = MathMax(flow, 1.0);
 
-   // Update SymC
+   // Update SymC (regime detection from physics state)
    g_symbols[idx].symc.Update(
       g_symbols[idx].physics.GetMass(),
       flow,
-      g_symbols[idx].spec.bid,
+      bid,
       g_symbols[idx].physics
    );
-
-   // Update ATR with ring buffer storage
-   double atrBuf[];
-   if(CopyBuffer(g_symbols[idx].atrHandle, 0, 0, 1, atrBuf) > 0)
-   {
-      g_symbols[idx].atr = atrBuf[0];
-
-      // Store in ring buffer for rolling average
-      g_perfManager.symbolData[idx].RecordATR(atrBuf[0]);
-
-      // Use ring buffer average instead of EMA (more stable)
-      if(g_perfManager.symbolData[idx].atrHistory.Count() >= 5)
-         g_symbols[idx].avgATR = g_perfManager.symbolData[idx].GetAvgATR();
-      else if(g_symbols[idx].avgATR == 0)
-         g_symbols[idx].avgATR = g_symbols[idx].atr;
-      else
-         g_symbols[idx].avgATR = (g_symbols[idx].avgATR * 0.98) + (g_symbols[idx].atr * 0.02);
-   }
 
    // Mark as updated
    g_perfManager.symbolData[idx].lastUpdate = TimeCurrent();

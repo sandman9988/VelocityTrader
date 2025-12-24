@@ -15,9 +15,177 @@
 #include "VT_Structures.mqh"
 #include "VT_Predictor.mqh"
 #include "VT_CircuitBreaker.mqh"
+#include "VT_KinematicRegimes.mqh"
 
 //+------------------------------------------------------------------+
-//| FORWARD DECLARATION: SymC (Physics) - Stub for now               |
+//| STRUCTURE: Physics Engine - Real Kinematic Calculations          |
+//|                                                                   |
+//| Wraps CKinematicRegimeDetector to provide velocity, acceleration,|
+//| jerk, mass, and multi-timescale analysis for regime detection    |
+//+------------------------------------------------------------------+
+struct PhysicsEngine
+{
+private:
+   CKinematicRegimeDetector* m_detector;
+   string                     m_symbol;
+   bool                       m_ownsDetector;
+   double                     m_lastPrice;
+
+public:
+   void Init(string sym)
+   {
+      m_symbol = sym;
+      m_detector = new CKinematicRegimeDetector();
+      m_ownsDetector = true;
+      m_lastPrice = 0;
+   }
+
+   void Deinit()
+   {
+      if(m_ownsDetector && m_detector != NULL)
+      {
+         delete m_detector;
+         m_detector = NULL;
+      }
+   }
+
+   void UpdateWithATR(double price, double atr)
+   {
+      if(m_detector != NULL && price > 0 && atr > 0)
+         m_detector.Update(price, atr);
+      m_lastPrice = price;
+   }
+
+   // Legacy Update() for backward compatibility
+   void Update()
+   {
+      if(m_symbol == "" || m_detector == NULL) return;
+      double price = SymbolInfoDouble(m_symbol, SYMBOL_BID);
+      if(price <= 0) return;
+
+      // Estimate ATR from recent movement if not provided
+      double atr = 0.0;
+      if(m_lastPrice > 0)
+         atr = MathAbs(price - m_lastPrice) * 14.0;
+      else
+         atr = price * 0.001;  // Default 0.1% for first tick
+
+      atr = MathMax(atr, price * 0.0001);  // Minimum ATR
+      UpdateWithATR(price, atr);
+   }
+
+   bool IsReady()
+   {
+      return (m_detector != NULL && m_detector.IsReady());
+   }
+
+   double GetVelocity()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().velocity;
+   }
+
+   double GetAcceleration()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().acceleration;
+   }
+
+   double GetJerk()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().jerk;
+   }
+
+   double GetMass()
+   {
+      if(m_detector == NULL) return 1.0;
+      return m_detector.GetState().mass;
+   }
+
+   double GetMomentum()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().momentum;
+   }
+
+   double GetMicroVelocity()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().microVelocity;
+   }
+
+   double GetMesoVelocity()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().mesoVelocity;
+   }
+
+   double GetMacroVelocity()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().macroVelocity;
+   }
+
+   ENUM_KINEMATIC_STATE GetKinematicState()
+   {
+      if(m_detector == NULL) return KIN_CRUISING;
+      return m_detector.GetState().state;
+   }
+
+   double GetStateConfidence()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().stateConfidence;
+   }
+
+   int GetStatePersistence()
+   {
+      if(m_detector == NULL) return 0;
+      return m_detector.GetState().statePersistence;
+   }
+
+   KinematicState GetFullState()
+   {
+      if(m_detector == NULL)
+      {
+         KinematicState empty;
+         empty.Reset();
+         return empty;
+      }
+      return m_detector.GetState();
+   }
+
+   int GetStateVisitCount(ENUM_KINEMATIC_STATE kinState)
+   {
+      if(m_detector == NULL) return 0;
+      return m_detector.GetStateVisitCount(kinState);
+   }
+
+   double GetChi()
+   {
+      if(m_detector == NULL) return 1.0;
+      return m_detector.GetState().chi;
+   }
+
+   double GetChiZ()
+   {
+      if(m_detector == NULL) return 0.0;
+      return m_detector.GetState().chiZ;
+   }
+
+   ENUM_REGIME GetRegime()
+   {
+      if(m_detector == NULL) return REGIME_CALIBRATING;
+      return m_detector.GetState().regime;
+   }
+};
+
+//+------------------------------------------------------------------+
+//| STRUCTURE: SymC Data - Regime Detection Interface                |
+//|                                                                   |
+//| Provides chi (oscillation), regime classification, and price     |
+//| deviation metrics derived from the PhysicsEngine kinematic state |
 //+------------------------------------------------------------------+
 struct SymCData
 {
@@ -26,11 +194,19 @@ struct SymCData
    double priceDeviation;
    ENUM_REGIME regime;
 
-   void Init() { chi = 1.0; chiZ = 0; priceDeviation = 0; regime = REGIME_CALIBRATING; }
+   void Init()
+   {
+      chi = 1.0;
+      chiZ = 0;
+      priceDeviation = 0;
+      regime = REGIME_CALIBRATING;
+   }
+
    double GetChi() { return chi; }
    double GetChiZ() { return chiZ; }
    double GetPriceDeviation() { return priceDeviation; }
    ENUM_REGIME GetRegime() { return regime; }
+
    int GetRegimeIndex()
    {
       if(regime == REGIME_BREAKOUT) return 0;
@@ -38,26 +214,23 @@ struct SymCData
       if(regime == REGIME_MEANREV) return 2;
       return -1;
    }
-   void Update(double mass, double flow, double price, PhysicsEngine &phys) { /* stub */ }
-};
 
-//+------------------------------------------------------------------+
-//| FORWARD DECLARATION: Physics Engine - Stub for now               |
-//+------------------------------------------------------------------+
-struct PhysicsEngine
-{
-   bool ready;
-   double velocity;
-   double acceleration;
-   double mass;
+   void Update(double mass, double flow, double price, PhysicsEngine &phys)
+   {
+      // Get kinematic state from physics engine
+      KinematicState kinState = phys.GetFullState();
 
-   void Init(string sym) { ready = false; velocity = 0; acceleration = 0; mass = 1.0; }
-   void Deinit() { }
-   void Update() { ready = true; }
-   bool IsReady() { return ready; }
-   double GetVelocity() { return velocity; }
-   double GetAcceleration() { return acceleration; }
-   double GetMass() { return mass; }
+      // Update chi and chiZ from kinematic analysis
+      chi = kinState.chi;
+      chiZ = kinState.chiZ;
+
+      // Price deviation: normalized position converted to centered scale
+      // position 0.5 = neutral, <0.5 = oversold, >0.5 = overbought
+      priceDeviation = (kinState.position - 0.5) * 2.0;
+
+      // Regime from kinematic classification
+      regime = kinState.regime;
+   }
 };
 
 //+------------------------------------------------------------------+
