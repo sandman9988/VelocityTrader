@@ -125,18 +125,24 @@ struct NormalizedSpecs
    // Pack into feature vector for RL
    void ToFeatureVector(double &features[], int startIdx = 0)
    {
-      if(ArraySize(features) < startIdx + 9)
-         ArrayResize(features, startIdx + 9);
+      int requiredSize = startIdx + 9;
+      if(ArraySize(features) < requiredSize)
+         ArrayResize(features, requiredSize);
 
-      features[startIdx + 0] = spreadNorm;
-      features[startIdx + 1] = swapLongNorm;
-      features[startIdx + 2] = swapShortNorm;
-      features[startIdx + 3] = commissionNorm;
-      features[startIdx + 4] = marginNorm;
-      features[startIdx + 5] = volatilityNorm;
-      features[startIdx + 6] = liquidityNorm;
-      features[startIdx + 7] = sessionNorm;
-      features[startIdx + 8] = riskScoreNorm;
+      // Bounds-safe assignment
+      int size = ArraySize(features);
+      if(startIdx + 8 < size)
+      {
+         features[startIdx + 0] = spreadNorm;
+         features[startIdx + 1] = swapLongNorm;
+         features[startIdx + 2] = swapShortNorm;
+         features[startIdx + 3] = commissionNorm;
+         features[startIdx + 4] = marginNorm;
+         features[startIdx + 5] = volatilityNorm;
+         features[startIdx + 6] = liquidityNorm;
+         features[startIdx + 7] = sessionNorm;
+         features[startIdx + 8] = riskScoreNorm;
+      }
    }
 };
 
@@ -918,6 +924,7 @@ public:
       for(int offset = 0; offset < 7; offset++)
       {
          int checkDay = (now.day_of_week + offset) % 7;
+         if(checkDay < 0 || checkDay >= 7) continue;  // Bounds check
 
          if(spec.sessions[checkDay].isActive)
          {

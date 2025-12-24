@@ -729,13 +729,17 @@ public:
       if(count > 0)
          avgCorr = SafeDivide(avgCorr, (double)count, 0.0);
 
-      // Normalize to 0-1
-      features[startIdx + 0] = (avgCorr + 1.0) / 2.0;
-      features[startIdx + 1] = (maxCorr + 1.0) / 2.0;
-      features[startIdx + 2] = (minCorr + 1.0) / 2.0;
-      features[startIdx + 3] = m_exposure.grossExposure > 0 ?
-         MathMin(1.0, m_exposure.netExposure / m_exposure.grossExposure) : 0.5;
-      features[startIdx + 4] = MathMin(1.0, m_exposure.diversificationRatio / 3.0);
+      // Normalize to 0-1 with bounds check
+      int size = ArraySize(features);
+      if(startIdx + 4 < size)
+      {
+         features[startIdx + 0] = (avgCorr + 1.0) / 2.0;
+         features[startIdx + 1] = (maxCorr + 1.0) / 2.0;
+         features[startIdx + 2] = (minCorr + 1.0) / 2.0;
+         features[startIdx + 3] = m_exposure.grossExposure > 0 ?
+            MathMin(1.0, SafeDivide(m_exposure.netExposure, m_exposure.grossExposure, 0.5)) : 0.5;
+         features[startIdx + 4] = MathMin(1.0, SafeDivide(m_exposure.diversificationRatio, 3.0, 0.0));
+      }
    }
 
    //+------------------------------------------------------------------+

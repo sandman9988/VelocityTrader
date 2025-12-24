@@ -649,8 +649,8 @@ bool IsTypeAllowed(ENUM_ASSET_TYPE type)
 //+------------------------------------------------------------------+
 void UpdateSymbol(int idx)
 {
-   if(!g_symbols[idx].initialized) return;
    if(!IsValidIndex(idx, MAX_SYMBOLS)) return;
+   if(!g_symbols[idx].initialized) return;
 
    // Refresh spec (always needed for trading)
    double bid = SymbolInfoDouble(g_symbols[idx].name, SYMBOL_BID);
@@ -815,6 +815,10 @@ void ProcessSignals()
 void ProcessAgentSignal(TradingAgent &agent, int symIdx, int regimeIdx,
                         ENUM_REGIME regime, double accel, double chiZ, double priceZ)
 {
+   // Validate indices
+   if(!IsValidIndex(symIdx, MAX_SYMBOLS)) return;
+   if(regimeIdx < 0 || regimeIdx >= 3) return;
+
    // Determine action based on regime and agent threshold
    int action = GetAgentAction(agent, regime, accel, priceZ);
    if(action == 0) return;

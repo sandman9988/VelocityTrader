@@ -663,7 +663,12 @@ public:
 
    KinematicState GetState() { return m_state; }
    bool IsReady() { return m_initialized; }
-   int GetStateVisitCount(ENUM_KINEMATIC_STATE state) { return m_stateCount[(int)state]; }
+   int GetStateVisitCount(ENUM_KINEMATIC_STATE state)
+   {
+      int idx = (int)state;
+      if(idx < 0 || idx >= KINEMATIC_STATES) return 0;
+      return m_stateCount[idx];
+   }
 
 private:
    double CalculateAverageVelocity(int window)
@@ -792,8 +797,10 @@ private:
       else
          m_state.statePersistence = 1;
 
-      // Update visit counts
-      m_stateCount[(int)m_state.state]++;
+      // Update visit counts (with bounds check)
+      int stateIdx = (int)m_state.state;
+      if(stateIdx >= 0 && stateIdx < KINEMATIC_STATES)
+         m_stateCount[stateIdx]++;
    }
 
    void ClassifyRegime()
