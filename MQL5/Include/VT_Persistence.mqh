@@ -660,6 +660,8 @@ void LoadProfile(int handle, AgentProfile &profile)
       return;
    }
 
+   // Load regime-specific stats
+   // NOTE: Loop is bounded to exactly 3 regimes matching profile.regime[3] array size
    for(int i = 0; i < 3; i++)
    {
       // Load Q-values (no strict bounds, but validate they're finite)
