@@ -1162,6 +1162,16 @@ public:
       mc.relatedTicket = ticket;
       mc.score = score;
 
+      // Ensure array has space before assignment
+      if(m_markedCount >= ArraySize(m_markedCandles))
+      {
+         int newSize = m_markedCount + 100;
+         if(ArrayResize(m_markedCandles, newSize) != newSize)
+         {
+            Print("ERROR: CVTLogger::MarkCandle - failed to resize array");
+            return false;
+         }
+      }
       m_markedCandles[m_markedCount] = mc;
       m_markedCount++;
 

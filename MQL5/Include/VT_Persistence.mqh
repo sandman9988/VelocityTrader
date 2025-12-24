@@ -660,7 +660,10 @@ void LoadProfile(int handle, AgentProfile &profile)
       return;
    }
 
-   for(int i = 0; i < 3; i++)
+   int regimeCount = ArraySize(profile.regime);
+   int loopCount = MathMin(3, regimeCount);
+
+   for(int i = 0; i < loopCount; i++)
    {
       // Load Q-values (no strict bounds, but validate they're finite)
       double qBuy = FileReadDouble(handle);
