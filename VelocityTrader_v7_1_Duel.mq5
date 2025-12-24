@@ -35,6 +35,17 @@
 #include <Trade\PositionInfo.mqh>
 #include <Trade\DealInfo.mqh>
 
+// ═══════════════════════════════════════════════════════════════════
+// MODULAR INCLUDES - VelocityTrader v7.1 Component Library
+// ═══════════════════════════════════════════════════════════════════
+// Note: VT_Globals.mqh includes all other headers in correct order:
+//   - VT_Definitions.mqh (constants, enums, colors)
+//   - VT_RLParameters.mqh (RL tunable parameters)
+//   - VT_Structures.mqh (core data structures)
+//   - VT_Predictor.mqh (probability predictor, statistical gate)
+//   - VT_CircuitBreaker.mqh (risk management state machine)
+// ═══════════════════════════════════════════════════════════════════
+
 //+------------------------------------------------------------------+
 //| INPUT PARAMETERS                                                  |
 //+------------------------------------------------------------------+
@@ -122,6 +133,29 @@ input bool      InpManualReinstate = false;      // Set TRUE to reinstate
 input bool      InpForceHalt = false;            // Set TRUE to force halt
 input bool      InpShadowOnly = false;           // Shadow only mode
 
+// ═══════════════════════════════════════════════════════════════════
+// INCLUDE MODULAR COMPONENTS
+// ═══════════════════════════════════════════════════════════════════
+#include "Include/VT_Globals.mqh"      // All structs and global variables
+#include "Include/VT_HUD.mqh"          // HUD rendering functions
+#include "Include/VT_Persistence.mqh"  // State save/load functions
+
+// ═══════════════════════════════════════════════════════════════════
+// LEGACY INLINE DEFINITIONS (Now in header files - kept for reference)
+// ═══════════════════════════════════════════════════════════════════
+// The following definitions are now in Include/*.mqh files:
+// - VT_Definitions.mqh: MAX_SYMBOLS, MAX_POSITIONS, ROLLING_WINDOW,
+//                       PERSISTENCE_MAGIC, enums, color defines
+// - VT_RLParameters.mqh: RLParameters struct
+// - VT_Structures.mqh: WelfordStats, BrokerSpec, StrategyStats,
+//                      AgentProfile, TradingAgent, VelocityRank,
+//                      PositionData, PeriodStats, ExcursionStats, SystemStatus
+// - VT_Predictor.mqh: ProbabilityPredictor, StatisticalGate
+// - VT_CircuitBreaker.mqh: CircuitBreaker
+// - VT_Globals.mqh: SymCData, PhysicsEngine, SymbolInfo, all g_* variables
+// ═══════════════════════════════════════════════════════════════════
+
+#if 0  // BEGIN LEGACY INLINE DEFINITIONS (disabled - now in headers)
 //+------------------------------------------------------------------+
 //| CONSTANTS                                                         |
 //+------------------------------------------------------------------+
@@ -1076,6 +1110,11 @@ struct CircuitBreaker
       }
       else if(state == STATE_RETRAINING)
       {
+         // NOTE: This code was truncated in the original - fixed in VT_CircuitBreaker.mqh
+      }
+   }
+};
+#endif  // END LEGACY INLINE DEFINITIONS
 
 //+------------------------------------------------------------------+
 //| EXPERT INITIALIZATION                                             |
@@ -2237,6 +2276,18 @@ bool HasPositionOnSymbol(const string sym)
 }
 
 //+------------------------------------------------------------------+
+//| CHART EVENT - Delegate to VT_HUD.mqh handler                      |
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+   HandleHUDChartEvent(id, lparam, dparam, sparam);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LEGACY HUD & PERSISTENCE CODE (Now in header files - disabled)
+// ═══════════════════════════════════════════════════════════════════
+#if 0  // BEGIN LEGACY HUD/PERSISTENCE (disabled - now in VT_HUD.mqh & VT_Persistence.mqh)
+//+------------------------------------------------------------------+
 //| HUD FUNCTIONS                                                     |
 //+------------------------------------------------------------------+
 void HUD_Create(string name, int x, int y, string text, color clr, int size = 8)
@@ -3240,5 +3291,8 @@ void LoadProfile(int handle, AgentProfile &profile)
       profile.regime[i].InvalidateCache();
    }
 }
+#endif  // END LEGACY HUD/PERSISTENCE
 
+//+------------------------------------------------------------------+
+//| END OF FILE - VelocityTrader v7.1 Duel Architecture               |
 //+------------------------------------------------------------------+

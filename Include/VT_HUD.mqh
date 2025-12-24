@@ -32,27 +32,9 @@ extern double    InpRiskPercent;
 extern double    InpMaxLot;
 extern int       InpMaxPositions;
 
-//+------------------------------------------------------------------+
-//| HELPER: Count Real Positions                                      |
-//+------------------------------------------------------------------+
-int CountRealPositions()
-{
-   int count = 0;
-   for(int i = 0; i < g_posCount; i++)
-      if(g_positions[i].active && !g_positions[i].isShadow) count++;
-   return count;
-}
-
-//+------------------------------------------------------------------+
-//| HELPER: Count Shadow Positions                                    |
-//+------------------------------------------------------------------+
-int CountShadowPositions()
-{
-   int count = 0;
-   for(int i = 0; i < g_posCount; i++)
-      if(g_positions[i].active && g_positions[i].isShadow) count++;
-   return count;
-}
+// Forward declarations - these are defined in main EA
+int CountRealPositions();
+int CountShadowPositions();
 
 //+------------------------------------------------------------------+
 //| HUD_Create: Create/Update Text Label                              |
