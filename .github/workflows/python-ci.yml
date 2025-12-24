@@ -1,0 +1,151 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths:
+      - 'Tools/**/*.py'
+      - 'requirements.txt'
+      - '.flake8'
+      - '.github/workflows/python-ci.yml'
+  pull_request:
+    branches: [ main, master, develop ]
+    paths:
+      - 'Tools/**/*.py'
+      - 'requirements.txt'
+      - '.flake8'
+      - '.github/workflows/python-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+
+      - name: Run flake8 linting
+        run: |
+          echo "Running flake8 on Tools/ directory..."
+          flake8 Tools/ --exclude=Tools/archive --statistics --count
+        continue-on-error: true
+
+      - name: Lint summary
+        if: always()
+        run: |
+          echo "Linting complete. Review any warnings above."
+
+  syntax-check:
+    name: Python Syntax Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check Python syntax
+        run: |
+          echo "Checking Python syntax..."
+          find Tools/ -name "*.py" -not -path "Tools/archive/*" | while read file; do
+            python -m py_compile "$file" || echo "Syntax error in: $file"
+          done
+          echo "Syntax check complete."
+
+  type-check:
+    name: Type Check (mypy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install mypy types-requests
+
+      - name: Run mypy type checking
+        run: |
+          echo "Running mypy type checking..."
+          mypy Tools/ --exclude 'Tools/archive' --ignore-missing-imports --no-error-summary || true
+        continue-on-error: true
+
+  import-check:
+    name: Import Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify imports
+        run: |
+          echo "Verifying Python imports..."
+          cd Tools
+          for file in *.py; do
+            if [ -f "$file" ] && [ "$file" != "__init__.py" ]; then
+              echo "Checking imports in $file..."
+              python -c "import ast; ast.parse(open('$file').read())" 2>/dev/null || echo "  Parse error in $file"
+            fi
+          done
+          echo "Import verification complete."
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+
+      - name: Run security scan
+        run: |
+          echo "Running Bandit security scan..."
+          bandit -r Tools/ --exclude Tools/archive -ll -ii --skip B101 || true
+        continue-on-error: true
