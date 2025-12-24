@@ -1,0 +1,244 @@
+{
+  "pages": [
+    {
+      "number": 1,
+      "type": "cover",
+      "title": "VelocityTrader v7.1: Duel Architecture",
+      "content": "2-Agent / 3-Regime Evolutionary RL Trading System"
+    },
+    {
+      "number": 2,
+      "type": "table_of_contents",
+      "title": "Contents",
+      "content": "1. System Architecture Overview; 2. Duel Architecture: Real vs Shadow; 3. Physics Engine & Kinematic Analysis; 4. Agent Strategies: Sniper vs Berserker; 5. Regime Detection & Market States; 6. Reinforcement Learning Framework; 7. Risk Management & Circuit Breakers; 8. Performance Measurement & HUD; 9. Implementation Deep Dive"
+    },
+    {
+      "number": 3,
+      "type": "chapter",
+      "title": "01: System Architecture Overview",
+      "content": "Understanding the core components and philosophy behind the evolutionary trading system"
+    },
+    {
+      "number": 4,
+      "type": "content",
+      "title": "VelocityTrader Philosophy",
+      "content": "This page explores the foundational principles of the system: divergent RL learning per agent to maximize performance, profit journey optimization through normalized and agnostic parameters, dynamic self-healing code architecture, enhanced performance measurement in HUD, and asymmetrical reward shaping. It explains how these principles create a robust, adaptive trading system that evolves with market conditions."
+    },
+    {
+      "number": 5,
+      "type": "content",
+      "title": "Core Architecture Components",
+      "content": "This page presents a comprehensive technical diagram showing the interaction between all major components: 2-Agent Duel System (Sniper/Berserker), 3-Regime Detection Engine (Breakout/Trend/MeanRev), Physics Engine with Kinematic Analysis, Probability Predictor with Omega Sizing, Statistical Gate for edge validation, Circuit Breaker for risk management, and the HUD Performance Dashboard. The diagram will show data flows and decision pathways."
+    },
+    {
+      "number": 6,
+      "type": "chapter",
+      "title": "02: Duel Architecture",
+      "content": "Real vs Shadow: The evolutionary battle that drives continuous improvement"
+    },
+    {
+      "number": 7,
+      "type": "content",
+      "title": "The Duel Concept: Champion vs Challenger",
+      "content": "This page explains the revolutionary duel architecture where each agent maintains two parallel instances: a Real (Champion) instance that trades live capital, and a Shadow (Challenger) instance that continuously explores new strategies through paper trading. The page details the swap mechanism: Shadow beats Real → Swap occurs, evolution happens when Shadow achieves 10% better Profit Factor after minimum 30 trades, and capital allocation shifts based on performance metrics."
+    },
+    {
+      "number": 8,
+      "type": "content",
+      "title": "Shadow Trading: Continuous Learning",
+      "content": "This page details the shadow trading mechanism that enables continuous learning without capital risk. Shadow trades execute immediately without probability gates for learning purposes, use tighter stops (2x ATR) and targets (1.5x ATR) for faster feedback loops, have 15-minute timeout for rapid iteration, and always trade regardless of circuit breaker state. The page includes statistics showing how shadow performance correlates with real performance and the learning rate acceleration this provides."
+    },
+    {
+      "number": 9,
+      "type": "content",
+      "title": "Evolution & Capital Allocation",
+      "content": "This page explains how the system dynamically allocates capital between agents based on evolutionary performance. Capital allocation ranges from 20% minimum to 80% maximum per agent, rebalanced every 50 trades based on Profit Factor ratios. The page includes a chart showing example allocation shifts over time and how duel swaps trigger immediate reallocation. It also covers the mutation mechanism that introduces controlled randomness into new shadow instances to maintain genetic diversity."
+    },
+    {
+      "number": 10,
+      "type": "chapter",
+      "title": "03: Physics Engine & Kinematic Analysis",
+      "content": "Applying physics principles to model market dynamics and regime changes"
+    },
+    {
+      "number": 11,
+      "type": "content",
+      "title": "Kinematic Physics Model",
+      "content": "This page details the physics engine that models market behavior using classical mechanics principles. It explains how price movement is decomposed into Mass (liquidity depth from Level 2 DOM or synthetic calculation), Force (order flow imbalance = volume × direction), Velocity (rate of change in price points), Acceleration (change in velocity, normalized using Welford statistics), and Momentum (sustained velocity with persistence tracking). The page includes formulas and a chart showing how these metrics identify market regimes."
+    },
+    {
+      "number": 12,
+      "type": "content",
+      "title": "Market Mass & Force Calculation",
+      "content": "This page dives deep into the mass and force calculations that drive the physics engine. Mass calculation uses real Level 2 DOM data when available, aggregating bid/ask volumes across 10 levels, or falls back to synthetic mass calculation using volume-to-price-delta ratios with exponential decay. Force calculation combines volume delta (current vs previous tick volume) with price direction (+1, 0, -1). The page shows how higher mass creates resistance to acceleration, identifying thick vs thin market conditions."
+    },
+    {
+      "number": 13,
+      "type": "content",
+      "title": "Velocity & Acceleration Analysis",
+      "content": "This page explains how the system measures and normalizes velocity and acceleration for regime detection. Velocity is calculated as price change in points per tick or bar, tracked as average velocity over 3 periods for smoothing. Acceleration is derived as the change in velocity, normalized using Welford's online algorithm for statistical significance. The page includes visualizations showing how breakout conditions show high acceleration (>2σ), trend conditions show sustained moderate acceleration (>0.8σ), and mean reversion shows deceleration at extremes."
+    },
+    {
+      "number": 14,
+      "type": "content",
+      "title": "Backtest vs Live Mode Adaptation",
+      "content": "This page covers the sophisticated fallback mechanisms that ensure consistent behavior across different execution environments. In backtest mode (MT5 Tester), the system automatically switches to bar-based calculations using OHLCV data, pre-loads historical bars for calibration (100 bars minimum), and simulates tick-level physics with realistic approximations. The page includes comparison tests showing minimal performance difference between live and backtest modes, validating strategy testing reliability."
+    },
+    {
+      "number": 15,
+      "type": "chapter",
+      "title": "04: Agent Strategies",
+      "content": "Sniper vs Berserker: Complementary approaches to market opportunity"
+    },
+    {
+      "number": 16,
+      "type": "content",
+      "title": "Agent Profiles & Characteristics",
+      "content": "This page defines the two agent personalities and their distinct trading approaches. SNIPER: Patient, high-conviction trader that rides trends, uses higher signal threshold (1.5σ) for quality over quantity, holds positions longer with wider stops, and excels in trending regimes. BERSERKER: Aggressive, quick-entry volatility hunter, uses lower threshold (1.0σ) for more opportunities, takes faster profits with tighter management, and dominates in breakout regimes. The page includes performance comparison charts showing how each agent performs across different market conditions."
+    },
+    {
+      "number": 17,
+      "type": "content",
+      "title": "Signal Generation & Threshold Logic",
+      "content": "This page details how each agent generates trading signals based on their unique thresholds and market interpretation. Signal logic varies by regime: BREAKOUT trades acceleration spikes exceeding agent threshold, TREND trades sustained velocity with regime-specific multipliers, and MEAN REVERSION fades price extremes with confirmation from deceleration. The page explains how RL-tunable parameters allow dynamic threshold adjustment: learning multiplier reduces thresholds during initial exploration (first 100 trades), trend multiplier adjusts breakout vs trend sensitivity, and momentum multiplier controls fallback behavior."
+    },
+    {
+      "number": 18,
+      "type": "content",
+      "title": "Position Management & Exit Strategies",
+      "content": "This page covers how agents manage open positions with dynamic stop-loss and take-profit strategies. All positions use ATR-based sizing for volatility-adjusted risk. Exit strategies include: Initial stop-loss at 2x ATR (adjustable via RL parameters), trailing stop that activates after position moves favorably, take-profit targets at 1.5x ATR for shadow positions (faster learning), and time-based exits after 15 minutes for shadow positions. The page shows how RL parameters control trail distance (0.5x to 3x ATR), stop distance (0.5x to 4x ATR), and target distance (0.5x to 3x ATR)."
+    },
+    {
+      "number": 19,
+      "type": "chapter",
+      "title": "05: Regime Detection",
+      "content": "Identifying and adapting to three distinct market states"
+    },
+    {
+      "number": 20,
+      "type": "content",
+      "title": "Three Market Regimes",
+      "content": "This page defines the three market regimes that the system identifies and adapts to. BREAKOUT: Steep acceleration (>2σ), explosive price movement, high force-to-mass ratio, characterized by momentum ignition and volatility expansion. TREND: Sustained velocity with moderate acceleration (>0.8σ), persistent directional movement, requires minimum 5 bars of persistence, represents steady directional flow. MEAN REVERSION: High price deviation (>1σ) combined with deceleration, price at extremes losing momentum, high chi (liquidity/mass ratio), indicates potential reversal zones. The page includes regime transition diagrams and statistical characteristics."
+    },
+    {
+      "number": 21,
+      "type": "content",
+      "title": "SymC Monitor: Damping Ratio Analysis",
+      "content": "This page explains the SymC (System Chi) Monitor that calculates market damping characteristics. Chi (χ) is calculated as average liquidity divided by average flow, representing the damping ratio of the market system. High χ (>1.3) indicates thick, stable markets resistant to movement (favors mean reversion). Low χ indicates thin, reactive markets prone to explosive moves (favors breakout/trend). The page shows how chi is normalized using Welford statistics to create chi-zones (<-2σ, -2σ:-1σ, -1σ:1σ, 1σ:2σ, >2σ) for probability prediction and how this metric improves regime classification accuracy."
+    },
+    {
+      "number": 22,
+      "type": "content",
+      "title": "Regime Transition & Persistence",
+      "content": "This page covers how the system handles regime transitions and maintains persistence tracking to avoid false signals. Velocity persistence tracking counts consecutive bars in same direction, regime transitions require confirmation from multiple indicators, calibration period (100 ticks live, 10 bars backtest) prevents early trading, and CRITICAL regime acts as safe state when signals conflict. The page includes a state machine diagram showing valid transitions and explains why the system defaults to TREND or MR rather than CRITICAL for continuous learning."
+    },
+    {
+      "number": 23,
+      "type": "chapter",
+      "title": "06: Reinforcement Learning Framework",
+      "content": "Normalized, agnostic, and dynamic parameter evolution"
+    },
+    {
+      "number": 24,
+      "type": "content",
+      "title": "RL Parameter Architecture",
+      "content": "This page presents the comprehensive RL parameter system where all key thresholds are normalized to [0,1] for uniform exploration. The system includes 17 tunable parameters covering: Reward Shaping (loss penalty 1x-5x, time decay 0-0.05/min, surprise boost 1x-2x), Position Management (trail/stop/target ATR multipliers), Signal Thresholds (trend, learning, momentum multipliers), Regime Detection (z-score extremes, mean rev thresholds), Acceleration Logic (decel/spike multipliers), Capital Allocation (base allocation, edge boost), and Q-Learning (discount factor 0.8-0.99). Each parameter includes conversion functions that map [0,1] to practical ranges."
+    },
+    {
+      "number": 25,
+      "type": "content",
+      "title": "Q-Learning & Adaptive Learning Rates",
+      "content": "This page explains the Q-learning implementation with regime-specific Q-values and adaptive learning rates. Each agent maintains separate Q-values for BUY, SELL, and HOLD actions across 3 regimes (9 Q-values total). Learning rates are adaptive: start at 0.15, decay by 0.995 per trade, minimum 0.01, with surprise-based boosts when prediction errors are large. The page shows the Q-update formula Q(s,a) += α × (r - Q(s,a)) and explains how surprise boosts (up to 2x) accelerate learning during significant market events. It includes convergence tracking and learning rate visualization."
+    },
+    {
+      "number": 26,
+      "type": "content",
+      "title": "Reward Shaping: Asymmetrical Design",
+      "content": "This page details the sophisticated reward shaping mechanism that creates asymmetrical incentives. Loss penalty scaling: losses multiplied by 1x to 5x (RL-tunable) to discourage bad trades, time decay subtracts 0 to 0.05 per minute to encourage timely decisions, surprise boost multiplies rewards up to 2x when outcomes exceed expectations, and friction costs (spread + commission) are always subtracted for realism. The page explains how this asymmetrical design (harsher penalties than rewards) forces agents to develop higher conviction strategies and includes reward distribution charts showing the impact of different penalty levels."
+    },
+    {
+      "number": 27,
+      "type": "content",
+      "title": "Parameter Mutation & Exploration",
+      "content": "This page covers how the system maintains genetic diversity through controlled parameter mutation. When a shadow becomes the new champion, a new shadow is created as a clone plus mutations. Mutation mechanism: 10% probability per parameter, maximum step size 0.2, ensures parameters stay within [0,1] bounds, maintains exploitable knowledge while exploring variations. The page explains the mutation rate trade-offs: too high = unstable learning, too low = premature convergence. It includes visualization of parameter evolution over multiple generations and shows how mutation helps discover optimal parameter combinations."
+    },
+    {
+      "number": 28,
+      "type": "chapter",
+      "title": "07: Risk Management",
+      "content": "Multi-layered protection through statistical validation and circuit breakers"
+    },
+    {
+      "number": 29,
+      "type": "content",
+      "title": "Statistical Gate: Edge Validation",
+      "content": "This page explains the Statistical Gate that validates trading edge before allowing real positions. Requirements for edge validation: minimum 30 trades to establish statistical significance, win rate must exceed 52% plus friction adjustment (e.g., 52% + (2.0/avgWin)), p-value < 0.05 for statistical significance, and must beat coin-flip plus transaction costs. The page includes the statistical formulas for p-value calculation using normal CDF approximation and shows how friction adjustments create realistic performance hurdles. It displays edge status for both agents with traffic light indicators."
+    },
+    {
+      "number": 30,
+      "type": "content",
+      "title": "Circuit Breaker: Multi-Trigger Protection",
+      "content": "This page details the comprehensive circuit breaker system with multiple independent triggers. Trigger conditions: daily loss exceeds 3% of starting equity, 5+ consecutive losses, rolling 20-trade win rate drops below 45%, maximum drawdown exceeds 10% from peak. When triggered, the system enters HALTED state for 60-minute cooldown, then transitions to RETRAINING mode (shadow only). Recovery requires: minimum 20 shadow trades, win rate ≥52%, profit factor ≥1.10. The page includes state machine visualization and explains how this prevents catastrophic losses while maintaining learning continuity."
+    },
+    {
+      "number": 31,
+      "type": "content",
+      "title": "Probability Predictor & Position Sizing",
+      "content": "This page covers the probability prediction system and dynamic position sizing. Probability prediction combines: regime-specific win rates (30% weight), chi zone win rates (20% weight), acceleration zone win rates (25% weight), and agent historical win rate (25% weight). Minimum 55% probability required for real trades. Omega-based sizing scales position size based on historical upside/downside ratio: baseline 1.0 = break-even, scale up to 1.5x for high Omega, scale down to 0.3x for low Omega. The page shows how this creates position sizes proportional to edge strength."
+    },
+    {
+      "number": 32,
+      "type": "chapter",
+      "title": "08: Performance Measurement",
+      "content": "Enhanced HUD with comprehensive metrics and real-time monitoring"
+    },
+    {
+      "number": 33,
+      "type": "content",
+      "title": "HUD Architecture: 6-Tab Dashboard",
+      "content": "This page presents the comprehensive HUD design with 6 specialized tabs. DASHBOARD: Overview with P&L summary, agent status, system state, regime distribution. PERFORMANCE: Detailed session vs cumulative stats, MAE/MFE analysis, streak tracking. RL TRAINING: Q-values, learning rates, convergence status, RL parameters. PROBABILITY: Regime and zone win rates, prediction accuracy. RISK: Drawdown, daily limits, circuit breaker status. INSTRUMENTS: Top symbols by regime with real-time rankings. The page includes screenshots or mockups of each tab and explains how the HUD provides complete system transparency."
+    },
+    {
+      "number": 34,
+      "type": "content",
+      "title": "MAE/MFE Analysis: Trade Quality Metrics",
+      "content": "This page explains the Maximum Adverse Excursion (MAE) and Maximum Favorable Excursion (MFE) tracking that measures trade quality beyond simple P&L. MAE tracks worst drawdown during each trade (entry to worst point), MFE tracks best profit during each trade (entry to best point), ETD (End Trade Drawdown) = MFE - Final PnL (profit given back). These metrics reveal: whether stops are too tight or too loose, whether targets are optimally placed, and behavioral patterns of each agent. The page includes MAE/MFE distribution charts for both agents and shows how this data informs strategy improvements."
+    },
+    {
+      "number": 35,
+      "type": "content",
+      "title": "Multi-Period Performance Tracking",
+      "content": "This page covers the multi-period performance tracking system. The system tracks P&L, trade count, and win rate across: daily (current session), weekly (rolling 7 days), monthly (rolling 30 days), and total (all-time). This reveals short-term vs long-term performance consistency, helps identify when strategy degradation occurs, and provides context for current performance. The page includes comparative charts showing performance across timeframes and explains how period tracking helps distinguish between normal variance and genuine strategy deterioration."
+    },
+    {
+      "number": 36,
+      "type": "chapter",
+      "title": "09: Implementation Deep Dive",
+      "content": "Technical implementation details and code architecture"
+    },
+    {
+      "number": 37,
+      "type": "content",
+      "title": "Code Architecture: Key Structures",
+      "content": "This page presents the core code architecture showing how the system is organized. Key structures include: RLParameters (17 normalized parameters with conversion functions), TradingAgent (name, colors, real/shadow profiles, edge tracking, allocation), AgentProfile (strategy stats per regime, cumulative totals), StrategyStats (Q-values, performance metrics, adaptive learning rate), CKinematicPhysics (mass, force, velocity, acceleration), CSymC_Monitor (chi calculation, regime detection), and supporting systems for probability, statistics, and risk management. The page includes class hierarchy diagrams and explains the modular design that allows independent evolution of components."
+    },
+    {
+      "number": 38,
+      "type": "content",
+      "title": "Persistence & State Management",
+      "content": "This page explains the sophisticated persistence system that maintains state across restarts. Features include: atomic file operations (write to temp, validate, then swap), checksum validation to prevent corruption, version migration for backward compatibility, backup file creation for safety, and saves Q-values, learning rates, performance stats, predictor data, and circuit breaker state. The page covers the save/load workflow and explains how atomic operations prevent data corruption during unexpected shutdowns. It includes persistence statistics and validation success rates."
+    },
+    {
+      "number": 39,
+      "type": "content",
+      "title": "Performance Optimizations",
+      "content": "This page covers the performance optimizations that enable real-time operation across multiple symbols. Optimizations include: selective symbol updates (current chart updated every tick, others throttled), efficient data structures (fixed-size arrays, minimal dynamic allocation), cached calculations (performance metrics, regime indices), batched HUD updates (250ms throttle), and Welford statistics for online variance calculation without storing history. The page includes performance profiling results showing CPU usage, memory footprint, and update latency across different symbol counts. It explains design decisions that balance accuracy with performance."
+    },
+    {
+      "number": 40,
+      "type": "final",
+      "title": "VelocityTrader v7.1: The Future of Algorithmic Trading",
+      "content": "A self-evolving system that combines physics-based market analysis, dual-agent reinforcement learning, and comprehensive risk management to adapt continuously to changing market conditions."
+    }
+  ]
+}

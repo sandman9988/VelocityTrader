@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VelocityTrader v7.1: Duel Architecture</title>
+    <script src="https://statics.moonshot.cn/kimi-ppt/html-gen/static/tailwindcss@4_0805.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Chiron+Hei+HK:wght@400;700&family=Hedvig+Letters+Sans:wght@400;700&family=Quattrocento+Sans:wght@400;700&family=Coda:wght@400;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdmirror.com/npm/mathjax@3.2.2/es5/tex-svg.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .ppt-slide {
+                @apply relative w-[1280px] h-[720px] mx-auto p-[40px] box-border overflow-hidden mb-[40px];
+            }
+        }
+    </style>
+    <style>
+        body {
+            color: #E0E0E0;
+            font-family: 'Quattrocento Sans', sans-serif;
+        }
+        .font-display {
+            font-family: 'Chiron Hei HK', sans-serif;
+        }
+        .font-heading-alt {
+            font-family: 'Hedvig Letters Sans', sans-serif;
+        }
+        .font-accent {
+            font-family: 'Coda', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 py-8">
+    
+    <!-- Slide 1: Cover -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="cover">
+        <img src="cover_background.png" class="absolute inset-0 w-full h-full object-cover opacity-40" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-br from-[#00C2FF]/20 via-transparent to-[#8B5CF6]/20"></div>
+        <div class="relative h-full flex flex-col justify-center items-center text-center">
+            <div class="inline-block px-6 py-2 border-2 border-[#00C2FF] rounded mb-6">
+                <span class="font-accent text-[#00C2FF] text-lg tracking-widest">ALGORITHMIC TRADING SYSTEM</span>
+            </div>
+            <h1 class="font-heading-alt text-7xl font-bold text-[#F5F5F5] mb-4 leading-tight">
+                VelocityTrader <span class="text-[#00C2FF]">v7.1</span>
+            </h1>
+            <div class="text-3xl text-[#8B5CF6] font-display mb-8">Duel Architecture</div>
+            <div class="text-2xl text-[#E0E0E0] mb-12">2-Agent / 3-Regime Evolutionary RL Trading System</div>
+            <div class="flex gap-8 text-lg">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-[#00C2FF]"></div>
+                    <span>Divergent RL Learning</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-[#8B5CF6]"></div>
+                    <span>Physics-Based Analysis</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-[#F5F5F5]"></div>
+                    <span>Self-Healing Architecture</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 2: Table of Contents -->
+    <div class="ppt-slide !bg-[#1A1D21] flex flex-col justify-center" type="table_of_contents">
+        <div class="mb-8">
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Contents</h2>
+            <div class="w-20 h-1 bg-[#00C2FF] mt-2"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-6">
+            <div class="border-l-4 border-[#00C2FF] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#00C2FF] mb-2">01</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">System Architecture Overview</h3>
+                <p class="text-base text-[#E0E0E0]">Understanding the core components and philosophy behind the evolutionary trading system</p>
+            </div>
+            <div class="border-l-4 border-[#8B5CF6] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#8B5CF6] mb-2">02</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">Duel Architecture</h3>
+                <p class="text-base text-[#E0E0E0]">Real vs Shadow: The evolutionary battle that drives continuous improvement</p>
+            </div>
+            <div class="border-l-4 border-[#00C2FF] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#00C2FF] mb-2">03</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">Physics Engine & Kinematic Analysis</h3>
+                <p class="text-base text-[#E0E0E0]">Applying physics principles to model market dynamics and regime changes</p>
+            </div>
+            <div class="border-l-4 border-[#8B5CF6] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#8B5CF6] mb-2">04</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">Agent Strategies</h3>
+                <p class="text-base text-[#E0E0E0]">Sniper vs Berserker: Complementary approaches to market opportunity</p>
+            </div>
+            <div class="border-l-4 border-[#00C2FF] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#00C2FF] mb-2">05</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">Regime Detection</h3>
+                <p class="text-base text-[#E0E0E0]">Identifying and adapting to three distinct market states</p>
+            </div>
+            <div class="border-l-4 border-[#8B5CF6] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#8B5CF6] mb-2">06</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">Reinforcement Learning Framework</h3>
+                <p class="text-base text-[#E0E0E0]">Normalized, agnostic, and dynamic parameter evolution</p>
+            </div>
+            <div class="border-l-4 border-[#00C2FF] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#00C2FF] mb-2">07</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">Risk Management</h3>
+                <p class="text-base text-[#E0E0E0]">Multi-layered protection through statistical validation and circuit breakers</p>
+            </div>
+            <div class="border-l-4 border-[#8B5CF6] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#8B5CF6] mb-2">08</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">Performance Measurement</h3>
+                <p class="text-base text-[#E0E0E0]">Enhanced HUD with comprehensive metrics and real-time monitoring</p>
+            </div>
+            <div class="border-l-4 border-[#00C2FF] pl-4 py-3">
+                <div class="font-accent text-2xl text-[#00C2FF] mb-2">09</div>
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-2">Implementation Deep Dive</h3>
+                <p class="text-base text-[#E0E0E0]">Technical implementation details and code architecture</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Chapter 1 -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="chapter">
+        <img src="cover_background.png" class="absolute inset-0 w-full h-full object-cover opacity-20" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-r from-[#00C2FF]/30 to-transparent"></div>
+        <div class="relative h-full flex flex-col justify-center">
+            <div class="font-accent text-9xl text-[#00C2FF]/30 mb-4">01</div>
+            <h2 class="font-heading-alt text-7xl font-bold text-[#F5F5F5] mb-6 leading-tight">System Architecture<br>Overview</h2>
+            <div class="text-2xl text-[#E0E0E0] max-w-3xl">Understanding the core components and philosophy behind the evolutionary trading system</div>
+            <div class="flex gap-2 mt-8">
+                <div class="w-20 h-1 bg-[#00C2FF]"></div>
+                <div class="w-10 h-1 bg-[#8B5CF6]"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: VelocityTrader Philosophy -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-6">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">FOUNDATIONAL PRINCIPLES</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">VelocityTrader Philosophy</h2>
+        </div>
+        <div class="space-y-5">
+            <div class="grid grid-cols-2 gap-5">
+                <div class="border border-[#00C2FF]/50 p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-project-diagram text-3xl text-[#00C2FF]"></i>
+                        <h3 class="text-2xl font-bold text-[#F5F5F5]">Divergent RL Learning</h3>
+                    </div>
+                    <p class="text-base text-[#E0E0E0] mb-3">Each agent evolves independently with separate reinforcement learning parameters, allowing specialization for different market conditions and trading styles.</p>
+                    <div class="flex gap-2 flex-wrap">
+                        <span class="px-3 py-1 border border-[#00C2FF] text-[#00C2FF] text-sm">Independent Evolution</span>
+                        <span class="px-3 py-1 border border-[#00C2FF] text-[#00C2FF] text-sm">Specialized Strategies</span>
+                    </div>
+                </div>
+                <div class="border border-[#8B5CF6]/50 p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-route text-3xl text-[#8B5CF6]"></i>
+                        <h3 class="text-2xl font-bold text-[#F5F5F5]">Profit Journey Optimization</h3>
+                    </div>
+                    <p class="text-base text-[#E0E0E0] mb-3">Normalized parameters (0-1 range) ensure uniform exploration across all dimensions, while agnostic implementation adapts to any market or timeframe.</p>
+                    <div class="flex gap-2 flex-wrap">
+                        <span class="px-3 py-1 border border-[#8B5CF6] text-[#8B5CF6] text-sm">Normalized [0,1]</span>
+                        <span class="px-3 py-1 border border-[#8B5CF6] text-[#8B5CF6] text-sm">Market Agnostic</span>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-5">
+                <div class="border border-[#F5F5F5]/50 p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-sync-alt text-3xl text-[#F5F5F5]"></i>
+                        <h3 class="text-2xl font-bold text-[#F5F5F5]">Dynamic Self-Healing Code</h3>
+                    </div>
+                    <p class="text-base text-[#E0E0E0] mb-3">The duel architecture enables automatic strategy evolution through shadow testing, ensuring continuous adaptation without manual intervention.</p>
+                    <div class="flex gap-2 flex-wrap">
+                        <span class="px-3 py-1 border border-[#F5F5F5] text-[#F5F5F5] text-sm">Shadow Evolution</span>
+                        <span class="px-3 py-1 border border-[#F5F5F5] text-[#F5F5F5] text-sm">Auto-Adaptation</span>
+                    </div>
+                </div>
+                <div class="border border-[#00C2FF]/50 p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-chart-line text-3xl text-[#00C2FF]"></i>
+                        <h3 class="text-2xl font-bold text-[#F5F5F5]">Enhanced Performance Measurement</h3>
+                    </div>
+                    <p class="text-base text-[#E0E0E0] mb-3">Comprehensive HUD provides real-time visibility into Q-values, learning rates, regime distribution, and trade quality metrics beyond simple P&L.</p>
+                    <div class="flex gap-2 flex-wrap">
+                        <span class="px-3 py-1 border border-[#00C2FF] text-[#00C2FF] text-sm">6-Tab Dashboard</span>
+                        <span class="px-3 py-1 border border-[#00C2FF] text-[#00C2FF] text-sm">MAE/MFE Analysis</span>
+                    </div>
+                </div>
+            </div>
+            <div class="border-2 border-[#8B5CF6] p-5">
+                <div class="flex items-center gap-3 mb-3">
+                    <i class="fas fa-balance-scale text-3xl text-[#8B5CF6]"></i>
+                    <h3 class="text-2xl font-bold text-[#F5F5F5]">Asymmetrical Reward Shaping</h3>
+                </div>
+                <p class="text-base text-[#E0E0E0] mb-3">Losses are penalized 1x to 5x more than wins are rewarded, forcing agents to develop high-conviction strategies and avoid over-trading. Combined with time decay and friction costs, this creates realistic trading discipline.</p>
+                <div class="grid grid-cols-4 gap-3 text-center text-sm">
+                    <div class="border border-[#8B5CF6] p-2">
+                        <div class="text-[#8B5CF6] font-bold">Loss Penalty</div>
+                        <div class="text-[#E0E0E0]">1x-5x</div>
+                    </div>
+                    <div class="border border-[#8B5CF6] p-2">
+                        <div class="text-[#8B5CF6] font-bold">Time Decay</div>
+                        <div class="text-[#E0E0E0]">0-0.05/min</div>
+                    </div>
+                    <div class="border border-[#8B5CF6] p-2">
+                        <div class="text-[#8B5CF6] font-bold">Surprise Boost</div>
+                        <div class="text-[#E0E0E0]">1x-2x</div>
+                    </div>
+                    <div class="border border-[#8B5CF6] p-2">
+                        <div class="text-[#8B5CF6] font-bold">Friction Cost</div>
+                        <div class="text-[#E0E0E0]">Real</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Core Architecture Components -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">SYSTEM ARCHITECTURE</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Core Architecture Components</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="flex flex-col gap-4">
+                <div class="border-2 border-[#00C2FF] p-4 flex flex-col">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-12 h-12 bg-[#00C2FF] flex items-center justify-center text-[#1A1D21] font-bold text-xl">01</div>
+                        <h3 class="text-xl font-bold text-[#F5F5F5]">2-Agent Duel System</h3>
+                    </div>
+                    <div class="space-y-1 text-base text-[#E0E0E0] mb-3 flex-grow">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span><strong class="text-[#00C2FF]">SNIPER:</strong> Patient, high-conviction trend rider</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span><strong class="text-[#8B5CF6]">BERSERKER:</strong> Aggressive volatility hunter</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong class="text-[#F5F5F5]">Each has Real + Shadow instances</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Evolution through performance-based swaps</span>
+                        </div>
+                    </div>
+                    <div class="p-2 bg-[#00C2FF]/10 text-sm text-[#E0E0E0]">
+                        <strong class="text-[#00C2FF]">Swap Threshold:</strong> Shadow PF > Real PF × 1.10 after 30+ trades
+                    </div>
+                </div>
+                <div class="border-2 border-[#8B5CF6] p-4 flex flex-col">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-12 h-12 bg-[#8B5CF6] flex items-center justify-center text-[#1A1D21] font-bold text-xl">02</div>
+                        <h3 class="text-xl font-bold text-[#F5F5F5]">3-Regime Detection Engine</h3>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mb-3 flex-grow">
+                        <div class="text-center p-2 border border-[#00C2FF]">
+                            <div class="font-bold text-[#00C2FF]">BREAKOUT</div>
+                            <div class="text-sm text-[#E0E0E0]">>2σ accel</div>
+                        </div>
+                        <div class="text-center p-2 border border-[#8B5CF6]">
+                            <div class="font-bold text-[#8B5CF6]">TREND</div>
+                            <div class="text-sm text-[#E0E0E0]">>0.8σ sustained</div>
+                        </div>
+                        <div class="text-center p-2 border border-[#F5F5F5]">
+                            <div class="font-bold text-[#F5F5F5]">MEANREV</div>
+                            <div class="text-sm text-[#E0E0E0]">Extreme + decel</div>
+                        </div>
+                    </div>
+                    <div class="p-2 bg-[#8B5CF6]/10 text-sm text-[#E0E0E0]">
+                        <strong class="text-[#8B5CF6]">Physics-Based:</strong> Kinematic analysis of mass, force, velocity, acceleration
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col gap-4">
+                <div class="border-2 border-[#F5F5F5] p-4 flex flex-col">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-12 h-12 bg-[#F5F5F5] flex items-center justify-center text-[#1A1D21] font-bold text-xl">03</div>
+                        <h3 class="text-xl font-bold text-[#F5F5F5]">Physics Engine</h3>
+                    </div>
+                    <div class="space-y-1 text-base text-[#E0E0E0] mb-3 flex-grow">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong>Mass:</strong> Liquidity depth (L2 DOM)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong>Force:</strong> Order flow imbalance</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong>Velocity:</strong> Price rate of change</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong>Acceleration:</strong> Normalized with Welford</span>
+                        </div>
+                    </div>
+                    <div class="p-2 bg-[#F5F5F5]/10 text-sm text-[#E0E0E0]">
+                        <strong class="text-[#F5F5F5]">Fallback:</strong> Bar-based mode for backtesting with realistic approximations
+                    </div>
+                </div>
+                <div class="border-2 border-[#00C2FF] p-4 flex flex-col">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-12 h-12 bg-[#00C2FF] flex items-center justify-center text-[#1A1D21] font-bold text-xl">04</div>
+                        <h3 class="text-xl font-bold text-[#F5F5F5]">Probability Predictor</h3>
+                    </div>
+                    <div class="space-y-1 text-base text-[#E0E0E0] mb-3 flex-grow">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Regime + zone win rate tracking</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Minimum 55% P(Win) for real trades</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Omega-based dynamic position sizing</span>
+                        </div>
+                    </div>
+                    <div class="p-2 bg-[#00C2FF]/10 text-sm text-[#E0E0E0]">
+                        <strong class="text-[#00C2FF]">Omega:</strong> Historical upside/downside ratio for edge-based sizing
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 mt-4">
+            <div class="border border-[#8B5CF6] p-3 text-center">
+                <div class="text-lg font-bold text-[#8B5CF6]">Statistical Gate</div>
+                <div class="text-sm text-[#E0E0E0]">Edge validation, p-value < 0.05</div>
+            </div>
+            <div class="border border-[#F5F5F5] p-3 text-center">
+                <div class="text-lg font-bold text-[#F5F5F5]">Circuit Breaker</div>
+                <div class="text-sm text-[#E0E0E0]">Multi-trigger protection system</div>
+            </div>
+            <div class="border border-[#00C2FF] p-3 text-center">
+                <div class="text-lg font-bold text-[#00C2FF]">HUD Dashboard</div>
+                <div class="text-sm text-[#E0E0E0]">6-tab real-time monitoring</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Chapter 2 -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="chapter">
+        <img src="duel_concept.png" class="absolute inset-0 w-full h-full object-cover opacity-20" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-r from-[#8B5CF6]/30 to-transparent"></div>
+        <div class="relative h-full flex flex-col justify-center">
+            <div class="font-accent text-9xl text-[#8B5CF6]/30 mb-4">02</div>
+            <h2 class="font-heading-alt text-7xl font-bold text-[#F5F5F5] mb-6 leading-tight">Duel Architecture</h2>
+            <div class="text-2xl text-[#E0E0E0] max-w-3xl">Real vs Shadow: The evolutionary battle that drives continuous improvement</div>
+            <div class="flex gap-2 mt-8">
+                <div class="w-20 h-1 bg-[#8B5CF6]"></div>
+                <div class="w-10 h-1 bg-[#00C2FF]"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: The Duel Concept -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#8B5CF6] tracking-wider mb-2">DUEL ARCHITECTURE</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">The Duel Concept: Champion vs Challenger</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="flex flex-col gap-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4 flex items-center gap-2">
+                        <i class="fas fa-chess-king"></i>
+                        Real (Champion)
+                    </h3>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="flex items-start gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF] mt-2"></div>
+                            <span>Trades live capital with full risk management</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF] mt-2"></div>
+                            <span>Requires statistical edge validation</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF] mt-2"></div>
+                            <span>Subject to probability gates (min 55% P(Win))</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF] mt-2"></div>
+                            <span>Protected by circuit breaker system</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 p-3 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                        <div class="text-sm text-[#E0E0E0]">
+                            <strong class="text-[#00C2FF]">Capital Allocation:</strong> Dynamic 20%-80% based on performance
+                        </div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4 flex items-center gap-2">
+                        <i class="fas fa-chess-pawn"></i>
+                        Shadow (Challenger)
+                    </h3>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="flex items-start gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6] mt-2"></div>
+                            <span>Paper trading for continuous exploration</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6] mt-2"></div>
+                            <span>No probability gates - always trades</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6] mt-2"></div>
+                            <span>Faster feedback with tighter stops/targets</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6] mt-2"></div>
+                            <span>Parameter mutation for genetic diversity</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 p-3 bg-[#8B5CF6]/10 border border-[#8B5CF6]">
+                        <div class="text-sm text-[#E0E0E0]">
+                            <strong class="text-[#8B5CF6]">Learning Acceleration:</strong> 15-min timeout vs hours for real positions
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col gap-4">
+                <div class="border-2 border-[#F5F5F5] p-4 flex-grow">
+                    <h3 class="text-2xl font-bold text-[#F5F5F5] mb-4">Evolution Mechanism</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-16 h-16 border-2 border-[#00C2FF] flex items-center justify-center text-2xl text-[#00C2FF] font-bold shrink-0">1</div>
+                            <div class="text-base text-[#E0E0E0]">
+                                <strong class="text-[#F5F5F5]">Continuous Monitoring:</strong> Shadow performance tracked in real-time
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="w-16 h-16 border-2 border-[#8B5CF6] flex items-center justify-center text-2xl text-[#8B5CF6] font-bold shrink-0">2</div>
+                            <div class="text-base text-[#E0E0E0]">
+                                <strong class="text-[#F5F5F5]">Swap Evaluation:</strong> Trigger when Shadow PF > Real PF × 1.10 after minimum 30 trades
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="w-16 h-16 border-2 border-[#F5F5F5] flex items-center justify-center text-2xl text-[#F5F5F5] font-bold shrink-0">3</div>
+                            <div class="text-base text-[#E0E0E0]">
+                                <strong class="text-[#F5F5F5]">Instant Evolution:</strong> Shadow becomes new Real, Real becomes new Shadow with mutations
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#00C2FF]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#00C2FF] mb-3">Benefits of Duel Architecture</h4>
+                    <div class="grid grid-cols-2 gap-3 text-base text-[#E0E0E0]">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Continuous evolution</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Risk-free exploration</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Genetic diversity</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Performance validation</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="text-center p-3 border border-[#8B5CF6]">
+                        <div class="text-3xl font-bold text-[#8B5CF6]">~30-50</div>
+                        <div class="text-sm text-[#E0E0E0]">Trades between swaps</div>
+                    </div>
+                    <div class="text-center p-3 border border-[#8B5CF6]">
+                        <div class="text-3xl font-bold text-[#8B5CF6]">10%</div>
+                        <div class="text-sm text-[#E0E0E0]">Performance improvement required</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Shadow Trading -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#8B5CF6] tracking-wider mb-2">CONTINUOUS LEARNING</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Shadow Trading: Continuous Learning</h2>
+        </div>
+        <div class="grid grid-cols-3 gap-5">
+            <div class="border-2 border-[#8B5CF6] p-5 flex flex-col">
+                <h3 class="text-xl font-bold text-[#8B5CF6] mb-4">Shadow Configuration</h3>
+                <div class="space-y-4 flex-grow">
+                    <div>
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-2">Tighter Risk Management</div>
+                        <div class="text-base text-[#E0E0E0]">Stop Loss: <strong class="text-[#8B5CF6]">2.0x ATR</strong> (vs 2.0x real)</div>
+                        <div class="text-base text-[#E0E0E0]">Take Profit: <strong class="text-[#8B5CF6]">1.5x ATR</strong> (vs variable real)</div>
+                        <div class="text-sm text-[#E0E0E0] mt-1">Faster feedback loops for learning</div>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-2">Time-Based Exits</div>
+                        <div class="text-base text-[#E0E0E0]">Maximum duration: <strong class="text-[#8B5CF6]">15 minutes</strong></div>
+                        <div class="text-sm text-[#E0E0E0] mt-1">Prevents capital tie-up in learning phase</div>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-2">No Trading Gates</div>
+                        <div class="text-base text-[#E0E0E0]">Always trades regardless of:</div>
+                        <div class="text-sm text-[#E0E0E0] ml-4">• Circuit breaker state</div>
+                        <div class="text-sm text-[#E0E0E0] ml-4">• Probability thresholds</div>
+                        <div class="text-sm text-[#E0E0E0] ml-4">• Statistical edge requirements</div>
+                    </div>
+                </div>
+            </div>
+            <div class="border-2 border-[#00C2FF] p-5 flex flex-col">
+                <h3 class="text-xl font-bold text-[#00C2FF] mb-4">Learning Acceleration</h3>
+                <div class="space-y-4 flex-grow">
+                    <div class="p-4 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-2">Daily Learning Rate</div>
+                        <div class="text-4xl font-bold text-[#00C2FF] mb-1">~100+</div>
+                        <div class="text-sm text-[#E0E0E0]">Shadow trades per day</div>
+                    </div>
+                    <div class="p-4 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-2">Real Trading Rate</div>
+                        <div class="text-4xl font-bold text-[#00C2FF] mb-1">~10-30</div>
+                        <div class="text-sm text-[#E0E0E0]">Real trades per day (gated)</div>
+                    </div>
+                    <div class="p-3 bg-[#1A1D21] border border-[#00C2FF]">
+                        <div class="text-base text-[#E0E0E0]">
+                            <strong class="text-[#F5F5F5]">Learning Multiplier:</strong> <span class="text-[#00C2FF] font-bold text-xl">5-10x</span> faster strategy evolution
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="border-2 border-[#F5F5F5] p-5 flex flex-col">
+                <h3 class="text-xl font-bold text-[#F5F5F5] mb-4">Exploration Strategy</h3>
+                <div class="space-y-4 flex-grow">
+                    <div>
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-2">Parameter Mutation</div>
+                        <div class="text-base text-[#E0E0E0] mb-2">When Shadow becomes Real, new Shadow is created with mutations:</div>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div class="p-2 border border-[#F5F5F5]">
+                                <div class="text-[#F5F5F5] font-bold">Mutation Rate</div>
+                                <div class="text-[#E0E0E0]">10% per param</div>
+                            </div>
+                            <div class="p-2 border border-[#F5F5F5]">
+                                <div class="text-[#F5F5F5] font-bold">Max Step</div>
+                                <div class="text-[#E0E0E0]">±0.2</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-2">Exploration Rate</div>
+                        <div class="text-base text-[#E0E0E0]">Random reward noise: <strong class="text-[#F5F5F5]">15%</strong></div>
+                        <div class="text-sm text-[#E0E0E0] mt-1">Maintains genetic diversity while preserving learned knowledge</div>
+                    </div>
+                    <div class="p-3 bg-[#F5F5F5]/10 border border-[#F5F5F5]">
+                        <div class="text-base text-[#E0E0E0]">
+                            <strong class="text-[#F5F5F5]">Result:</strong> Continuous exploration without risking capital
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">Always On</div>
+                <div class="text-sm text-[#E0E0E0]">Regardless of circuit breaker</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">Faster Feedback</div>
+                <div class="text-sm text-[#E0E0E0]">15min vs hours for real</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">No Risk</div>
+                <div class="text-sm text-[#E0E0E0]">Paper trading only</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">Mutates</div>
+                <div class="text-sm text-[#E0E0E0]">Parameter exploration</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 9: Evolution & Capital Allocation -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#8B5CF6] tracking-wider mb-2">PERFORMANCE-BASED ALLOCATION</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Evolution & Capital Allocation</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Dynamic Capital Allocation</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Allocation Formula</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Allocation based on Profit Factor ratios:</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#00C2FF] font-mono text-sm text-[#00C2FF]">
+                                Sniper_Alloc = Sniper_PF / (Sniper_PF + Berserker_PF)<br>
+                                Berserker_Alloc = 1 - Sniper_Alloc
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="border border-[#00C2FF] p-3 text-center">
+                                <div class="text-[#00C2FF] font-bold">Min Allocation</div>
+                                <div class="text-2xl font-bold text-[#F5F5F5]">20%</div>
+                                <div class="text-sm text-[#E0E0E0]">Prevents extinction</div>
+                            </div>
+                            <div class="border border-[#00C2FF] p-3 text-center">
+                                <div class="text-[#00C2FF] font-bold">Max Allocation</div>
+                                <div class="text-2xl font-bold text-[#F5F5F5]">80%</div>
+                                <div class="text-sm text-[#E0E0E0]">Maintains diversity</div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#00C2FF]">Rebalance Frequency:</strong> Every 50 trades for stability
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#8B5CF6]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#8B5CF6] mb-3">Example Allocation Scenarios</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="flex justify-between p-2 border border-[#8B5CF6]/30">
+                            <span>Sniper PF = 1.5, Berserker PF = 1.0</span>
+                            <span class="text-[#8B5CF6] font-bold">SNI: 60%, BER: 40%</span>
+                        </div>
+                        <div class="flex justify-between p-2 border border-[#8B5CF6]/30">
+                            <span>Sniper PF = 2.0, Berserker PF = 1.0</span>
+                            <span class="text-[#8B5CF6] font-bold">SNI: 67%, BER: 33%</span>
+                        </div>
+                        <div class="flex justify-between p-2 border border-[#8B5CF6]/30">
+                            <span>Sniper PF = 0.8, Berserker PF = 1.6</span>
+                            <span class="text-[#8B5CF6] font-bold">SNI: 33%, BER: 67%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Evolution Through Swaps</h3>
+                    <div id="evolution-chart" style="width: 100%; height: 280px;"></div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">Mutation Strategy</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong class="text-[#F5F5F5]">Clone + Mutate:</strong> New Shadow copies champion's Q-values as baseline</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong class="text-[#F5F5F5]">Controlled Variance:</strong> 10% mutation rate with ±0.2 max step</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong class="text-[#F5F5F5]">Knowledge Preservation:</strong> Maintains learned insights while exploring</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            var evolutionChart = echarts.init(document.getElementById('evolution-chart'));
+            var option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    textStyle: { fontSize: 14 }
+                },
+                legend: {
+                    data: ['Sniper PF', 'Berserker PF', 'Swap Events'],
+                    textStyle: { color: '#E0E0E0', fontSize: 14 },
+                    top: 10
+                },
+                grid: {
+                    left: '10%',
+                    right: '10%',
+                    bottom: '15%',
+                    top: '20%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['0-50', '51-100', '101-150', '151-200', '201-250', '251-300', '301-350', '351-400'],
+                    axisLabel: { color: '#E0E0E0', fontSize: 12 },
+                    axisLine: { lineStyle: { color: '#00C2FF' } },
+                    name: 'Trade Period',
+                    nameTextStyle: { color: '#E0E0E0', fontSize: 13 }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: { color: '#E0E0E0', fontSize: 12 },
+                    axisLine: { lineStyle: { color: '#00C2FF' } },
+                    splitLine: { lineStyle: { color: '#333' } },
+                    name: 'Profit Factor',
+                    nameTextStyle: { color: '#E0E0E0', fontSize: 13 }
+                },
+                series: [
+                    {
+                        name: 'Sniper PF',
+                        type: 'line',
+                        data: [1.2, 1.4, 1.3, 1.6, 1.5, 1.8, 1.7, 1.9],
+                        lineStyle: { color: '#00C2FF', width: 3 },
+                        itemStyle: { color: '#00C2FF' },
+                        symbol: 'circle',
+                        symbolSize: 8
+                    },
+                    {
+                        name: 'Berserker PF',
+                        type: 'line',
+                        data: [1.1, 1.0, 1.2, 1.1, 1.4, 1.3, 1.5, 1.4],
+                        lineStyle: { color: '#8B5CF6', width: 3 },
+                        itemStyle: { color: '#8B5CF6' },
+                        symbol: 'circle',
+                        symbolSize: 8
+                    },
+                    {
+                        name: 'Swap Events',
+                        type: 'scatter',
+                        data: [[2, 1.3], [5, 1.8], [7, 1.5]],
+                        symbolSize: 20,
+                        itemStyle: { color: '#F5F5F5' },
+                        symbol: 'diamond'
+                    }
+                ]
+            };
+            evolutionChart.setOption(option);
+            window.addEventListener('resize', function() {
+                evolutionChart.resize();
+            });
+        </script>
+    </div>
+
+    <!-- Slide 10: Chapter 3 -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="chapter">
+        <img src="physics_engine.png" class="absolute inset-0 w-full h-full object-cover opacity-20" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-r from-[#00C2FF]/30 to-transparent"></div>
+        <div class="relative h-full flex flex-col justify-center">
+            <div class="font-accent text-9xl text-[#00C2FF]/30 mb-4">03</div>
+            <h2 class="font-heading-alt text-7xl font-bold text-[#F5F5F5] mb-6 leading-tight">Physics Engine &<br>Kinematic Analysis</h2>
+            <div class="text-2xl text-[#E0E0E0] max-w-3xl">Applying physics principles to model market dynamics and regime changes</div>
+            <div class="flex gap-2 mt-8">
+                <div class="w-20 h-1 bg-[#00C2FF]"></div>
+                <div class="w-10 h-1 bg-[#8B5CF6]"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 11: Kinematic Physics Model -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">PHYSICS-BASED ANALYSIS</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Kinematic Physics Model</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Core Physics Concepts</h3>
+                    <div class="space-y-3">
+                        <div class="border-l-4 border-[#00C2FF] pl-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-1">Mass (m)</div>
+                            <div class="text-base text-[#E0E0E0]">Liquidity depth from Level 2 DOM or synthetic calculation. Higher mass = thicker market, more resistance to movement.</div>
+                        </div>
+                        <div class="border-l-4 border-[#8B5CF6] pl-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-1">Force (F)</div>
+                            <div class="text-base text-[#E0E0E0]">Order flow imbalance: volume delta × price direction. Measures buying/selling pressure.</div>
+                        </div>
+                        <div class="border-l-4 border-[#F5F5F5] pl-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-1">Velocity (v)</div>
+                            <div class="text-base text-[#E0E0E0]">Rate of price change in points per tick/bar. Tracked as average over 3 periods for smoothing.</div>
+                        </div>
+                        <div class="border-l-4 border-[#00C2FF] pl-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-1">Acceleration (a)</div>
+                            <div class="text-base text-[#E0E0E0]">Change in velocity, normalized using Welford statistics for statistical significance testing.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#8B5CF6]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#8B5CF6] mb-3">Key Equations</h4>
+                    <div class="space-y-2 font-mono text-base">
+                        <div class="p-2 bg-[#1A1D21] border border-[#8B5CF6] text-[#8B5CF6]">F = volume × direction</div>
+                        <div class="p-2 bg-[#1A1D21] border border-[#8B5CF6] text-[#8B5CF6]">v = Δprice / Δtime</div>
+                        <div class="p-2 bg-[#1A1D21] border border-[#8B5CF6] text-[#8B5CF6]">a = Δv, normalized</div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Physics-Based Regime Detection</h3>
+                    <div id="physics-chart" style="width: 100%; height: 260px;"></div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">Momentum Persistence</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span>Tracks consecutive bars in same direction</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span>Velocity threshold: RL-tunable parameter</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span>TREND requires 5+ persistent bars</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            var physicsChart = echarts.init(document.getElementById('physics-chart'));
+            var option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    textStyle: { fontSize: 13 }
+                },
+                legend: {
+                    data: ['Acceleration (σ)', 'Velocity', 'Force'],
+                    textStyle: { color: '#E0E0E0', fontSize: 13 },
+                    top: 5
+                },
+                grid: {
+                    left: '10%',
+                    right: '10%',
+                    bottom: '15%',
+                    top: '18%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: Array.from({length: 50}, (_, i) => i + 1),
+                    axisLabel: { color: '#E0E0E0', fontSize: 11 },
+                    axisLine: { lineStyle: { color: '#00C2FF' } },
+                    name: 'Time (Bars)',
+                    nameTextStyle: { color: '#E0E0E0', fontSize: 12 }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: { color: '#E0E0E0', fontSize: 11 },
+                    axisLine: { lineStyle: { color: '#00C2FF' } },
+                    splitLine: { lineStyle: { color: '#333' } },
+                    name: 'Normalized Values',
+                    nameTextStyle: { color: '#E0E0E0', fontSize: 12 }
+                },
+                series: [
+                    {
+                        name: 'Acceleration (σ)',
+                        type: 'line',
+                        data: [0.5, 0.8, 1.2, 2.1, 2.5, 1.8, 1.1, 0.7, 0.9, 1.4, 0.3, -0.2, -0.8, -1.2, -0.7, -0.3, 0.1, 0.6, 1.1, 1.8, 2.3, 1.9, 1.2, 0.8, 0.4, -0.1, -0.6, -1.1, -1.8, -1.2, -0.7, -0.2, 0.3, 0.8, 1.3, 1.9, 2.4, 2.8, 2.1, 1.4, 0.9, 0.5, 0.1, -0.4, -0.9, -1.3, -1.9, -1.4, -0.9, -0.4, 0.2],
+                        lineStyle: { color: '#00C2FF', width: 2 },
+                        itemStyle: { color: '#00C2FF' },
+                        markLine: {
+                            data: [
+                                { yAxis: 2, name: 'Breakout Threshold', lineStyle: { color: '#F5F5F5', type: 'dashed' } },
+                                { yAxis: 0.8, name: 'Trend Threshold', lineStyle: { color: '#8B5CF6', type: 'dashed' } }
+                            ],
+                            label: { color: '#E0E0E0', fontSize: 11 }
+                        }
+                    },
+                    {
+                        name: 'Velocity',
+                        type: 'line',
+                        data: [0.2, 0.4, 0.7, 1.1, 1.5, 1.8, 1.6, 1.3, 1.0, 0.8, 0.5, 0.2, -0.1, -0.4, -0.7, -0.5, -0.2, 0.1, 0.4, 0.8, 1.2, 1.5, 1.3, 1.0, 0.7, 0.4, 0.1, -0.2, -0.6, -0.9, -0.6, -0.3, 0.0, 0.3, 0.6, 1.0, 1.4, 1.8, 2.1, 1.8, 1.4, 1.1, 0.8, 0.5, 0.2, -0.1, -0.4, -0.8, -1.1, -0.8, -0.5],
+                        lineStyle: { color: '#8B5CF6', width: 2 },
+                        itemStyle: { color: '#8B5CF6' }
+                    },
+                    {
+                        name: 'Force',
+                        type: 'line',
+                        data: [10, 15, 25, 40, 55, 45, 30, 20, 18, 28, 12, 5, -8, -18, -12, -6, 3, 12, 22, 35, 48, 38, 25, 15, 10, 2, -5, -12, -22, -15, -8, -2, 5, 15, 25, 38, 52, 58, 45, 32, 22, 15, 8, 3, -2, -8, -15, -25, -18, -12, -5],
+                        lineStyle: { color: '#F5F5F5', width: 1, opacity: 0.6 },
+                        itemStyle: { color: '#F5F5F5' },
+                        yAxisIndex: 0
+                    }
+                ]
+            };
+            physicsChart.setOption(option);
+            window.addEventListener('resize', function() {
+                physicsChart.resize();
+            });
+        </script>
+    </div>
+
+    <!-- Slide 12: Market Mass & Force Calculation -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">PHYSICS IMPLEMENTATION</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Market Mass & Force Calculation</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Mass Calculation</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Live Mode (Level 2 DOM)</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">When Level 2 data is available:</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                                    <span>Aggregate bid/ask volumes across 10 levels</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                                    <span>Sum total liquidity: mass = Σ volumes</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                                    <span>Represents actual market thickness</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Fallback Mode (Synthetic)</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">When L2 unavailable (backtest or no data):</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                                    <span>Calculate from volume-to-price-delta ratio</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                                    <span>Apply exponential decay: mass = mass × 0.95 + new × 0.05</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                                    <span>Clamped between 10-1000 for stability</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#00C2FF]">Interpretation:</strong> High mass = thick book, low mass = thin book
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Force Calculation</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Force Formula</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#8B5CF6] font-mono text-lg text-[#8B5CF6] text-center">
+                                F = volume_Δ × direction
+                            </div>
+                            <div class="text-base text-[#E0E0E0] mt-2">
+                                Where: volume_Δ = current_volume - prev_volume<br>
+                                direction = sign(price_change)
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="text-center p-3 border border-[#8B5CF6]">
+                                <div class="text-[#8B5CF6] font-bold">High Force</div>
+                                <div class="text-xl text-[#F5F5F5]">Strong Pressure</div>
+                                <div class="text-sm text-[#E0E0E0]">Large volume + clear direction</div>
+                            </div>
+                            <div class="text-center p-3 border border-[#8B5CF6]">
+                                <div class="text-[#8B5CF6] font-bold">Low Force</div>
+                                <div class="text-xl text-[#F5F5F5]">Weak Pressure</div>
+                                <div class="text-sm text-[#E0E0E0]">Low volume or chop</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">F = ma Applied to Markets</h4>
+                    <div class="text-base text-[#E0E0E0] mb-3">The same physics principles apply:</div>
+                    <div class="grid grid-cols-3 gap-3 text-center text-base">
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <div class="text-[#F5F5F5] font-bold">High Mass</div>
+                            <div class="text-sm text-[#E0E0E0]">More force needed for acceleration</div>
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <div class="text-[#F5F5F5] font-bold">High Force</div>
+                            <div class="text-sm text-[#E0E0E0]">Creates strong acceleration if mass low</div>
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <div class="text-[#F5F5F5] font-bold">Acceleration</div>
+                            <div class="text-sm text-[#E0E0E0]">Directly proportional to force, inverse to mass</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Live L2</div>
+                <div class="text-sm text-[#E0E0E0]">Real DOM data when available</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Synthetic</div>
+                <div class="text-sm text-[#E0E0E0]">Fallback for backtesting</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Normalized</div>
+                <div class="text-sm text-[#E0E0E0]">Statistical significance</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Real-time</div>
+                <div class="text-sm text-[#E0E0E0]">Tick-by-tick updates</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 13: Velocity & Acceleration Analysis -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">MOTION ANALYSIS</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Velocity & Acceleration Analysis</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Velocity Calculation</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Raw Velocity</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#00C2FF] font-mono text-lg text-[#00C2FF] text-center">
+                                v = (price_now - price_prev) / point_size
+                            </div>
+                            <div class="text-base text-[#E0E0E0] mt-2">Measured in points per tick/bar for consistency</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Average Velocity</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Smoothed over 3 periods to reduce noise:</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#8B5CF6] font-mono text-base text-[#8B5CF6] text-center">
+                                v_avg = (v₁ + v₂ + v₃) / 3
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#00C2FF]">Velocity Persistence:</strong> Counts consecutive bars above threshold for regime confirmation
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#8B5CF6]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#8B5CF6] mb-3">Velocity Thresholds (RL-Tunable)</h4>
+                    <div class="grid grid-cols-2 gap-3 text-base">
+                        <div class="p-2 border border-[#8B5CF6]">
+                            <div class="text-[#8B5CF6] font-bold">Minimum</div>
+                            <div class="text-[#E0E0E0]">0.2 (parameter: 0.0)</div>
+                        </div>
+                        <div class="p-2 border border-[#8B5CF6]">
+                            <div class="text-[#8B5CF6] font-bold">Maximum</div>
+                            <div class="text-[#E0E0E0]">1.0 (parameter: 1.0)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Acceleration & Normalization</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Raw Acceleration</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#8B5CF6] font-mono text-lg text-[#8B5CF6] text-center">
+                                a_raw = v_now - v_prev
+                            </div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Welford Normalization</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Online algorithm maintains running statistics:</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                                    <span>Mean: μₙ = μₙ₋₁ + (xₙ - μₙ₋₁)/n</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                                    <span>M2: M2ₙ = M2ₙ₋₁ + (xₙ - μₙ₋₁)(xₙ - μₙ)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                                    <span>Std: σ = √(M2/(n-1))</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                                    <span>Z-Score: z = (x - μ)/σ</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#8B5CF6]/10 border border-[#8B5CF6]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#8B5CF6]">Benefits:</strong> No history storage, O(1) memory, robust to outliers
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">Regime Identification</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span><strong class="text-[#00C2FF]">BREAKOUT:</strong> |a| > 2σ (explosive acceleration)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span><strong class="text-[#8B5CF6]">TREND:</strong> |a| > 0.8σ sustained (persistent velocity)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#F5F5F5]"></div>
+                            <span><strong class="text-[#F5F5F5]">MEANREV:</strong> |a| < threshold + deceleration</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Online</div>
+                <div class="text-sm text-[#E0E0E0]">Real-time statistics</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">Normalized</div>
+                <div class="text-sm text-[#E0E0E0]">Z-score significance</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">Adaptive</div>
+                <div class="text-sm text-[#E0E0E0]">Window size 500</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 14: Backtest vs Live Mode -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">ADAPTIVE EXECUTION</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Backtest vs Live Mode Adaptation</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Automatic Mode Detection</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Live Trading Mode</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                                    <span>Tick-by-tick physics updates</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                                    <span>Real Level 2 DOM subscription</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                                    <span>MarketBookAdd() for liquidity data</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                                    <span>TickCounter throttling for performance</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Backtest Mode (MT5 Tester)</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                                    <span>Bar-based calculation using OHLCV</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                                    <span>Pre-loads 100+ historical bars</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                                    <span>Simulates tick-level physics realistically</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                                    <span>Faster calibration (10 bars vs 100 ticks)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#00C2FF]">Detection:</strong> MQLInfoInteger(MQL_TESTER) != 0
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Bar-Based Physics Simulation</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Velocity from Price ROC</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Using closing prices:</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div>v₁ = (close[0] - close[1]) / point</div>
+                                <div>v₂ = (close[1] - close[2]) / point</div>
+                                <div>v₃ = (close[2] - close[3]) / point</div>
+                            </div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Mass from Volume & Range</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Synthetic mass calculation:</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#F5F5F5] font-mono text-base text-[#F5F5F5] text-center">
+                                mass = volume / (range/point) × 0.01
+                            </div>
+                            <div class="text-sm text-[#E0E0E0] mt-1">Higher volume + lower range = thicker book</div>
+                        </div>
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Force from Volume × Direction</div>
+                            <div class="text-base text-[#E0E0E0]">F = volume × sign(close - close[1])</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">Performance Comparison</h4>
+                    <div class="grid grid-cols-2 gap-3 text-base">
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <div class="text-[#F5F5F5] font-bold">Live Mode</div>
+                            <div class="text-sm text-[#E0E0E0]">Higher precision, tick granularity</div>
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <div class="text-[#F5F5F5] font-bold">Backtest Mode</div>
+                            <div class="text-sm text-[#E0E0E0]">Realistic approximation, fast execution</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Seamless</div>
+                <div class="text-sm text-[#E0E0E0]">No code changes required</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">Consistent</div>
+                <div class="text-sm text-[#E0E0E0]">Minimal performance difference</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">Reliable</div>
+                <div class="text-sm text-[#E0E0E0]">Validates strategy robustness</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 15: Chapter 4 -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="chapter">
+        <img src="strategy_concept.png" class="absolute inset-0 w-full h-full object-cover opacity-20" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-r from-[#8B5CF6]/30 to-transparent"></div>
+        <div class="relative h-full flex flex-col justify-center">
+            <div class="font-accent text-9xl text-[#8B5CF6]/30 mb-4">04</div>
+            <h2 class="font-heading-alt text-7xl font-bold text-[#F5F5F5] mb-6 leading-tight">Agent Strategies</h2>
+            <div class="text-2xl text-[#E0E0E0] max-w-3xl">Sniper vs Berserker: Complementary approaches to market opportunity</div>
+            <div class="flex gap-2 mt-8">
+                <div class="w-20 h-1 bg-[#8B5CF6]"></div>
+                <div class="w-10 h-1 bg-[#00C2FF]"></div>
+            </div>
+        </div>
+    </div>
+
+    

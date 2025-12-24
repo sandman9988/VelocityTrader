@@ -1,0 +1,1358 @@
+<!-- Slide 27: Parameter Mutation & Exploration -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#8B5CF6] tracking-wider mb-2">GENETIC DIVERSITY</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Parameter Mutation & Exploration</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Mutation Mechanism</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">When Shadow Becomes Champion</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div>1. Shadow's parameters become new baseline</div>
+                                <div>2. Create new Shadow as clone + mutations</div>
+                                <div>3. Reset Shadow learning rate to initial</div>
+                                <div>4. Preserve Q-values as starting point</div>
+                            </div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Mutation Parameters</div>
+                            <div class="grid grid-cols-2 gap-3 text-center">
+                                <div class="p-2 border border-[#8B5CF6]">
+                                    <div class="text-[#8B5CF6] font-bold">Rate</div>
+                                    <div class="text-2xl font-bold text-[#F5F5F5]">10%</div>
+                                    <div class="text-sm text-[#E0E0E0]">per parameter</div>
+                                </div>
+                                <div class="p-2 border border-[#8B5CF6]">
+                                    <div class="text-[#8B5CF6] font-bold">Max Step</div>
+                                    <div class="text-2xl font-bold text-[#F5F5F5]">±0.2</div>
+                                    <div class="text-sm text-[#E0E0E0]">in [0,1] space</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#00C2FF]">Result:</strong> Explores parameter space while preserving learned knowledge
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#8B5CF6]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#8B5CF6] mb-3">Exploration Rate</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span>Random reward noise: 15% probability</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span>Noise: 0.8 + random(0.4) multiplier</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span>Maintains genetic diversity</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Parameter Evolution Visualization</h3>
+                    <div id="parameter-evolution-chart" style="width: 100%; height: 240px;"></div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">Balancing Exploration vs Exploitation</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <strong class="text-[#F5F5F5]">Too High Mutation:</strong> Unstable learning, forgets good parameters
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <strong class="text-[#F5F5F5]">Too Low Mutation:</strong> Premature convergence, local optima
+                        </div>
+                        <div class="p-2 border border-[#00C2FF]">
+                            <strong class="text-[#00C2FF]">Optimal:</strong> 10% rate with ±0.2 step size
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">10%</div>
+                <div class="text-sm text-[#E0E0E0]">Mutation rate</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">±0.2</div>
+                <div class="text-sm text-[#E0E0E0]">Max step size</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">Clone+</div>
+                <div class="text-sm text-[#E0E0E0]">Preserve knowledge</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Diversity</div>
+                <div class="text-sm text-[#E0E0E0]">Genetic variation</div>
+            </div>
+        </div>
+        <script>
+            var paramChart = echarts.init(document.getElementById('parameter-evolution-chart'));
+            var generations = ['Gen 1', 'Gen 2', 'Gen 3', 'Gen 4', 'Gen 5', 'Gen 6', 'Gen 7', 'Gen 8', 'Gen 9', 'Gen 10'];
+            var option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    textStyle: { fontSize: 13 }
+                },
+                legend: {
+                    data: ['Loss Penalty', 'Trail ATR', 'Trend Mult'],
+                    textStyle: { color: '#E0E0E0', fontSize: 12 },
+                    top: 0
+                },
+                grid: {
+                    left: '12%',
+                    right: '10%',
+                    bottom: '15%',
+                    top: '18%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: generations,
+                    axisLabel: { color: '#E0E0E0', fontSize: 11 },
+                    axisLine: { lineStyle: { color: '#8B5CF6' } }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Normalized Value',
+                    nameTextStyle: { color: '#E0E0E0', fontSize: 12 },
+                    axisLabel: { color: '#E0E0E0', fontSize: 11 },
+                    axisLine: { lineStyle: { color: '#8B5CF6' } },
+                    splitLine: { lineStyle: { color: '#333' } }
+                },
+                series: [
+                    {
+                        name: 'Loss Penalty',
+                        type: 'line',
+                        data: [0.375, 0.35, 0.42, 0.38, 0.45, 0.41, 0.39, 0.43, 0.40, 0.44],
+                        lineStyle: { color: '#8B5CF6', width: 2 },
+                        itemStyle: { color: '#8B5CF6' },
+                        symbol: 'circle',
+                        symbolSize: 8
+                    },
+                    {
+                        name: 'Trail ATR',
+                        type: 'line',
+                        data: [0.40, 0.38, 0.35, 0.42, 0.39, 0.36, 0.41, 0.37, 0.40, 0.38],
+                        lineStyle: { color: '#00C2FF', width: 2 },
+                        itemStyle: { color: '#00C2FF' },
+                        symbol: 'circle',
+                        symbolSize: 8
+                    },
+                    {
+                        name: 'Trend Mult',
+                        type: 'line',
+                        data: [0.60, 0.58, 0.62, 0.59, 0.61, 0.57, 0.63, 0.60, 0.58, 0.61],
+                        lineStyle: { color: '#F5F5F5', width: 2 },
+                        itemStyle: { color: '#F5F5F5' },
+                        symbol: 'circle',
+                        symbolSize: 8
+                    }
+                ]
+            };
+            paramChart.setOption(option);
+            window.addEventListener('resize', function() {
+                paramChart.resize();
+            });
+        </script>
+    </div>
+
+    <!-- Slide 28: Chapter 7 -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="chapter">
+        <img src="risk_management.png" class="absolute inset-0 w-full h-full object-cover opacity-20" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-r from-[#00C2FF]/30 to-transparent"></div>
+        <div class="relative h-full flex flex-col justify-center">
+            <div class="font-accent text-9xl text-[#00C2FF]/30 mb-4">07</div>
+            <h2 class="font-heading-alt text-7xl font-bold text-[#F5F5F5] mb-6 leading-tight">Risk Management</h2>
+            <div class="text-2xl text-[#E0E0E0] max-w-3xl">Multi-layered protection through statistical validation and circuit breakers</div>
+            <div class="flex gap-2 mt-8">
+                <div class="w-20 h-1 bg-[#00C2FF]"></div>
+                <div class="w-10 h-1 bg-[#8B5CF6]"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 29: Statistical Gate -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">EDGE VALIDATION</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Statistical Gate: Edge Validation</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Edge Requirements</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">1. Minimum Sample Size</div>
+                            <div class="text-4xl font-bold text-[#00C2FF] mb-2">30</div>
+                            <div class="text-base text-[#E0E0E0]">Trades required for statistical significance</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">2. Win Rate Threshold</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Must beat friction-adjusted coin flip:</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#8B5CF6] font-mono text-base text-[#8B5CF6] text-center">
+                                min_WR = 0.52 + (friction / avgWin)
+                            </div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">3. Statistical Significance</div>
+                            <div class="text-4xl font-bold text-[#F5F5F5] mb-2">p < 0.05</div>
+                            <div class="text-base text-[#E0E0E0]">95% confidence level</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#00C2FF]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#00C2FF] mb-3">P-Value Calculation</h4>
+                    <div class="p-3 bg-[#1A1D21] border border-[#00C2FF] font-mono text-sm text-[#00C2FF]">
+                        z = (observed_WR - 0.5) / stdErr<br>
+                        p = 1 - NormalCDF(z)<br>
+                        stdErr = √(0.5 × 0.5 / n)
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Edge Status Dashboard</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">SNIPER</div>
+                                <div class="px-3 py-1 border border-[#00C2FF] text-[#00C2FF] text-sm">EDGE VALID</div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-sm">
+                                <div class="p-2 border border-[#00C2FF]/30">
+                                    <div class="text-[#00C2FF]">Trades</div>
+                                    <div class="text-[#F5F5F5] font-bold">156</div>
+                                </div>
+                                <div class="p-2 border border-[#00C2FF]/30">
+                                    <div class="text-[#00C2FF]">Win Rate</div>
+                                    <div class="text-[#F5F5F5] font-bold">58.3%</div>
+                                </div>
+                                <div class="p-2 border border-[#00C2FF]/30">
+                                    <div class="text-[#00C2FF]">p-Value</div>
+                                    <div class="text-[#F5F5F5] font-bold">0.023</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">BERSERKER</div>
+                                <div class="px-3 py-1 border border-[#F5F5F5] text-[#F5F5F5] text-sm">NO EDGE</div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-sm">
+                                <div class="p-2 border border-[#F5F5F5]/30">
+                                    <div class="text-[#F5F5F5]">Trades</div>
+                                    <div class="text-[#E0E0E0] font-bold">18</div>
+                                </div>
+                                <div class="p-2 border border-[#F5F5F5]/30">
+                                    <div class="text-[#F5F5F5]">Win Rate</div>
+                                    <div class="text-[#E0E0E0] font-bold">61.1%</div>
+                                </div>
+                                <div class="p-2 border border-[#F5F5F5]/30">
+                                    <div class="text-[#F5F5F5]">p-Value</div>
+                                    <div class="text-[#E0E0E0] font-bold">N/A</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#8B5CF6]/10 border border-[#8B5CF6]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#8B5CF6]">Note:</strong> Only agents with validated edge can trade real capital
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">Normal CDF Approximation</h4>
+                    <div class="text-base text-[#E0E0E0] mb-2">Uses polynomial approximation for speed:</div>
+                    <div class="p-3 bg-[#1A1D21] border border-[#F5F5F5] font-mono text-xs text-[#F5F5F5]">
+                        erf(x) ≈ 1 - 1/(1 + a₁x + a₂x² + a₃x³ + a₄x⁴ + a₅x⁵)⁴<br>
+                        where a₁=0.254829592, a₂=-0.284496736, etc.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">30+</div>
+                <div class="text-sm text-[#E0E0E0]">Min trades</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">p < 0.05</div>
+                <div class="text-sm text-[#E0E0E0]">Significance</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">52%+</div>
+                <div class="text-sm text-[#E0E0E0]">Min win rate</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 30: Circuit Breaker -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">PROTECTION SYSTEM</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Circuit Breaker: Multi-Trigger Protection</h2>
+        </div>
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-5">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Trigger Conditions</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">Daily Loss Limit</div>
+                                <div class="text-2xl font-bold text-[#00C2FF]">3%</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Maximum daily loss (equity-based). Resets at midnight.</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">Consecutive Losses</div>
+                                <div class="text-2xl font-bold text-[#8B5CF6]">5</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Maximum consecutive losing trades. Resets on win.</div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">Rolling Win Rate</div>
+                                <div class="text-2xl font-bold text-[#F5F5F5]">45%</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Minimum 20-trade rolling win rate.</div>
+                        </div>
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">Max Drawdown</div>
+                                <div class="text-2xl font-bold text-[#00C2FF]">10%</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Peak-to-trough maximum decline.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Circuit Breaker States</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-4 h-4 bg-[#00C2FF]"></div>
+                                <div class="text-lg font-bold text-[#F5F5F5]">LIVE</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Full trading enabled. Normal operation.</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-4 h-4 bg-[#8B5CF6]"></div>
+                                <div class="text-lg font-bold text-[#F5F5F5]">HALTED</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Cooldown period: 60 minutes. No trading.</div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-4 h-4 bg-[#F5F5F5]"></div>
+                                <div class="text-lg font-bold text-[#F5F5F5]">RETRAINING</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Shadow only. Rebuilding performance.</div>
+                        </div>
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-4 h-4 bg-[#00C2FF]"></div>
+                                <div class="text-lg font-bold text-[#F5F5F5]">PENDING</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Ready for reinstatement. Awaits manual approval.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="border-2 border-[#F5F5F5] p-4">
+                <h3 class="text-2xl font-bold text-[#F5F5F5] mb-4">Recovery Requirements</h3>
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="border border-[#F5F5F5]/50 p-3 text-center">
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-1">Min Trades</div>
+                        <div class="text-3xl font-bold text-[#00C2FF] mb-1">20</div>
+                        <div class="text-sm text-[#E0E0E0]">Shadow trades during retrain</div>
+                    </div>
+                    <div class="border border-[#F5F5F5]/50 p-3 text-center">
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-1">Min Win Rate</div>
+                        <div class="text-3xl font-bold text-[#8B5CF6] mb-1">52%</div>
+                        <div class="text-sm text-[#E0E0E0]">Recovery performance</div>
+                    </div>
+                    <div class="border border-[#F5F5F5]/50 p-3 text-center">
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-1">Min PF</div>
+                        <div class="text-3xl font-bold text-[#F5F5F5] mb-1">1.10</div>
+                        <div class="text-sm text-[#E0E0E0]">Profit factor threshold</div>
+                    </div>
+                    <div class="border border-[#F5F5F5]/50 p-3 text-center">
+                        <div class="text-lg font-bold text-[#F5F5F5] mb-1">Manual</div>
+                        <div class="text-3xl font-bold text-[#00C2FF] mb-1">✓</div>
+                        <div class="text-sm text-[#E0E0E0]">Approval required</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 31: Probability Predictor -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">POSITION SIZING</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Probability Predictor & Position Sizing</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Probability Prediction Model</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Weighted Ensemble</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Combines multiple predictive factors:</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div>• Regime WR (30% weight)</div>
+                                <div>• Chi Zone WR (20% weight)</div>
+                                <div>• Accel Zone WR (25% weight)</div>
+                                <div>• Agent Historical WR (25% weight)</div>
+                            </div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Probability Formula</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#8B5CF6] font-mono text-sm text-[#8B5CF6]">
+                                P(Win) = 0.30 × P_regime<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ 0.20 × P_chi<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ 0.25 × P_accel<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ 0.25 × P_agent
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#00C2FF]">Gate:</strong> Minimum 55% P(Win) required for real trades
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#8B5CF6]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#8B5CF6] mb-3">Zone-Based Tracking</h4>
+                    <div class="grid grid-cols-2 gap-3 text-base text-[#E0E0E0]">
+                        <div>
+                            <div class="text-[#8B5CF6] font-bold mb-1">Chi Zones</div>
+                            <div class="text-sm"><-2σ, -2σ:-1σ, -1σ:1σ, 1σ:2σ, >2σ</div>
+                        </div>
+                        <div>
+                            <div class="text-[#8B5CF6] font-bold mb-1">Accel Zones</div>
+                            <div class="text-sm">Same 5-zone structure</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Omega-Based Position Sizing</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Omega Ratio</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Historical upside vs downside:</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#8B5CF6] font-mono text-xl text-[#8B5CF6] text-center">
+                                Ω = Upside / Downside
+                            </div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Position Scaling</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Size scaled based on Omega vs baseline:</div>
+                            <div class="grid grid-cols-3 gap-2 text-center text-sm">
+                                <div class="p-2 border border-[#F5F5F5]">
+                                    <div class="text-[#F5F5F5] font-bold">Low Omega</div>
+                                    <div class="text-[#E0E0E0]">0.3-0.7x</div>
+                                </div>
+                                <div class="p-2 border border-[#F5F5F5]">
+                                    <div class="text-[#F5F5F5] font-bold">Baseline</div>
+                                    <div class="text-[#E0E0E0]">1.0x</div>
+                                </div>
+                                <div class="p-2 border border-[#F5F5F5]">
+                                    <div class="text-[#F5F5F5] font-bold">High Omega</div>
+                                    <div class="text-[#E0E0E0]">1.0-1.5x</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-[#8B5CF6]/10 border border-[#8B5CF6]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#8B5CF6]">Benefit:</strong> Larger positions when edge is stronger
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#00C2FF]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#00C2FF] mb-3">Sizing Formula</h4>
+                    <div class="p-3 bg-[#1A1D21] border border-[#00C2FF] font-mono text-sm text-[#00C2FF]">
+                        if omega < baseline:<br>
+                        &nbsp;&nbsp;scale = max(0.3, omega / baseline)<br>
+                        else:<br>
+                        &nbsp;&nbsp;excess = omega - baseline<br>
+                        &nbsp;&nbsp;scale = 1 + (excess × 0.3)<br>
+                        scale *= (0.5 + pWin)<br>
+                        final_scale = min(scale, 1.5)
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">55%</div>
+                <div class="text-sm text-[#E0E0E0]">Min probability</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">Ensemble</div>
+                <div class="text-sm text-[#E0E0E0]">4 factors weighted</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">Omega</div>
+                <div class="text-sm text-[#E0E0E0]">Edge-based sizing</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Dynamic</div>
+                <div class="text-sm text-[#E0E0E0]">0.3x to 1.5x scale</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 32: Chapter 8 -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="chapter">
+        <img src="dashboard_hud.png" class="absolute inset-0 w-full h-full object-cover opacity-20" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-r from-[#8B5CF6]/30 to-transparent"></div>
+        <div class="relative h-full flex flex-col justify-center">
+            <div class="font-accent text-9xl text-[#8B5CF6]/30 mb-4">08</div>
+            <h2 class="font-heading-alt text-7xl font-bold text-[#F5F5F5] mb-6 leading-tight">Performance Measurement</h2>
+            <div class="text-2xl text-[#E0E0E0] max-w-3xl">Enhanced HUD with comprehensive metrics and real-time monitoring</div>
+            <div class="flex gap-2 mt-8">
+                <div class="w-20 h-1 bg-[#8B5CF6]"></div>
+                <div class="w-10 h-1 bg-[#00C2FF]"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 33: HUD Architecture -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#8B5CF6] tracking-wider mb-2">MONITORING INTERFACE</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">HUD Architecture: 6-Tab Dashboard</h2>
+        </div>
+        <div class="space-y-4">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-xl font-bold text-[#00C2FF] mb-3 flex items-center gap-2">
+                        <i class="fas fa-tachometer-alt"></i>
+                        DASHBOARD
+                    </h3>
+                    <div class="space-y-1 text-base text-[#E0E0E0]">
+                        <div>• P&L Summary (Day/Week/Month/Total)</div>
+                        <div>• Agent Status & Allocation</div>
+                        <div>• System State & Circuit Breaker</div>
+                        <div>• Open Positions & Regime Distribution</div>
+                        <div>• Performance Traffic Lights</div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-xl font-bold text-[#8B5CF6] mb-3 flex items-center gap-2">
+                        <i class="fas fa-chart-bar"></i>
+                        PERFORMANCE
+                    </h3>
+                    <div class="space-y-1 text-base text-[#E0E0E0]">
+                        <div>• Session vs Cumulative Stats</div>
+                        <div>• Real vs Shadow Comparison</div>
+                        <div>• MAE/MFE Analysis</div>
+                        <div>• Consecutive Loss Tracking</div>
+                        <div>• Rolling Win Rate (20 trades)</div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#F5F5F5] p-4">
+                    <h3 class="text-xl font-bold text-[#F5F5F5] mb-3 flex items-center gap-2">
+                        <i class="fas fa-brain"></i>
+                        RL TRAINING
+                    </h3>
+                    <div class="space-y-1 text-base text-[#E0E0E0]">
+                        <div>• Q-Values (Buy/Sell per Regime)</div>
+                        <div>• Learning Rates & Convergence</div>
+                        <div>• RL Parameters (17 normalized)</div>
+                        <div>• Mutation History</div>
+                        <div>• Exploration vs Exploitation Status</div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-xl font-bold text-[#00C2FF] mb-3 flex items-center gap-2">
+                        <i class="fas fa-percentage"></i>
+                        PROBABILITY
+                    </h3>
+                    <div class="space-y-1 text-base text-[#E0E0E0]">
+                        <div>• Regime Win Rates</div>
+                        <div>• Chi & Accel Zone WR</div>
+                        <div>• Prediction Accuracy Tracking</div>
+                        <div>• Omega Ratio Distribution</div>
+                        <div>• Probability Gates Status</div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-xl font-bold text-[#8B5CF6] mb-3 flex items-center gap-2">
+                        <i class="fas fa-shield-alt"></i>
+                        RISK
+                    </h3>
+                    <div class="space-y-1 text-base text-[#E0E0E0]">
+                        <div>• Drawdown & Daily Limits</div>
+                        <div>• Circuit Breaker Status</div>
+                        <div>• Statistical Edge Validation</div>
+                        <div>• Position Sizing Logic</div>
+                        <div>• Retrain Progress (if applicable)</div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#F5F5F5] p-4">
+                    <h3 class="text-xl font-bold text-[#F5F5F5] mb-3 flex items-center gap-2">
+                        <i class="fas fa-chart-line"></i>
+                        INSTRUMENTS
+                    </h3>
+                    <div class="space-y-1 text-base text-[#E0E0E0]">
+                        <div>• Top Symbols by Regime</div>
+                        <div>• Real-time Rankings</div>
+                        <div>• Velocity & Acceleration</div>
+                        <div>• Chi Values</div>
+                        <div>• Signal Strength Indicators</div>
+                    </div>
+                </div>
+            </div>
+            <div class="border-2 border-[#00C2FF] p-4">
+                <h3 class="text-2xl font-bold text-[#00C2FF] mb-4 flex items-center gap-2">
+                    <i class="fas fa-desktop"></i>
+                    HUD Features & Navigation
+                </h3>
+                <div class="grid grid-cols-4 gap-4 text-base text-[#E0E0E0]">
+                    <div class="flex items-start gap-2">
+                        <div class="w-2 h-2 bg-[#00C2FF] mt-2"></div>
+                        <span><strong class="text-[#F5F5F5]">Auto-Rotation:</strong> Cycles tabs every 5 seconds if enabled</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <div class="w-2 h-2 bg-[#00C2FF] mt-2"></div>
+                        <span><strong class="text-[#F5F5F5]">Key Navigation:</strong> Keys 1-6, TAB, arrow keys for control</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <div class="w-2 h-2 bg-[#00C2FF] mt-2"></div>
+                        <span><strong class="text-[#F5F5F5]">Real-time Updates:</strong> 250ms throttle for performance</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <div class="w-2 h-2 bg-[#00C2FF] mt-2"></div>
+                        <span><strong class="text-[#F5F5F5]">Transparency:</strong> Complete visibility into system state</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 34: MAE/MFE Analysis -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">TRADE QUALITY METRICS</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">MAE/MFE Analysis: Trade Quality Metrics</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">MAE/MFE Definitions</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">MAE - Maximum Adverse Excursion</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Worst drawdown during trade:</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#00C2FF] font-mono text-lg text-[#00C2FF] text-center">
+                                MAE = min(PnL_t) for all t
+                            </div>
+                            <div class="text-sm text-[#E0E0E0] mt-1">Measures how far trade went against you</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">MFE - Maximum Favorable Excursion</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Best profit during trade:</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#8B5CF6] font-mono text-lg text-[#8B5CF6] text-center">
+                                MFE = max(PnL_t) for all t
+                            </div>
+                            <div class="text-sm text-[#E0E0E0] mt-1">Measures how far trade went in your favor</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">ETD - End Trade Drawdown</h4>
+                    <div class="p-3 bg-[#1A1D21] border border-[#F5F5F5] font-mono text-lg text-[#F5F5F5] text-center">
+                        ETD = MFE - Final_PnL
+                    </div>
+                    <div class="text-base text-[#E0E0E0] mt-2">How much profit was given back. Lower is better.</div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">MAE/MFE Distribution</h3>
+                    <div id="mae-mfe-chart" style="width: 100%; height: 240px;"></div>
+                </div>
+                <div class="border border-[#00C2FF]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#00C2FF] mb-3">Trade Quality Insights</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="p-2 border border-[#00C2FF]">
+                            <strong class="text-[#00C2FF]">Low Avg MAE:</strong> Good entry timing, minimal drawdown
+                        </div>
+                        <div class="p-2 border border-[#8B5CF6]">
+                            <strong class="text-[#8B5CF6]">High Avg MFE:</strong> Good at catching moves
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <strong class="text-[#F5F5F5]">Low Avg ETD:</strong> Good at exiting, minimal give-back
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">MAE</div>
+                <div class="text-sm text-[#E0E0E0]">Worst drawdown</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">MFE</div>
+                <div class="text-sm text-[#E0E0E0]">Best profit</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">ETD</div>
+                <div class="text-sm text-[#E0E0E0]">Profit given back</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Quality</div>
+                <div class="text-sm text-[#E0E0E0]">Beyond simple P&L</div>
+            </div>
+        </div>
+        <script>
+            var maeMfeChart = echarts.init(document.getElementById('mae-mfe-chart'));
+            var option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    textStyle: { fontSize: 13 }
+                },
+                legend: {
+                    data: ['SNIPER MAE', 'SNIPER MFE', 'BERSERKER MAE', 'BERSERKER MFE'],
+                    textStyle: { color: '#E0E0E0', fontSize: 12 },
+                    top: 0
+                },
+                grid: {
+                    left: '10%',
+                    right: '10%',
+                    bottom: '15%',
+                    top: '18%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['Trade 1', 'Trade 2', 'Trade 3', 'Trade 4', 'Trade 5', 'Trade 6', 'Trade 7', 'Trade 8', 'Trade 9', 'Trade 10'],
+                    axisLabel: { color: '#E0E0E0', fontSize: 11 },
+                    axisLine: { lineStyle: { color: '#8B5CF6' } }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Pips',
+                    nameTextStyle: { color: '#E0E0E0', fontSize: 12 },
+                    axisLabel: { color: '#E0E0E0', fontSize: 11 },
+                    axisLine: { lineStyle: { color: '#8B5CF6' } },
+                    splitLine: { lineStyle: { color: '#333' } }
+                },
+                series: [
+                    {
+                        name: 'SNIPER MAE',
+                        type: 'bar',
+                        data: [-15, -12, -18, -8, -20, -14, -10, -16, -11, -13],
+                        itemStyle: { color: '#00C2FF' },
+                        barWidth: '15%'
+                    },
+                    {
+                        name: 'SNIPER MFE',
+                        type: 'bar',
+                        data: [25, 30, 18, 35, 22, 28, 32, 20, 26, 24],
+                        itemStyle: { color: '#8B5CF6' },
+                        barWidth: '15%'
+                    },
+                    {
+                        name: 'BERSERKER MAE',
+                        type: 'bar',
+                        data: [-20, -15, -25, -12, -18, -22, -16, -19, -14, -17],
+                        itemStyle: { color: '#00C2FF', opacity: 0.6 },
+                        barWidth: '15%'
+                    },
+                    {
+                        name: 'BERSERKER MFE',
+                        type: 'bar',
+                        data: [30, 22, 35, 28, 25, 32, 26, 29, 24, 27],
+                        itemStyle: { color: '#8B5CF6', opacity: 0.6 },
+                        barWidth: '15%'
+                    }
+                ]
+            };
+            maeMfeChart.setOption(option);
+            window.addEventListener('resize', function() {
+                maeMfeChart.resize();
+            });
+        </script>
+    </div>
+
+    <!-- Slide 35: Multi-Period Performance Tracking -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">PERFORMANCE ANALYSIS</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Multi-Period Performance Tracking</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Period Definitions</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">Today</div>
+                                <div class="px-3 py-1 border border-[#00C2FF] text-[#00C2FF] text-sm">SESSION</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Current trading session since midnight</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">Week</div>
+                                <div class="px-3 py-1 border border-[#8B5CF6] text-[#8B5CF6] text-sm">ROLLING 7D</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Rolling 7-day window</div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">Month</div>
+                                <div class="px-3 py-1 border border-[#F5F5F5] text-[#F5F5F5] text-sm">ROLLING 30D</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Rolling 30-day window</div>
+                        </div>
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-lg font-bold text-[#F5F5F5]">Total</div>
+                                <div class="px-3 py-1 border border-[#00C2FF] text-[#00C2FF] text-sm">ALL-TIME</div>
+                            </div>
+                            <div class="text-base text-[#E0E0E0]">Cumulative since inception</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#8B5CF6]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#8B5CF6] mb-3">Benefits of Multi-Period View</h4>
+                    <div class="space-y-1 text-base text-[#E0E0E0]">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span>Reveals short vs long-term consistency</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span>Identifies strategy degradation early</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span>Context for current performance</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#8B5CF6]"></div>
+                            <span>Distinguishes variance vs deterioration</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Performance Comparison</h3>
+                    <div id="period-performance-chart" style="width: 100%; height: 240px;"></div>
+                </div>
+                <div class="border border-[#00C2FF]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#00C2FF] mb-3">Performance Metrics Tracked</h4>
+                    <div class="grid grid-cols-2 gap-3 text-base text-[#E0E0E0]">
+                        <div>
+                            <div class="text-[#00C2FF] font-bold mb-1">Per Period:</div>
+                            <div class="text-sm">• P&L (realized)</div>
+                            <div class="text-sm">• Trade count</div>
+                            <div class="text-sm">• Win count</div>
+                            <div class="text-sm">• Win rate %</div>
+                        </div>
+                        <div>
+                            <div class="text-[#00C2FF] font-bold mb-1">Calculated:</div>
+                            <div class="text-sm">• Average trade PnL</div>
+                            <div class="text-sm">• Profit factor</div>
+                            <div class="text-sm">• Expectancy</div>
+                            <div class="text-sm">• Consistency score</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">4 Periods</div>
+                <div class="text-sm text-[#E0E0E0]">Day/Week/Month/Total</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">Rolling</div>
+                <div class="text-sm text-[#E0E0E0]">7D and 30D windows</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">Context</div>
+                <div class="text-sm text-[#E0E0E0]">Variance vs deterioration</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Real-time</div>
+                <div class="text-sm text-[#E0E0E0]">Continuous tracking</div>
+            </div>
+        </div>
+        <script>
+            var periodChart = echarts.init(document.getElementById('period-performance-chart'));
+            var option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    textStyle: { fontSize: 13 }
+                },
+                legend: {
+                    data: ['P&L ($)', 'Win Rate (%)', 'Trades'],
+                    textStyle: { color: '#E0E0E0', fontSize: 12 },
+                    top: 0
+                },
+                grid: {
+                    left: '10%',
+                    right: '10%',
+                    bottom: '15%',
+                    top: '18%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['Today', 'Week', 'Month', 'Total'],
+                    axisLabel: { color: '#E0E0E0', fontSize: 13 },
+                    axisLine: { lineStyle: { color: '#00C2FF' } }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: 'P&L ($)',
+                        nameTextStyle: { color: '#E0E0E0', fontSize: 12 },
+                        axisLabel: { color: '#E0E0E0', fontSize: 11 },
+                        axisLine: { lineStyle: { color: '#00C2FF' } },
+                        splitLine: { lineStyle: { color: '#333' } }
+                    },
+                    {
+                        type: 'value',
+                        name: 'Win Rate (%)',
+                        nameTextStyle: { color: '#E0E0E0', fontSize: 12 },
+                        axisLabel: { color: '#E0E0E0', fontSize: 11 },
+                        axisLine: { lineStyle: { color: '#8B5CF6' } },
+                        splitLine: { show: false }
+                    }
+                ],
+                series: [
+                    {
+                        name: 'P&L ($)',
+                        type: 'bar',
+                        data: [250, 1200, 3800, 12500],
+                        itemStyle: { color: '#00C2FF' },
+                        barWidth: '20%'
+                    },
+                    {
+                        name: 'Win Rate (%)',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: [62, 58, 55, 57],
+                        lineStyle: { color: '#8B5CF6', width: 3 },
+                        itemStyle: { color: '#8B5CF6' },
+                        symbol: 'circle',
+                        symbolSize: 8
+                    },
+                    {
+                        name: 'Trades',
+                        type: 'bar',
+                        data: [12, 68, 245, 892],
+                        itemStyle: { color: '#F5F5F5' },
+                        barWidth: '20%'
+                    }
+                ]
+            };
+            periodChart.setOption(option);
+            window.addEventListener('resize', function() {
+                periodChart.resize();
+            });
+        </script>
+    </div>
+
+    <!-- Slide 36: Chapter 9 -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="chapter">
+        <img src="code_architecture.png" class="absolute inset-0 w-full h-full object-cover opacity-20" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-r from-[#00C2FF]/30 to-transparent"></div>
+        <div class="relative h-full flex flex-col justify-center">
+            <div class="font-accent text-9xl text-[#00C2FF]/30 mb-4">09</div>
+            <h2 class="font-heading-alt text-7xl font-bold text-[#F5F5F5] mb-6 leading-tight">Implementation<br>Deep Dive</h2>
+            <div class="text-2xl text-[#E0E0E0] max-w-3xl">Technical implementation details and code architecture</div>
+            <div class="flex gap-2 mt-8">
+                <div class="w-20 h-1 bg-[#00C2FF]"></div>
+                <div class="w-10 h-1 bg-[#8B5CF6]"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 37: Code Architecture -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">SOFTWARE DESIGN</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Code Architecture: Key Structures</h2>
+        </div>
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-5">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Core Data Structures</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">RLParameters</div>
+                            <div class="text-base text-[#E0E0E0]">17 normalized parameters with conversion functions. Encapsulates all tunable thresholds.</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">TradingAgent</div>
+                            <div class="text-base text-[#E0E0E0]">Name, colors, real/shadow profiles, edge tracking, capital allocation, swap tracking.</div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">AgentProfile</div>
+                            <div class="text-base text-[#E0E0E0]">Strategy stats per regime, cumulative totals, session tracking, performance caching.</div>
+                        </div>
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">StrategyStats</div>
+                            <div class="text-base text-[#E0E0E0]">Q-values, trades, wins, PnL, upside/downside, adaptive learning rate.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Physics & Regime</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">CKinematicPhysics</div>
+                            <div class="text-base text-[#E0E0E0]">Mass, force, velocity, acceleration. Tick/bar fallback modes. Welford normalization.</div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">CSymC_Monitor</div>
+                            <div class="text-base text-[#E0E0E0]">Chi calculation, regime detection, price deviation tracking, persistence counting.</div>
+                        </div>
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">ProbabilityPredictor</div>
+                            <div class="text-base text-[#E0E0E0]">Zone-based win rates, ensemble prediction, Omega sizing calculation.</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">StatisticalGate</div>
+                            <div class="text-base text-[#E0E0E0]">Edge validation, p-value calculation, normal CDF approximation.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="border-2 border-[#F5F5F5] p-4">
+                    <h3 class="text-xl font-bold text-[#F5F5F5] mb-3">Risk & Persistence</h3>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="p-2 border border-[#F5F5F5]/50">
+                            <strong class="text-[#F5F5F5]">CircuitBreaker:</strong> Multi-trigger protection, state management, retrain tracking
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]/50">
+                            <strong class="text-[#F5F5F5]">Persistence:</strong> Atomic saves, checksum validation, version migration
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]/50">
+                            <strong class="text-[#F5F5F5]">SymbolData:</strong> Market specs, physics, regime, ATR handles
+                        </div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-xl font-bold text-[#00C2FF] mb-3">Performance & UI</h3>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="p-2 border border-[#00C2FF]/50">
+                            <strong class="text-[#00C2FF]">ExcursionStats:</strong> MAE/MFE aggregation, trade quality analysis
+                        </div>
+                        <div class="p-2 border border-[#00C2FF]/50">
+                            <strong class="text-[#00C2FF]">PeriodStats:</strong> Multi-period tracking (day/week/month/total)
+                        </div>
+                        <div class="p-2 border border-[#00C2FF]/50">
+                            <strong class="text-[#00C2FF]">HUD System:</strong> 6-tab interface, real-time updates, navigation
+                        </div>
+                    </div>
+                </div>
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-xl font-bold text-[#8B5CF6] mb-3">Key Design Patterns</h3>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="p-2 border border-[#8B5CF6]/50">
+                            <strong class="text-[#8B5CF6]">Modular:</strong> Independent components with clean interfaces
+                        </div>
+                        <div class="p-2 border border-[#8B5CF6]/50">
+                            <strong class="text-[#8B5CF6]">Efficient:</strong> O(1) memory, batched updates, minimal allocation
+                        </div>
+                        <div class="p-2 border border-[#8B5CF6]/50">
+                            <strong class="text-[#8B5CF6]">Robust:</strong> Fallback modes, error handling, validation
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 38: Persistence & State Management -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">DATA INTEGRITY</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Persistence & State Management</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Atomic File Operations</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Three-Step Process</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div><strong class="text-[#00C2FF]">1. Write to Temp:</strong> Create _temp.bin file</div>
+                                <div><strong class="text-[#8B5CF6]">2. Validate:</strong> Verify magic & version</div>
+                                <div><strong class="text-[#F5F5F5]">3. Atomic Swap:</strong> Move temp → main</div>
+                            </div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Backup Strategy</div>
+                            <div class="text-base text-[#E0E0E0]">Current state → backup before swap. Enables recovery if corruption occurs.</div>
+                        </div>
+                        <div class="p-3 bg-[#00C2FF]/10 border border-[#00C2FF]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#00C2FF]">Result:</strong> Prevents corruption during unexpected shutdowns
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#8B5CF6]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#8B5CF6] mb-3">Save Frequency</h4>
+                    <div class="grid grid-cols-2 gap-3 text-base text-[#E0E0E0]">
+                        <div class="p-2 border border-[#8B5CF6]">
+                            <div class="text-[#8B5CF6] font-bold">On Deinit</div>
+                            <div class="text-sm">Always saves on shutdown</div>
+                        </div>
+                        <div class="p-2 border border-[#8B5CF6]">
+                            <div class="text-[#8B5CF6] font-bold">Periodic</div>
+                            <div class="text-sm">Every 5 minutes during operation</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Checksum & Validation</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Checksum Calculation</div>
+                            <div class="p-3 bg-[#1A1D21] border border-[#8B5CF6] font-mono text-sm text-[#8B5CF6]">
+                                checksum = 0x12345678<br>
+                                for each byte in data:<br>
+                                &nbsp;&nbsp;checksum ^= (byte << (pos % 4))<br>
+                                &nbsp;&nbsp;checksum = rotate_left(checksum)
+                            </div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Validation Process</div>
+                            <div class="space-y-1 text-base text-[#E0E0E0]">
+                                <div>1. Read magic number (must match)</div>
+                                <div>2. Read version (must be supported)</div>
+                                <div>3. Read timestamp for info</div>
+                                <div>4. Calculate checksum of data</div>
+                                <div>5. Compare with stored checksum</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#00C2FF]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#00C2FF] mb-3">Version Migration</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="p-2 border border-[#00C2FF]">
+                            <strong class="text-[#00C2FF]">Current:</strong> v720 with learning rate storage
+                        </div>
+                        <div class="p-2 border border-[#00C2FF]">
+                            <strong class="text-[#00C2FF]">Legacy:</strong> v710 loader for backward compatibility
+                        </div>
+                        <div class="p-2 border border-[#00C2FF]">
+                            <strong class="text-[#00C2FF]">Future-Proof:</strong> Handles unknown versions gracefully
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Atomic</div>
+                <div class="text-sm text-[#E0E0E0]">No corruption</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]">Validated</div>
+                <div class="text-sm text-[#E0E0E0]">Checksum verified</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">Backed Up</div>
+                <div class="text-sm text-[#E0E0E0]">Recovery available</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">Versioned</div>
+                <div class="text-sm text-[#E0E0E0]">Backward compatible</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 39: Performance Optimizations -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="content">
+        <div class="mb-4">
+            <div class="font-accent text-lg text-[#00C2FF] tracking-wider mb-2">EFFICIENCY</div>
+            <h2 class="font-display text-5xl font-bold text-[#F5F5F5]">Performance Optimizations</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="border-2 border-[#00C2FF] p-4">
+                    <h3 class="text-2xl font-bold text-[#00C2FF] mb-4">Update Optimization</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#00C2FF]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Selective Updates</div>
+                            <div class="text-base text-[#E0E0E0] mb-2">Current chart symbol: every tick. Others: throttled to 500ms or every 10 ticks.</div>
+                        </div>
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Batched HUD Updates</div>
+                            <div class="text-base text-[#E0E0E0]">250ms throttle prevents UI flooding. Smooth 4 FPS refresh rate.</div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Efficient Data Structures</div>
+                            <div class="text-base text-[#E0E0E0]">Fixed-size arrays, minimal dynamic allocation. O(1) operations where possible.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#00C2FF]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#00C2FF] mb-3">Memory Management</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Pre-allocated arrays (MAX_SYMBOLS, MAX_POSITIONS)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Welford stats: O(1) memory vs O(n) history</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 bg-[#00C2FF]"></div>
+                            <span>Cached calculations (PF, WR, regime indices)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="border-2 border-[#8B5CF6] p-4">
+                    <h3 class="text-2xl font-bold text-[#8B5CF6] mb-4">Performance Profiling</h3>
+                    <div class="space-y-3">
+                        <div class="border border-[#8B5CF6]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Typical Performance</div>
+                            <div class="grid grid-cols-2 gap-3 text-center">
+                                <div class="p-2 border border-[#8B5CF6]">
+                                    <div class="text-[#8B5CF6] font-bold">CPU Usage</div>
+                                    <div class="text-2xl font-bold text-[#F5F5F5]">~5%</div>
+                                    <div class="text-sm text-[#E0E0E0]">on modern CPU</div>
+                                </div>
+                                <div class="p-2 border border-[#8B5CF6]">
+                                    <div class="text-[#8B5CF6] font-bold">Memory</div>
+                                    <div class="text-2xl font-bold text-[#F5F5F5]">~50MB</div>
+                                    <div class="text-sm text-[#E0E0E0]">for 50 symbols</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border border-[#F5F5F5]/50 p-3">
+                            <div class="text-lg font-bold text-[#F5F5F5] mb-2">Update Latency</div>
+                            <div class="text-base text-[#E0E0E0]">Tick-to-HUD: < 1ms. Position management: < 0.1ms. Signal generation: < 2ms.</div>
+                        </div>
+                        <div class="p-3 bg-[#8B5CF6]/10 border border-[#8B5CF6]">
+                            <div class="text-sm text-[#E0E0E0]">
+                                <strong class="text-[#8B5CF6]">Scalability:</strong> Linear with symbol count. 100+ symbols manageable.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-[#F5F5F5]/50 p-4">
+                    <h4 class="text-xl font-bold text-[#F5F5F5] mb-3">Key Optimizations</h4>
+                    <div class="space-y-2 text-base text-[#E0E0E0]">
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <strong class="text-[#F5F5F5]">Avoided Virtual Functions:</strong> MQL5 overhead, direct struct access
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <strong class="text-[#F5F5F5]">Minimized String Ops:</strong> Char arrays, hash comparisons
+                        </div>
+                        <div class="p-2 border border-[#F5F5F5]">
+                            <strong class="text-[#F5F5F5]">Optimized Math:</strong> Welford vs storing history
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">~5%</div>
+                <div class="text-sm text-[#E0E0E0]">CPU usage</div>
+            </div>
+            <div class="text-center p-3 border border-[#8B5CF6]">
+                <div class="text-2xl font-bold text-[#8B5CF6]"><1ms</div>
+                <div class="text-sm text-[#E0E0E0]">HUD latency</div>
+            </div>
+            <div class="text-center p-3 border border-[#F5F5F5]">
+                <div class="text-2xl font-bold text-[#F5F5F5]">O(1)</div>
+                <div class="text-sm text-[#E0E0E0]">Memory scaling</div>
+            </div>
+            <div class="text-center p-3 border border-[#00C2FF]">
+                <div class="text-2xl font-bold text-[#00C2FF]">100+</div>
+                <div class="text-sm text-[#E0E0E0]">Symbols supported</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 40: Final -->
+    <div class="ppt-slide !bg-[#1A1D21]" type="final">
+        <img src="final_future.png" class="absolute inset-0 w-full h-full object-cover opacity-30" alt="Background">
+        <div class="absolute inset-0 bg-gradient-to-br from-[#00C2FF]/30 via-transparent to-[#8B5CF6]/30"></div>
+        <div class="relative h-full flex flex-col justify-center items-center text-center">
+            <div class="inline-block px-8 py-3 border-2 border-[#00C2FF] rounded mb-8">
+                <span class="font-accent text-[#00C2FF] text-2xl tracking-widest">VELOCITYTRADER v7.1</span>
+            </div>
+            <h1 class="font-heading-alt text-6xl font-bold text-[#F5F5F5] mb-8 leading-tight">
+                The Future of<br>Algorithmic Trading
+            </h1>
+            <div class="max-w-4xl text-2xl text-[#E0E0E0] mb-12 leading-relaxed">
+                A self-evolving system that combines physics-based market analysis, dual-agent reinforcement learning, and comprehensive risk management to adapt continuously to changing market conditions.
+            </div>
+            <div class="grid grid-cols-3 gap-8 mb-12">
+                <div class="border-2 border-[#00C2FF] p-6">
+                    <i class="fas fa-sync-alt text-5xl text-[#00C2FF] mb-4"></i>
+                    <div class="text-2xl font-bold text-[#F5F5F5] mb-2">Self-Evolving</div>
+                    <div class="text-base text-[#E0E0E0]">Continuous adaptation through duel architecture</div>
+                </div>
+                <div class="border-2 border-[#8B5CF6] p-6">
+                    <i class="fas fa-atom text-5xl text-[#8B5CF6] mb-4"></i>
+                    <div class="text-2xl font-bold text-[#F5F5F5] mb-2">Physics-Based</div>
+                    <div class="text-base text-[#E0E0E0]">Kinematic analysis of market dynamics</div>
+                </div>
+                <div class="border-2 border-[#F5F5F5] p-6">
+                    <i class="fas fa-shield-alt text-5xl text-[#F5F5F5] mb-4"></i>
+                    <div class="text-2xl font-bold text-[#F5F5F5] mb-2">Risk-Managed</div>
+                    <div class="text-base text-[#E0E0E0]">Multi-layered protection systems</div>
+                </div>
+            </div>
+            <div class="flex gap-4 items-center">
+                <div class="w-16 h-1 bg-[#00C2FF]"></div>
+                <div class="text-xl text-[#E0E0E0]">Thank You</div>
+                <div class="w-16 h-1 bg-[#8B5CF6]"></div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
