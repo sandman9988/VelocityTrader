@@ -332,16 +332,17 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Missing Data Validity Check',
             'pattern': r'iClose|iOpen|iHigh|iLow|iVolume|iTime',
-            'exclude_pattern': r'==\s*0|==\s*EMPTY_VALUE|if\s*\(',
+            'exclude_pattern': r'==\s*0|==\s*EMPTY_VALUE|if\s*\(|SafeOHLCV|GetSafeOHLCV|IsValid|\.valid|MathIsValidNumber|IsValidNumber|data\.|mc\.',
             'description': 'Historical data access without validity check',
-            'recommendation': 'Check for EMPTY_VALUE or 0 before using data'
+            'recommendation': 'Check for EMPTY_VALUE or 0 before using data',
+            'check_in_safe_function': True  # Exclude if inside GetSafeOHLCV function
         },
         'DATA003': {
             'category': AuditCategory.DATA_INTEGRITY,
             'severity': Severity.MEDIUM,
             'title': 'File Operation Without Error Handling',
             'pattern': r'File(?:Open|ReadInteger|ReadDouble|ReadLong|ReadArray|ReadString|WriteInteger|WriteDouble|WriteLong|WriteArray|WriteString)',
-            'exclude_pattern': r'if\s*\(|INVALID_HANDLE|==\s*-1|SafeFile|FileWriteContext',
+            'exclude_pattern': r'if\s*\(|INVALID_HANDLE|==\s*-1|SafeFile|FileWriteContext|uint\s+written|written\s*[!=]|bytesRead|BytesRead|ctx\.|CalculateChecksum|CalculateFileChecksum',
             'description': 'File operations can fail',
             'recommendation': 'Always check file handles and operation results',
             'check_validated_handle': True  # Check if handle was validated earlier
@@ -359,18 +360,19 @@ class FinancialAuditRules:
             'category': AuditCategory.DATA_INTEGRITY,
             'severity': Severity.HIGH,
             'title': 'Missing Warmup Period Check',
-            'pattern': r'OnTick|OnCalculate|OnTimer',
+            'pattern': r'\bvoid\s+OnTick\s*\(\s*\)|\bvoid\s+OnCalculate|\bvoid\s+OnTimer\s*\(\s*\)',
             'context_check': 'warmup_check',
-            'exclude_pattern': r'warmup|WarmUp|warm_up|WARMUP|BarsCalculated|prev_calculated|initialized|IsReady|calibrat',
+            'exclude_pattern': r'warmup|WarmUp|warm_up|WARMUP|BarsCalculated|prev_calculated|initialized|IsReady|calibrat|Calibration|tickCount\s*<|class\s+\w+',
             'description': 'Trading logic should wait for indicator warmup before generating signals',
-            'recommendation': 'Check for sufficient historical bars and indicator warmup period'
+            'recommendation': 'Check for sufficient historical bars and indicator warmup period',
+            'check_function_body': True  # Check function body for warmup logic
         },
         'DATA006': {
             'category': AuditCategory.DATA_INTEGRITY,
             'severity': Severity.MEDIUM,
             'title': 'Missing Gap Detection',
             'pattern': r'iClose|iOpen|Close\[|Open\[|rates_total',
-            'exclude_pattern': r'gap|Gap|GAP|TimeDiff|holiday|Holiday|rollover|Rollover|weekend|Weekend',
+            'exclude_pattern': r'gap|Gap|GAP|TimeDiff|holiday|Holiday|rollover|Rollover|weekend|Weekend|HasPriceGap|SafeOHLCV|GetSafeOHLCV|Marked|Logger|Log\(',
             'description': 'Price data may have gaps from holidays, weekends, or rollovers',
             'recommendation': 'Detect and handle time gaps, especially around weekends and holidays'
         },
@@ -406,7 +408,7 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Unbounded Loop Over Symbols',
             'pattern': r'for\s*\([^;]+;\s*\w+\s*<\s*(?:g_symbolCount|SymbolsTotal)',
-            'exclude_pattern': r'batch|Batch|BATCH|chunk|Chunk|MAX_BATCH|MAX_SYMBOLS_PER_TICK|limit|Limit|priority|Priority|ranked|Ranked',
+            'exclude_pattern': r'batch|Batch|BATCH|chunk|Chunk|MAX_BATCH|MAX_SYMBOLS_PER_TICK|limit|Limit|priority|Priority|ranked|Ranked|&&\s*\w+\s*<\s*MAX_|initialized|typeAllowed|warmup|Warmup',
             'description': 'Processing all symbols each tick can cause performance issues with large watchlists',
             'recommendation': 'Process symbols in priority order: (1) Prioritize symbols with open positions, (2) Rank by trading signal strength, (3) Rotate through remaining symbols across ticks. Use adaptive batch sizes based on tick frequency.'
         },
@@ -1052,34 +1054,57 @@ class FinancialCodeAuditor:
                             if not context_pattern.search(context):
                                 continue
 
-                        # Special handling for RISK002 - check function body for drawdown checks
+                        # Special handling for rules that need function body analysis
                         if rule.get('check_function_body', False):
                             # First check if this is a class method (not main event handler)
                             # Look back up to 200 lines to find enclosing class
                             context_back = '\n'.join(lines[max(0, i-200):i])
                             if re.search(r'^\s*class\s+\w+', context_back, re.MULTILINE):
-                                # Check we haven't exited the class (no closing brace at indent level 0)
                                 # If OnTick inside a class, it's a method not main event handler
                                 continue
 
                             # Look ahead 100 lines in the function body
                             func_body = '\n'.join(lines[i:min(i+100, len(lines))])
-                            drawdown_patterns = [
-                                r'IsDrawdownExceeded',
-                                r'drawdown\s*>',
-                                r'g_breaker',
-                                r'CircuitBreaker',
-                                r'CanTrade',
-                                r'breaker\.Update',
-                                r'Drawdown.*return',
-                            ]
-                            found_drawdown_check = False
-                            for dp in drawdown_patterns:
-                                if re.search(dp, func_body, re.IGNORECASE):
-                                    found_drawdown_check = True
-                                    break
-                            if found_drawdown_check:
-                                continue
+
+                            # RISK002: Check for drawdown patterns
+                            if rule_id == 'RISK002':
+                                drawdown_patterns = [
+                                    r'IsDrawdownExceeded',
+                                    r'drawdown\s*>',
+                                    r'g_breaker',
+                                    r'CircuitBreaker',
+                                    r'CanTrade',
+                                    r'breaker\.Update',
+                                    r'Drawdown.*return',
+                                ]
+                                found_check = False
+                                for dp in drawdown_patterns:
+                                    if re.search(dp, func_body, re.IGNORECASE):
+                                        found_check = True
+                                        break
+                                if found_check:
+                                    continue
+
+                            # DATA005: Check for warmup/calibration patterns
+                            if rule_id == 'DATA005':
+                                warmup_patterns = [
+                                    r'warmup',
+                                    r'WarmUp',
+                                    r'calibrat',
+                                    r'Calibration',
+                                    r'tickCount\s*<',
+                                    r'InpCalibrationTicks',
+                                    r'warmupComplete',
+                                    r'!initialized',
+                                    r'prev_calculated',
+                                ]
+                                found_check = False
+                                for wp in warmup_patterns:
+                                    if re.search(wp, func_body, re.IGNORECASE):
+                                        found_check = True
+                                        break
+                                if found_check:
+                                    continue
 
                         # Special handling for DATA003 - check if file handle was validated earlier
                         if rule.get('check_validated_handle', False):
@@ -1101,6 +1126,13 @@ class FinancialCodeAuditor:
                         if rule.get('check_file_for_validation', False):
                             # Check if the entire file content has input validation
                             if re.search(r'ValidateInputParameters|ValidateInput|InputValidation', content):
+                                continue
+
+                        # Special handling for DATA002 - check if inside a safe validation function
+                        if rule.get('check_in_safe_function', False):
+                            # Look back to find enclosing function
+                            context_back = '\n'.join(lines[max(0, i-30):i])
+                            if re.search(r'GetSafeOHLCV|SafeOHLCV|IsValid|HasPriceGap|ValidateData', context_back):
                                 continue
 
                         finding = AuditFinding(

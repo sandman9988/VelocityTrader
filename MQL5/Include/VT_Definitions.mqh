@@ -109,6 +109,55 @@ double ClampValue(double value, double minVal, double maxVal)
 }
 
 //+------------------------------------------------------------------+
+//| DATA INTEGRITY: Safe market data retrieval                        |
+//| Returns false if data is invalid (0, EMPTY_VALUE, or NaN)         |
+//+------------------------------------------------------------------+
+struct SafeOHLCV
+{
+   double open;
+   double high;
+   double low;
+   double close;
+   long   volume;
+   bool   valid;
+
+   void Clear() { open = high = low = close = 0; volume = 0; valid = false; }
+
+   bool IsValid()
+   {
+      if(!valid) return false;
+      if(open <= 0 || high <= 0 || low <= 0 || close <= 0) return false;
+      if(!MathIsValidNumber(open) || !MathIsValidNumber(high)) return false;
+      if(!MathIsValidNumber(low) || !MathIsValidNumber(close)) return false;
+      if(high < low) return false;  // Sanity check
+      if(open == EMPTY_VALUE || close == EMPTY_VALUE) return false;
+      return true;
+   }
+};
+
+bool GetSafeOHLCV(string symbol, ENUM_TIMEFRAMES tf, int shift, SafeOHLCV &data)
+{
+   data.Clear();
+
+   data.open   = iOpen(symbol, tf, shift);
+   data.high   = iHigh(symbol, tf, shift);
+   data.low    = iLow(symbol, tf, shift);
+   data.close  = iClose(symbol, tf, shift);
+   data.volume = iVolume(symbol, tf, shift);
+
+   data.valid = data.IsValid();
+   return data.valid;
+}
+
+// Check for price gaps (weekend gaps, flash crashes)
+bool HasPriceGap(double prevClose, double currOpen, double atr, double gapThreshold = 3.0)
+{
+   if(atr <= 0) return false;
+   double gap = MathAbs(currOpen - prevClose);
+   return (gap > atr * gapThreshold);
+}
+
+//+------------------------------------------------------------------+
 //| COLORS                                                            |
 //+------------------------------------------------------------------+
 #define CLR_HEADER       C'0,255,255'

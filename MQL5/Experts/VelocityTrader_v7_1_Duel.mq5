@@ -347,7 +347,12 @@ void OnTimer()
    // TIMER: Non-critical operations moved here for better OnTick perf
    // Runs every TIMER_INTERVAL_MS (250ms default)
    // DEFENSE IN DEPTH: Drawdown checked via g_breaker.Update() + OnTick
+   // DATA INTEGRITY: No trading in OnTimer - warmup handled by OnTick
    // ════════════════════════════════════════════════════════════════
+
+   // Skip timer operations during warmup (OnTick handles warmup)
+   if(g_perfManager.tickCounter < InpCalibrationTicks)
+      return;
 
    static datetime lastSecond = 0;
    static datetime lastHUDRefresh = 0;
@@ -553,6 +558,27 @@ void OnTick()
    // Notify performance manager
    g_perfManager.OnTickStart();
    int tickCount = g_perfManager.tickCounter;
+
+   // DATA INTEGRITY: Warmup period for RL feature engineering
+   // During warmup: collect data, update features, but NO trading
+   static bool warmupComplete = false;
+   if(!warmupComplete)
+   {
+      if(tickCount < InpCalibrationTicks)
+      {
+         // Still in warmup - update data but don't trade
+         for(int i = 0; i < g_symbolCount; i++)
+         {
+            if(g_symbols[i].initialized)
+               UpdateSymbol(i);
+         }
+         if(tickCount % 100 == 0)
+            Print("Warmup: ", tickCount, "/", InpCalibrationTicks, " ticks...");
+         return;
+      }
+      warmupComplete = true;
+      Print("Warmup complete after ", InpCalibrationTicks, " ticks. Trading enabled.");
+   }
 
    // ════════════════════════════════════════════════════════════════
    // CRITICAL PATH: Minimum work on every tick
