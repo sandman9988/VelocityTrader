@@ -741,26 +741,26 @@ public:
       if(MathAbs(det) < 1e-10)
          return;  // Singular matrix
 
-      // Calculate c (constant)
+      // Calculate c (constant) - DEFENSE IN DEPTH: SafeDivide even with det check
       double detC = sumY * (sumX2 * sumX4 - sumX3 * sumX3)
                   - sumX * (sumXY * sumX4 - sumX3 * sumX2Y)
                   + sumX2 * (sumXY * sumX3 - sumX2 * sumX2Y);
-      reg.c = detC / det;
+      reg.c = SafeDivide(detC, det, 0.0);
 
       // Calculate b (linear coefficient)
       double detB = n * (sumXY * sumX4 - sumX3 * sumX2Y)
                   - sumY * (sumX * sumX4 - sumX3 * sumX2)
                   + sumX2 * (sumX * sumX2Y - sumX2 * sumXY);
-      reg.b = detB / det;
+      reg.b = SafeDivide(detB, det, 0.0);
 
       // Calculate a (quadratic coefficient)
       double detA = n * (sumX2 * sumX2Y - sumXY * sumX3)
                   - sumX * (sumX * sumX2Y - sumXY * sumX2)
                   + sumY * (sumX * sumX3 - sumX2 * sumX2);
-      reg.a = detA / det;
+      reg.a = SafeDivide(detA, det, 0.0);
 
       // Calculate R² (coefficient of determination)
-      double meanY = sumY / n;
+      double meanY = SafeDivide(sumY, (double)n, 0.0);
       double ssTot = 0, ssRes = 0;
 
       for(int i = 0; i < n; i++)
@@ -909,7 +909,7 @@ public:
       ArrayResize(returns, lookback);
 
       for(int i = 0; i < lookback; i++)
-         returns[i] = (closes[i] - closes[i + 1]) / closes[i + 1] * 100.0;
+         returns[i] = SafeDivide(closes[i] - closes[i + 1], closes[i + 1], 0.0) * 100.0;
 
       // Bin returns into categories for Shannon entropy
       int numBins = 10;
@@ -931,8 +931,8 @@ public:
       {
          if(bins[i] > 0)
          {
-            double p = (double)bins[i] / lookback;
-            entropy -= p * MathLog(p) / MathLog(2.0);  // log base 2
+            double p = SafeDivide((double)bins[i], (double)lookback, 0.0);
+            if(p > 0) entropy -= p * MathLog(p) / MathLog(2.0);  // log base 2
          }
       }
 
@@ -983,8 +983,8 @@ public:
          ent.cycleStrength = maxCorr;
 
          // Estimate current phase (0 to 2π)
-         ent.cyclePhase = MathMod((double)lookback, ent.cycleLength)
-                          / ent.cycleLength * 2.0 * M_PI;
+         ent.cyclePhase = SafeDivide(MathMod((double)lookback, ent.cycleLength),
+                          ent.cycleLength, 0.0) * 2.0 * M_PI;
 
          // At cycle extremes?
          ent.atCycleTrough = (ent.cyclePhase > 0.9 * M_PI && ent.cyclePhase < 1.1 * M_PI);
@@ -1075,7 +1075,7 @@ public:
       double avgVol = 0;
       for(int i = 0; i < copied; i++)
          avgVol += (double)volumes[i];
-      avgVol /= copied;
+      avgVol = SafeDivide(avgVol, (double)copied, 1.0);
 
       // Use 1/N of average daily volume per bucket
       double bucketVol = (volumePerBucket > 0) ? volumePerBucket : avgVol * 10;
@@ -1137,15 +1137,16 @@ public:
          sumSq += vpinHistory[i] * vpinHistory[i];
       }
 
-      vpinData.vpin = sum / numBuckets;
-      vpinData.vpinStdDev = MathSqrt(sumSq / numBuckets - vpinData.vpin * vpinData.vpin);
+      vpinData.vpin = SafeDivide(sum, (double)numBuckets, 0.0);
+      double variance = SafeDivide(sumSq, (double)numBuckets, 0.0) - vpinData.vpin * vpinData.vpin;
+      vpinData.vpinStdDev = MathSqrt(MathMax(0.0, variance));
 
       // Moving average (recent half)
       double recentSum = 0;
       int halfBuckets = numBuckets / 2;
       for(int i = 0; i < halfBuckets; i++)
          recentSum += vpinHistory[i];
-      vpinData.vpinMA = (halfBuckets > 0) ? recentSum / halfBuckets : vpinData.vpin;
+      vpinData.vpinMA = SafeDivide(recentSum, (double)halfBuckets, vpinData.vpin);
 
       // Store volume data
       vpinData.buyVolume = buyBuckets;
@@ -1291,7 +1292,7 @@ public:
             avgATR += m_atr[i];
          avgATR /= 10;
 
-         quality.atrRatio = m_atr[0] / avgATR;
+         quality.atrRatio = SafeDivide(m_atr[0], avgATR, 1.0);
 
          // Ideal volatility: 0.8 - 1.5 ATR ratio
          if(quality.atrRatio >= 0.8 && quality.atrRatio <= 1.5)

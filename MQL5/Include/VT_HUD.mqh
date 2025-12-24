@@ -559,7 +559,7 @@ void DrawTab_Risk(int x, int &y, int h, int sec)
 
    double dd = 0;
    if(g_breaker.peakEquity > 0)
-      dd = (g_breaker.peakEquity - equity) / g_breaker.peakEquity * 100;
+      dd = SafeDivide(g_breaker.peakEquity - equity, g_breaker.peakEquity, 0.0) * 100;
 
    color ddClr = (dd < InpMaxDrawdown * 50) ? CLR_POSITIVE :
                  (dd < InpMaxDrawdown * 100) ? CLR_NEUTRAL : CLR_NEGATIVE;
@@ -599,8 +599,7 @@ void DrawTab_Risk(int x, int &y, int h, int sec)
    }
    else if(g_breaker.state == STATE_RETRAINING)
    {
-      double wr = (g_breaker.retrainTrades > 0) ?
-                 ((double)g_breaker.retrainWins / g_breaker.retrainTrades * 100) : 0;
+      double wr = SafeDivide((double)g_breaker.retrainWins, (double)g_breaker.retrainTrades, 0.0) * 100;
       HUD_Create("H_R7", x+8, y, StringFormat("Retrain: %d/%d trades WR:%.0f%%",
          g_breaker.retrainTrades, InpRetrainMinTrades, wr), CLR_NEUTRAL);
       y += h;

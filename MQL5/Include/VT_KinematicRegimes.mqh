@@ -663,7 +663,12 @@ public:
 
    KinematicState GetState() { return m_state; }
    bool IsReady() { return m_initialized; }
-   int GetStateVisitCount(ENUM_KINEMATIC_STATE state) { return m_stateCount[(int)state]; }
+   int GetStateVisitCount(ENUM_KINEMATIC_STATE state)
+   {
+      int idx = (int)state;
+      if(idx < 0 || idx >= KINEMATIC_STATES) return 0;
+      return m_stateCount[idx];
+   }
 
 private:
    double CalculateAverageVelocity(int window)
@@ -676,7 +681,7 @@ private:
          int idx = (m_historyIdx - i) % m_historySize;
          sum += m_velocityHistory[idx];
       }
-      return sum / window;
+      return SafeDivide(sum, (double)window, 0.0);
    }
 
    double CalculateVolatility(int window)
@@ -689,7 +694,7 @@ private:
          int idx = (m_historyIdx - i) % m_historySize;
          mean += m_velocityHistory[idx];
       }
-      mean /= window;
+      mean = SafeDivide(mean, (double)window, 0.0);
 
       double sumSq = 0.0;
       for(int i = 0; i < window; i++)
@@ -699,7 +704,7 @@ private:
          sumSq += diff * diff;
       }
 
-      return MathSqrt(sumSq / window);
+      return MathSqrt(SafeDivide(sumSq, (double)window, 0.0));
    }
 
    double CalculateChi()
@@ -724,7 +729,7 @@ private:
       }
 
       // Normalize: 0 reversals = chi of 0.5, many reversals = high chi
-      return 0.5 + (double)reversals / MESO_WINDOW * 2.0;
+      return 0.5 + SafeDivide((double)reversals, (double)MESO_WINDOW, 0.0) * 2.0;
    }
 
    double CalculateNormalizedPosition()
@@ -792,8 +797,10 @@ private:
       else
          m_state.statePersistence = 1;
 
-      // Update visit counts
-      m_stateCount[(int)m_state.state]++;
+      // Update visit counts (with bounds check)
+      int stateIdx = (int)m_state.state;
+      if(stateIdx >= 0 && stateIdx < KINEMATIC_STATES)
+         m_stateCount[stateIdx]++;
    }
 
    void ClassifyRegime()

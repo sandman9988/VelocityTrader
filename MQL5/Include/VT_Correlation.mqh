@@ -78,13 +78,13 @@ struct SymbolReturns
       double sum = 0.0;
       for(int i = 0; i < count; i++)
          sum += returns[i];
-      mean = sum / count;
+      mean = SafeDivide(sum, (double)count, 0.0);
 
       // Std Dev
       double sumSq = 0.0;
       for(int i = 0; i < count; i++)
          sumSq += MathPow(returns[i] - mean, 2);
-      stdDev = MathSqrt(sumSq / count);
+      stdDev = MathSqrt(SafeDivide(sumSq, (double)count, 0.0));
    }
 };
 
@@ -243,7 +243,7 @@ public:
       // Calculate return
       if(m_lastPrices[idx] > 0)
       {
-         double ret = (price - m_lastPrices[idx]) / m_lastPrices[idx];
+         double ret = SafeDivide(price - m_lastPrices[idx], m_lastPrices[idx], 0.0);
          m_symbolData[idx].AddReturn(ret);
       }
 
@@ -295,11 +295,12 @@ public:
       {
          covar += (s1.returns[i] - s1.mean) * (s2.returns[i] - s2.mean);
       }
-      covar /= n;
+      covar = SafeDivide(covar, (double)n, 0.0);
 
       // Correlation
-      if(s1.stdDev > 0 && s2.stdDev > 0)
-         return covar / (s1.stdDev * s2.stdDev);
+      double denom = s1.stdDev * s2.stdDev;
+      if(denom > 0)
+         return SafeDivide(covar, denom, 0.0);
 
       return 0.0;
    }
@@ -509,7 +510,7 @@ public:
          if(sumIndividual > 0)
          {
             double portfolioVol = MathSqrt(CalculateExposureVariance(exposures));
-            m_exposure.diversificationRatio = sumIndividual / portfolioVol;
+            m_exposure.diversificationRatio = SafeDivide(sumIndividual, portfolioVol, 1.0);
          }
       }
    }
@@ -726,15 +727,19 @@ public:
       }
 
       if(count > 0)
-         avgCorr /= count;
+         avgCorr = SafeDivide(avgCorr, (double)count, 0.0);
 
-      // Normalize to 0-1
-      features[startIdx + 0] = (avgCorr + 1.0) / 2.0;
-      features[startIdx + 1] = (maxCorr + 1.0) / 2.0;
-      features[startIdx + 2] = (minCorr + 1.0) / 2.0;
-      features[startIdx + 3] = m_exposure.grossExposure > 0 ?
-         MathMin(1.0, m_exposure.netExposure / m_exposure.grossExposure) : 0.5;
-      features[startIdx + 4] = MathMin(1.0, m_exposure.diversificationRatio / 3.0);
+      // Normalize to 0-1 with bounds check
+      int size = ArraySize(features);
+      if(startIdx + 4 < size)
+      {
+         features[startIdx + 0] = (avgCorr + 1.0) / 2.0;
+         features[startIdx + 1] = (maxCorr + 1.0) / 2.0;
+         features[startIdx + 2] = (minCorr + 1.0) / 2.0;
+         features[startIdx + 3] = m_exposure.grossExposure > 0 ?
+            MathMin(1.0, SafeDivide(m_exposure.netExposure, m_exposure.grossExposure, 0.5)) : 0.5;
+         features[startIdx + 4] = MathMin(1.0, SafeDivide(m_exposure.diversificationRatio, 3.0, 0.0));
+      }
    }
 
    //+------------------------------------------------------------------+

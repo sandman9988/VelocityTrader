@@ -9,6 +9,8 @@
 #ifndef VT_PREDICTOR_MQH
 #define VT_PREDICTOR_MQH
 
+#include "VT_Definitions.mqh"  // Required for SafeDivide()
+
 // Forward declaration of input parameters (defined in main EA)
 extern double InpOmegaBaseline;
 extern double InpOmegaMaxScale;

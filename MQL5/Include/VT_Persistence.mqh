@@ -25,6 +25,52 @@ extern double    InpLearningRateInit;
 //| Calculate CRC32-based checksum for data validation                |
 //| Uses polynomial 0xEDB88320 for robust error detection             |
 //+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//| DEFENSE IN DEPTH: Safe file write wrappers with error tracking   |
+//| These wrappers ensure every write operation is validated          |
+//+------------------------------------------------------------------+
+struct FileWriteContext
+{
+   int handle;
+   int errors;
+   long bytesWritten;
+
+   void Init(int h) { handle = h; errors = 0; bytesWritten = 0; }
+   bool HasErrors() { return errors > 0; }
+   void Reset() { errors = 0; bytesWritten = 0; }
+};
+
+bool SafeFileWriteInteger(FileWriteContext &ctx, int value)
+{
+   if(ctx.handle == INVALID_HANDLE) { ctx.errors++; return false; }
+   uint written = FileWriteInteger(ctx.handle, value);
+   if(written != sizeof(int)) { ctx.errors++; return false; }
+   ctx.bytesWritten += written;
+   return true;
+}
+
+bool SafeFileWriteLong(FileWriteContext &ctx, long value)
+{
+   if(ctx.handle == INVALID_HANDLE) { ctx.errors++; return false; }
+   uint written = FileWriteLong(ctx.handle, value);
+   if(written != sizeof(long)) { ctx.errors++; return false; }
+   ctx.bytesWritten += written;
+   return true;
+}
+
+bool SafeFileWriteDouble(FileWriteContext &ctx, double value)
+{
+   if(ctx.handle == INVALID_HANDLE) { ctx.errors++; return false; }
+   uint written = FileWriteDouble(ctx.handle, value);
+   if(written != sizeof(double)) { ctx.errors++; return false; }
+   ctx.bytesWritten += written;
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Calculate CRC32-based checksum for data validation                |
+//| Uses polynomial 0xEDB88320 for robust error detection             |
+//+------------------------------------------------------------------+
 uint CalculateChecksum(const uchar &data[], int size)
 {
    // CRC32 lookup table
@@ -88,6 +134,8 @@ uint CalculateFileChecksum(string filename, int excludeLastBytes = 4)
 //+------------------------------------------------------------------+
 //| Forward declarations                                              |
 //+------------------------------------------------------------------+
+void SaveAgentSafe(FileWriteContext &ctx, TradingAgent &agent);
+void SaveProfileSafe(FileWriteContext &ctx, AgentProfile &profile);
 void SaveAgent(int handle, TradingAgent &agent);
 void SaveProfile(int handle, AgentProfile &profile);
 void LoadAgent(int handle, TradingAgent &agent);
@@ -109,7 +157,7 @@ void SaveState()
    string mainFilename = baseFilename + ".bin";
    string backupFilename = baseFilename + "_backup.bin";
 
-   // Step 1: Write to temporary file
+   // Step 1: Write to temporary file with error tracking
    int handle = FileOpen(tempFilename, FILE_WRITE | FILE_BIN);
    if(handle == INVALID_HANDLE)
    {
@@ -117,29 +165,42 @@ void SaveState()
       return;
    }
 
-   // Write header
-   FileWriteInteger(handle, PERSISTENCE_MAGIC);
-   FileWriteInteger(handle, PERSISTENCE_VERSION);
-   FileWriteLong(handle, TimeCurrent());  // Save timestamp
+   // DEFENSE IN DEPTH: Use safe write context to track all write errors
+   FileWriteContext ctx;
+   ctx.Init(handle);
 
-   // Save agents
-   SaveAgent(handle, g_sniper);
-   SaveAgent(handle, g_berserker);
+   // Write header with error tracking
+   SafeFileWriteInteger(ctx, PERSISTENCE_MAGIC);
+   SafeFileWriteInteger(ctx, PERSISTENCE_VERSION);
+   SafeFileWriteLong(ctx, TimeCurrent());  // Save timestamp
 
-   // Save predictor
-   for(int i = 0; i < 3; i++) FileWriteDouble(handle, g_predictor.regimeWR[i]);
-   for(int i = 0; i < 5; i++) FileWriteDouble(handle, g_predictor.chiZoneWR[i]);
-   for(int i = 0; i < 5; i++) FileWriteDouble(handle, g_predictor.accelZoneWR[i]);
-   for(int i = 0; i < 3; i++) FileWriteInteger(handle, g_predictor.regimeCounts[i]);
-   for(int i = 0; i < 5; i++) FileWriteInteger(handle, g_predictor.chiCounts[i]);
-   for(int i = 0; i < 5; i++) FileWriteInteger(handle, g_predictor.accelCounts[i]);
+   // Save agents with context
+   SaveAgentSafe(ctx, g_sniper);
+   SaveAgentSafe(ctx, g_berserker);
+
+   // Save predictor with error tracking
+   for(int i = 0; i < 3; i++) SafeFileWriteDouble(ctx, g_predictor.regimeWR[i]);
+   for(int i = 0; i < 5; i++) SafeFileWriteDouble(ctx, g_predictor.chiZoneWR[i]);
+   for(int i = 0; i < 5; i++) SafeFileWriteDouble(ctx, g_predictor.accelZoneWR[i]);
+   for(int i = 0; i < 3; i++) SafeFileWriteInteger(ctx, g_predictor.regimeCounts[i]);
+   for(int i = 0; i < 5; i++) SafeFileWriteInteger(ctx, g_predictor.chiCounts[i]);
+   for(int i = 0; i < 5; i++) SafeFileWriteInteger(ctx, g_predictor.accelCounts[i]);
 
    // Save circuit breaker state
-   FileWriteInteger(handle, (int)g_breaker.state);
-   FileWriteDouble(handle, g_breaker.peakEquity);
+   SafeFileWriteInteger(ctx, (int)g_breaker.state);
+   SafeFileWriteDouble(ctx, g_breaker.peakEquity);
 
    // Write checksum placeholder (will be updated after calculation)
-   FileWriteInteger(handle, 0);  // Placeholder for checksum
+   SafeFileWriteInteger(ctx, 0);  // Placeholder for checksum
+
+   // DEFENSE IN DEPTH: Abort if any write errors occurred
+   if(ctx.HasErrors())
+   {
+      Print("ERROR: File write errors detected (", ctx.errors, " errors). Aborting save.");
+      FileClose(handle);
+      FileDelete(tempFilename);
+      return;
+   }
 
    FileFlush(handle);
    FileClose(handle);
@@ -219,39 +280,59 @@ void SaveState()
 }
 
 //+------------------------------------------------------------------+
-//| SaveAgent: Save trading agent state                               |
+//| SaveAgentSafe: Save trading agent state with error tracking       |
 //+------------------------------------------------------------------+
-void SaveAgent(int handle, TradingAgent &agent)
+void SaveAgentSafe(FileWriteContext &ctx, TradingAgent &agent)
 {
    // Save real profile
-   SaveProfile(handle, agent.real);
+   SaveProfileSafe(ctx, agent.real);
 
    // Save shadow profile
-   SaveProfile(handle, agent.shadow);
+   SaveProfileSafe(ctx, agent.shadow);
 
    // Save meta
-   FileWriteDouble(handle, agent.capitalAlloc);
-   FileWriteInteger(handle, agent.swapCount);
-   FileWriteInteger(handle, agent.consLosses);
+   SafeFileWriteDouble(ctx, agent.capitalAlloc);
+   SafeFileWriteInteger(ctx, agent.swapCount);
+   SafeFileWriteInteger(ctx, agent.consLosses);
 }
 
 //+------------------------------------------------------------------+
-//| SaveProfile: Save agent profile (Q-values, stats)                 |
+//| SaveProfileSafe: Save agent profile with error tracking           |
 //+------------------------------------------------------------------+
-void SaveProfile(int handle, AgentProfile &profile)
+void SaveProfileSafe(FileWriteContext &ctx, AgentProfile &profile)
 {
    for(int i = 0; i < 3; i++)
    {
-      FileWriteDouble(handle, profile.regime[i].qBuy);
-      FileWriteDouble(handle, profile.regime[i].qSell);
-      FileWriteDouble(handle, profile.regime[i].qHold);
-      FileWriteInteger(handle, profile.regime[i].trades);
-      FileWriteInteger(handle, profile.regime[i].wins);
-      FileWriteDouble(handle, profile.regime[i].pnl);
-      FileWriteDouble(handle, profile.regime[i].upside);
-      FileWriteDouble(handle, profile.regime[i].downside);
-      FileWriteDouble(handle, profile.regime[i].learningRate);  // v720: Save learning rate
+      SafeFileWriteDouble(ctx, profile.regime[i].qBuy);
+      SafeFileWriteDouble(ctx, profile.regime[i].qSell);
+      SafeFileWriteDouble(ctx, profile.regime[i].qHold);
+      SafeFileWriteInteger(ctx, profile.regime[i].trades);
+      SafeFileWriteInteger(ctx, profile.regime[i].wins);
+      SafeFileWriteDouble(ctx, profile.regime[i].pnl);
+      SafeFileWriteDouble(ctx, profile.regime[i].upside);
+      SafeFileWriteDouble(ctx, profile.regime[i].downside);
+      SafeFileWriteDouble(ctx, profile.regime[i].learningRate);  // v720: Save learning rate
    }
+}
+
+//+------------------------------------------------------------------+
+//| SaveAgent: Legacy wrapper (for compatibility)                     |
+//+------------------------------------------------------------------+
+void SaveAgent(int handle, TradingAgent &agent)
+{
+   FileWriteContext ctx;
+   ctx.Init(handle);
+   SaveAgentSafe(ctx, agent);
+}
+
+//+------------------------------------------------------------------+
+//| SaveProfile: Legacy wrapper (for compatibility)                   |
+//+------------------------------------------------------------------+
+void SaveProfile(int handle, AgentProfile &profile)
+{
+   FileWriteContext ctx;
+   ctx.Init(handle);
+   SaveProfileSafe(ctx, profile);
 }
 
 //+------------------------------------------------------------------+
