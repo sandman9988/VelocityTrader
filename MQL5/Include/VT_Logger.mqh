@@ -65,7 +65,9 @@ enum ENUM_TRADE_TAG
    TAG_SWING = 7,            // Swing trade
    TAG_NEWS = 8,             // News event trade
    TAG_HEDGE = 9,            // Hedging trade
-   TAG_STUDY = 10            // Study/marked for review
+   TAG_STUDY = 10,           // Study/marked for review
+   TAG_MEAN_REVERSION = 11,  // Mean reversion (MR) trade
+   TAG_TREND_FOLLOW = 12     // Trend following trade
 };
 
 enum ENUM_MARKER_TYPE
@@ -250,17 +252,19 @@ struct ActionRecord
    {
       switch(tag)
       {
-         case TAG_BERSERKER:    return "Berserker";
-         case TAG_CONSERVATIVE: return "Conservative";
-         case TAG_REVERSAL:     return "Reversal";
-         case TAG_BREAKOUT:     return "Breakout";
-         case TAG_MOMENTUM:     return "Momentum";
-         case TAG_SCALP:        return "Scalp";
-         case TAG_SWING:        return "Swing";
-         case TAG_NEWS:         return "News";
-         case TAG_HEDGE:        return "Hedge";
-         case TAG_STUDY:        return "Study";
-         default:               return "None";
+         case TAG_BERSERKER:       return "Berserker";
+         case TAG_CONSERVATIVE:    return "Conservative";
+         case TAG_REVERSAL:        return "Reversal";
+         case TAG_BREAKOUT:        return "Breakout";
+         case TAG_MOMENTUM:        return "Momentum";
+         case TAG_SCALP:           return "Scalp";
+         case TAG_SWING:           return "Swing";
+         case TAG_NEWS:            return "News";
+         case TAG_HEDGE:           return "Hedge";
+         case TAG_STUDY:           return "Study";
+         case TAG_MEAN_REVERSION:  return "MeanReversion";
+         case TAG_TREND_FOLLOW:    return "TrendFollow";
+         default:                  return "None";
       }
    }
 };
