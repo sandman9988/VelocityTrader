@@ -760,7 +760,7 @@ public:
       reg.a = detA / det;
 
       // Calculate R² (coefficient of determination)
-      double meanY = sumY / n;
+      double meanY = SafeDivide(sumY, (double)n, 0.0);
       double ssTot = 0, ssRes = 0;
 
       for(int i = 0; i < n; i++)
@@ -909,7 +909,7 @@ public:
       ArrayResize(returns, lookback);
 
       for(int i = 0; i < lookback; i++)
-         returns[i] = (closes[i] - closes[i + 1]) / closes[i + 1] * 100.0;
+         returns[i] = SafeDivide(closes[i] - closes[i + 1], closes[i + 1], 0.0) * 100.0;
 
       // Bin returns into categories for Shannon entropy
       int numBins = 10;
@@ -931,8 +931,8 @@ public:
       {
          if(bins[i] > 0)
          {
-            double p = (double)bins[i] / lookback;
-            entropy -= p * MathLog(p) / MathLog(2.0);  // log base 2
+            double p = SafeDivide((double)bins[i], (double)lookback, 0.0);
+            if(p > 0) entropy -= p * MathLog(p) / MathLog(2.0);  // log base 2
          }
       }
 
@@ -983,8 +983,8 @@ public:
          ent.cycleStrength = maxCorr;
 
          // Estimate current phase (0 to 2π)
-         ent.cyclePhase = MathMod((double)lookback, ent.cycleLength)
-                          / ent.cycleLength * 2.0 * M_PI;
+         ent.cyclePhase = SafeDivide(MathMod((double)lookback, ent.cycleLength),
+                          ent.cycleLength, 0.0) * 2.0 * M_PI;
 
          // At cycle extremes?
          ent.atCycleTrough = (ent.cyclePhase > 0.9 * M_PI && ent.cyclePhase < 1.1 * M_PI);
@@ -1292,7 +1292,7 @@ public:
             avgATR += m_atr[i];
          avgATR /= 10;
 
-         quality.atrRatio = m_atr[0] / avgATR;
+         quality.atrRatio = SafeDivide(m_atr[0], avgATR, 1.0);
 
          // Ideal volatility: 0.8 - 1.5 ATR ratio
          if(quality.atrRatio >= 0.8 && quality.atrRatio <= 1.5)

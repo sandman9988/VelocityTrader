@@ -681,7 +681,7 @@ private:
          int idx = (m_historyIdx - i) % m_historySize;
          sum += m_velocityHistory[idx];
       }
-      return sum / window;
+      return SafeDivide(sum, (double)window, 0.0);
    }
 
    double CalculateVolatility(int window)
@@ -694,7 +694,7 @@ private:
          int idx = (m_historyIdx - i) % m_historySize;
          mean += m_velocityHistory[idx];
       }
-      mean /= window;
+      mean = SafeDivide(mean, (double)window, 0.0);
 
       double sumSq = 0.0;
       for(int i = 0; i < window; i++)
@@ -704,7 +704,7 @@ private:
          sumSq += diff * diff;
       }
 
-      return MathSqrt(sumSq / window);
+      return MathSqrt(SafeDivide(sumSq, (double)window, 0.0));
    }
 
    double CalculateChi()
@@ -729,7 +729,7 @@ private:
       }
 
       // Normalize: 0 reversals = chi of 0.5, many reversals = high chi
-      return 0.5 + (double)reversals / MESO_WINDOW * 2.0;
+      return 0.5 + SafeDivide((double)reversals, (double)MESO_WINDOW, 0.0) * 2.0;
    }
 
    double CalculateNormalizedPosition()
