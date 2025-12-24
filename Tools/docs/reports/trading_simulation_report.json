@@ -1,0 +1,1012 @@
+{
+  "simulation_results": {
+    "startup_phases": {
+      "BTCUSD": {
+        "initialization_time": 2.5046159994619943,
+        "memory_allocation": 114.20086204832009,
+        "data_loading_status": "SUCCESS",
+        "omega_calibration": {
+          "base_omega": 1.1292738149257004,
+          "calibrated_omega": 1.5847973500150263,
+          "calibration_factor": 1.403377399766678,
+          "status": "STABLE",
+          "iterations": 3
+        },
+        "journey_initialization": {
+          "asymmetric_penalty": 2.236195031221161,
+          "path_consistency_bonus": 0.3006687156945602,
+          "journey_weight": 0.7485167974263317,
+          "lookback_period": 50,
+          "initialization_status": "SUCCESS"
+        },
+        "rl_agent_warmup": {
+          "q_table_size": 1897,
+          "exploration_rate": 0.2305663214173274,
+          "learning_rate": 0.0009242901901886032,
+          "warmup_trades": 23,
+          "convergence_score": 0.8071627261001688,
+          "status": "READY"
+        }
+      },
+      "XAUUSD": {
+        "initialization_time": 4.284240186165883,
+        "memory_allocation": 88.95401864804772,
+        "data_loading_status": "SUCCESS",
+        "omega_calibration": {
+          "base_omega": 1.0544966594813572,
+          "calibrated_omega": 1.1387502907005589,
+          "calibration_factor": 1.0798993818156246,
+          "status": "STABLE",
+          "iterations": 4
+        },
+        "journey_initialization": {
+          "asymmetric_penalty": 2.7869666737106615,
+          "path_consistency_bonus": 0.2671585623465997,
+          "journey_weight": 0.6636073548424306,
+          "lookback_period": 54,
+          "initialization_status": "SUCCESS"
+        },
+        "rl_agent_warmup": {
+          "q_table_size": 1861,
+          "exploration_rate": 0.21521827148833406,
+          "learning_rate": 0.001134096837225547,
+          "warmup_trades": 16,
+          "convergence_score": 0.9279909248483058,
+          "status": "READY"
+        }
+      },
+      "GER40": {
+        "initialization_time": 3.0517146800965707,
+        "memory_allocation": 105.33140612409264,
+        "data_loading_status": "SUCCESS",
+        "omega_calibration": {
+          "base_omega": 1.2669365492729783,
+          "calibrated_omega": 1.3111560039553574,
+          "calibration_factor": 1.0349026592592614,
+          "status": "STABLE",
+          "iterations": 3
+        },
+        "journey_initialization": {
+          "asymmetric_penalty": 2.4363455770288858,
+          "path_consistency_bonus": 0.2824914058952068,
+          "journey_weight": 0.7328973409282674,
+          "lookback_period": 48,
+          "initialization_status": "SUCCESS"
+        },
+        "rl_agent_warmup": {
+          "q_table_size": 1856,
+          "exploration_rate": 0.23201519562161627,
+          "learning_rate": 0.000868670868356348,
+          "warmup_trades": 20,
+          "convergence_score": 0.8259932621836003,
+          "status": "READY"
+        }
+      },
+      "GBPAUD": {
+        "initialization_time": 3.165832205801521,
+        "memory_allocation": 89.57254548576745,
+        "data_loading_status": "SUCCESS",
+        "omega_calibration": {
+          "base_omega": 1.0187167206888745,
+          "calibrated_omega": 0.875866204462673,
+          "calibration_factor": 0.8597740536450571,
+          "status": "STABLE",
+          "iterations": 3
+        },
+        "journey_initialization": {
+          "asymmetric_penalty": 2.546038169019479,
+          "path_consistency_bonus": 0.2898974124174732,
+          "journey_weight": 0.696701948237448,
+          "lookback_period": 49,
+          "initialization_status": "SUCCESS"
+        },
+        "rl_agent_warmup": {
+          "q_table_size": 1969,
+          "exploration_rate": 0.21450803340303576,
+          "learning_rate": 0.0009942490952790763,
+          "warmup_trades": 30,
+          "convergence_score": 0.8096627718801107,
+          "status": "READY"
+        }
+      }
+    },
+    "regime_tests": {
+      "BTCUSD": {
+        "LIQUID": {
+          "omega_ratio": 0.9709241154291228,
+          "journey_score": -0.24102108157260893,
+          "win_rate": 0.6093630522660521,
+          "max_drawdown": 0.13665184505111233,
+          "trade_frequency": 18.597665237405476,
+          "stability_score": 99.13424935540556,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "VOLATILE": {
+          "omega_ratio": 0.6936417842119039,
+          "journey_score": 0.4883504876062162,
+          "win_rate": 0.673459670814557,
+          "max_drawdown": 0.2360018359442865,
+          "trade_frequency": 9,
+          "stability_score": 38.174178754574505,
+          "failure_events": [
+            "Stability threshold breach"
+          ],
+          "self_healing_triggered": true
+        },
+        "TRENDING": {
+          "omega_ratio": 1.658061875937315,
+          "journey_score": 0.5186472771944095,
+          "win_rate": 0.7170856941203045,
+          "max_drawdown": 0.09190824758870271,
+          "trade_frequency": 15,
+          "stability_score": 94.98681363295262,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "RANGING": {
+          "omega_ratio": 0.6824728598188917,
+          "journey_score": 0.4325631118951146,
+          "win_rate": 0.6600679952592456,
+          "max_drawdown": 0.2381927781650609,
+          "trade_frequency": 6.559919828405974,
+          "stability_score": 75.22912892185178,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "CRASH": {
+          "omega_ratio": 1.1807073706830555,
+          "journey_score": -0.008302436277207781,
+          "win_rate": 0.6993298008514088,
+          "max_drawdown": 0.23081154485477717,
+          "trade_frequency": 18,
+          "stability_score": 75.84882929673722,
+          "failure_events": [],
+          "self_healing_triggered": false
+        }
+      },
+      "XAUUSD": {
+        "LIQUID": {
+          "omega_ratio": 1.0958515610408586,
+          "journey_score": 0.34614237336810266,
+          "win_rate": 0.4961985801937654,
+          "max_drawdown": 0.23237392621026964,
+          "trade_frequency": 19.41863256521613,
+          "stability_score": 96.66329848974763,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "VOLATILE": {
+          "omega_ratio": 1.2444434584203004,
+          "journey_score": 0.38302071295359186,
+          "win_rate": 0.6571426644721752,
+          "max_drawdown": 0.293177907139188,
+          "trade_frequency": 12,
+          "stability_score": 71.4361114801577,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "TRENDING": {
+          "omega_ratio": 1.9490843842821408,
+          "journey_score": 0.07420265477624886,
+          "win_rate": 0.8733915516872436,
+          "max_drawdown": 0.19929180717089554,
+          "trade_frequency": 11,
+          "stability_score": 72.33873336679139,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "RANGING": {
+          "omega_ratio": 1.1233122466441103,
+          "journey_score": 0.11226801385513496,
+          "win_rate": 0.4505862614640824,
+          "max_drawdown": 0.10086213761732479,
+          "trade_frequency": 13.732994253136772,
+          "stability_score": 85.06282609983327,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "CRASH": {
+          "omega_ratio": 1.4045106814594037,
+          "journey_score": 0.24374650671364478,
+          "win_rate": 0.6416717068569592,
+          "max_drawdown": 0.24974023746138924,
+          "trade_frequency": 19,
+          "stability_score": 88.47312519611393,
+          "failure_events": [],
+          "self_healing_triggered": false
+        }
+      },
+      "GER40": {
+        "LIQUID": {
+          "omega_ratio": 0.8784856545316609,
+          "journey_score": 0.6228517715647286,
+          "win_rate": 0.4947787272716199,
+          "max_drawdown": 0.18088103939549038,
+          "trade_frequency": 23.71200261404746,
+          "stability_score": 98.33058823394714,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "VOLATILE": {
+          "omega_ratio": 0.9937843028189143,
+          "journey_score": 0.5719209589561852,
+          "win_rate": 0.5352417045707386,
+          "max_drawdown": 0.2392333703480941,
+          "trade_frequency": 19,
+          "stability_score": 65.87724522670572,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "TRENDING": {
+          "omega_ratio": 1.2260312672699498,
+          "journey_score": -0.2987951212265904,
+          "win_rate": 0.7494999174926426,
+          "max_drawdown": 0.08071340379750302,
+          "trade_frequency": 12,
+          "stability_score": 93.73423397953196,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "RANGING": {
+          "omega_ratio": 0.8931990923407962,
+          "journey_score": -0.1983756162273132,
+          "win_rate": 0.6075941691708551,
+          "max_drawdown": 0.14634208588976694,
+          "trade_frequency": 9.214777091726198,
+          "stability_score": 77.86230379992797,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "CRASH": {
+          "omega_ratio": 0.9292134793121134,
+          "journey_score": -0.25716581930747706,
+          "win_rate": 0.5860584487906811,
+          "max_drawdown": 0.08680731542165479,
+          "trade_frequency": 13,
+          "stability_score": 86.38213237118958,
+          "failure_events": [],
+          "self_healing_triggered": false
+        }
+      },
+      "GBPAUD": {
+        "LIQUID": {
+          "omega_ratio": 1.3208192769636993,
+          "journey_score": 0.4382336844524584,
+          "win_rate": 0.7003852257512317,
+          "max_drawdown": 0.12866175881547187,
+          "trade_frequency": 23.64918663061619,
+          "stability_score": 89.89967311456708,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "VOLATILE": {
+          "omega_ratio": 0.8555028551100959,
+          "journey_score": 0.15852574777417028,
+          "win_rate": 0.6787912120975845,
+          "max_drawdown": 0.2913134164630643,
+          "trade_frequency": 24,
+          "stability_score": 67.519523562038,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "TRENDING": {
+          "omega_ratio": 1.109388290811525,
+          "journey_score": 0.7578411440286686,
+          "win_rate": 0.7478204595224991,
+          "max_drawdown": 0.08481639519998853,
+          "trade_frequency": 16,
+          "stability_score": 82.95105271971357,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "RANGING": {
+          "omega_ratio": 1.0766839662634016,
+          "journey_score": 0.7906199678439543,
+          "win_rate": 0.5042552624516183,
+          "max_drawdown": 0.1736165467277714,
+          "trade_frequency": 5.675746359141915,
+          "stability_score": 91.22577773460154,
+          "failure_events": [],
+          "self_healing_triggered": false
+        },
+        "CRASH": {
+          "omega_ratio": 1.2688632193822555,
+          "journey_score": 0.3582637784737715,
+          "win_rate": 0.4665480558373132,
+          "max_drawdown": 0.0932928756650377,
+          "trade_frequency": 21,
+          "stability_score": 76.65641666797292,
+          "failure_events": [],
+          "self_healing_triggered": false
+        }
+      }
+    },
+    "stress_scenarios": {
+      "BTCUSD": {
+        "black_swan_monday": {
+          "price_shock_percent": -29.225018679338575,
+          "volatility_multiplier": 11.662330902798061,
+          "liquidity_drain": 0.2793738619587819,
+          "correlation_breakdown": 0.7473908077823533,
+          "duration_hours": 2.834354850008488,
+          "omega_response": {
+            "initial_omega_failure": true,
+            "recalibration_attempts": 9,
+            "convergence_time": 162.52934841655554,
+            "final_omega_value": 0.0845662088836296,
+            "threshold_adjustments": 2,
+            "survived": false
+          },
+          "journey_response": {
+            "asymmetric_penalty_spike": 4.696800051222301,
+            "journey_score_collapse": -0.6197545210359989,
+            "path_quality_deterioration": 0.9285252988857914,
+            "recovery_cycles": 45,
+            "adaptive_adjustment_success": false,
+            "survived": false
+          },
+          "circuit_breaker_response": {
+            "activation_time_ms": 193.55801780052337,
+            "lockout_duration_minutes": 11.740184184347095,
+            "drawdown_threshold_hit": true,
+            "emergency_liquidation": false,
+            "self_healing_calls": 8,
+            "activated_successfully": true
+          },
+          "system_survival": false
+        },
+        "flash_crash_friday": {
+          "crash_duration_seconds": 129.7898173800789,
+          "recovery_duration_seconds": 1746.4014041765377,
+          "crash_magnitude_percent": -26.331590949191767,
+          "order_book_collapse": 0.8737882738869076,
+          "spread_explosion": 36.80159034841019,
+          "fast_circuit_response": {
+            "detection_lag_ms": 56.355969438919146,
+            "response_time_seconds": 0.7858046752198417,
+            "missed_initial_move": false,
+            "recovery_tracking": false
+          },
+          "omega_recalibration": {
+            "calculation_breakdown": false,
+            "emergency_fallback_used": true,
+            "recalibration_time": 267.0215399214243,
+            "stabilized": false
+          },
+          "rl_confusion": {
+            "exploration_spike": true,
+            "q_value_oscillation": false,
+            "action_paralysis": false,
+            "complete_breakdown": false,
+            "recovery_time": 13.849446613660408
+          },
+          "system_survival": false
+        },
+        "rl_breakdown": {
+          "breakdown_type": "REWARD_SIGNAL_NOISE",
+          "severity": 0.8274879014846543,
+          "detection_time": 13.03874182318799,
+          "recovery_attempts": 5,
+          "recovery_successful": true,
+          "recovery_time_minutes": 17.563382066834684,
+          "backup_system_activated": false,
+          "system_survival": true
+        },
+        "correlation_breakdown": {
+          "breakdown_severity": 0.3187867715557109,
+          "affected_pairs": 8,
+          "detection_lag": 22.182762439548846,
+          "recalibration_required": false,
+          "recovery_time_minutes": 53.61705711575704,
+          "recovery_successful": true,
+          "fallback_mode_activated": false,
+          "system_survival": true
+        }
+      },
+      "XAUUSD": {
+        "black_swan_monday": {
+          "price_shock_percent": -30.61311765098371,
+          "volatility_multiplier": 10.650453054965961,
+          "liquidity_drain": 0.21615844150557362,
+          "correlation_breakdown": 0.8391325854762071,
+          "duration_hours": 6.862740886307502,
+          "omega_response": {
+            "initial_omega_failure": true,
+            "recalibration_attempts": 5,
+            "convergence_time": 175.86119234321808,
+            "final_omega_value": 0.0569485193620813,
+            "threshold_adjustments": 4,
+            "survived": false
+          },
+          "journey_response": {
+            "asymmetric_penalty_spike": 4.684001979926907,
+            "journey_score_collapse": -0.4733849620929636,
+            "path_quality_deterioration": 0.8873366700911558,
+            "recovery_cycles": 20,
+            "adaptive_adjustment_success": true,
+            "survived": true
+          },
+          "circuit_breaker_response": {
+            "activation_time_ms": 161.50429304694586,
+            "lockout_duration_minutes": 24.215442768113817,
+            "drawdown_threshold_hit": true,
+            "emergency_liquidation": false,
+            "self_healing_calls": 20,
+            "activated_successfully": true
+          },
+          "system_survival": false
+        },
+        "flash_crash_friday": {
+          "crash_duration_seconds": 149.64409252881933,
+          "recovery_duration_seconds": 774.1363903766301,
+          "crash_magnitude_percent": -16.827110354421613,
+          "order_book_collapse": 0.9143594584691711,
+          "spread_explosion": 18.4981003372603,
+          "fast_circuit_response": {
+            "detection_lag_ms": 52.261340459200305,
+            "response_time_seconds": 2.309405573368937,
+            "missed_initial_move": false,
+            "recovery_tracking": true
+          },
+          "omega_recalibration": {
+            "calculation_breakdown": false,
+            "emergency_fallback_used": false,
+            "recalibration_time": 244.43810156287026,
+            "stabilized": false
+          },
+          "rl_confusion": {
+            "exploration_spike": true,
+            "q_value_oscillation": false,
+            "action_paralysis": false,
+            "complete_breakdown": false,
+            "recovery_time": 14.324524389006402
+          },
+          "system_survival": false
+        },
+        "rl_breakdown": {
+          "breakdown_type": "LEARNING_RATE_DRIFT",
+          "severity": 0.590825058306843,
+          "detection_time": 7.432273679709539,
+          "recovery_attempts": 2,
+          "recovery_successful": true,
+          "recovery_time_minutes": 9.733637780279679,
+          "backup_system_activated": false,
+          "system_survival": true
+        },
+        "correlation_breakdown": {
+          "breakdown_severity": 0.2535752864283815,
+          "affected_pairs": 6,
+          "detection_lag": 21.39109436104428,
+          "recalibration_required": false,
+          "recovery_time_minutes": 50.2529179676518,
+          "recovery_successful": true,
+          "fallback_mode_activated": false,
+          "system_survival": true
+        }
+      },
+      "GER40": {
+        "black_swan_monday": {
+          "price_shock_percent": -28.37170266406142,
+          "volatility_multiplier": 12.90984261158647,
+          "liquidity_drain": 0.18239694274518617,
+          "correlation_breakdown": 0.6864346936674839,
+          "duration_hours": 6.176393623075203,
+          "omega_response": {
+            "initial_omega_failure": true,
+            "recalibration_attempts": 8,
+            "convergence_time": 154.06007652076363,
+            "final_omega_value": 0.07765916121663859,
+            "threshold_adjustments": 2,
+            "survived": false
+          },
+          "journey_response": {
+            "asymmetric_penalty_spike": 3.8958971515263245,
+            "journey_score_collapse": -0.811806994301863,
+            "path_quality_deterioration": 0.8884741456314451,
+            "recovery_cycles": 40,
+            "adaptive_adjustment_success": true,
+            "survived": true
+          },
+          "circuit_breaker_response": {
+            "activation_time_ms": 94.69862406088899,
+            "lockout_duration_minutes": 7.081276349163383,
+            "drawdown_threshold_hit": true,
+            "emergency_liquidation": false,
+            "self_healing_calls": 13,
+            "activated_successfully": true
+          },
+          "system_survival": false
+        },
+        "flash_crash_friday": {
+          "crash_duration_seconds": 80.69690006766021,
+          "recovery_duration_seconds": 910.0888138155459,
+          "crash_magnitude_percent": -18.967335747735664,
+          "order_book_collapse": 0.9771472266044454,
+          "spread_explosion": 24.942124480494865,
+          "fast_circuit_response": {
+            "detection_lag_ms": 114.1581953503842,
+            "response_time_seconds": 0.8621266569943564,
+            "missed_initial_move": false,
+            "recovery_tracking": false
+          },
+          "omega_recalibration": {
+            "calculation_breakdown": false,
+            "emergency_fallback_used": true,
+            "recalibration_time": 213.5142593785327,
+            "stabilized": false
+          },
+          "rl_confusion": {
+            "exploration_spike": false,
+            "q_value_oscillation": false,
+            "action_paralysis": true,
+            "complete_breakdown": false,
+            "recovery_time": 14.039928127902753
+          },
+          "system_survival": false
+        },
+        "rl_breakdown": {
+          "breakdown_type": "STATE_SPACE_OVERFLOW",
+          "severity": 0.35723291907767124,
+          "detection_time": 9.11976346147442,
+          "recovery_attempts": 5,
+          "recovery_successful": true,
+          "recovery_time_minutes": 9.515758176722509,
+          "backup_system_activated": false,
+          "system_survival": true
+        },
+        "correlation_breakdown": {
+          "breakdown_severity": 0.6006025107260401,
+          "affected_pairs": 8,
+          "detection_lag": 39.476107395139685,
+          "recalibration_required": true,
+          "recovery_time_minutes": 43.37349892017971,
+          "recovery_successful": true,
+          "fallback_mode_activated": false,
+          "system_survival": true
+        }
+      },
+      "GBPAUD": {
+        "black_swan_monday": {
+          "price_shock_percent": -36.16132200735816,
+          "volatility_multiplier": 14.172238038141613,
+          "liquidity_drain": 0.21045096012314035,
+          "correlation_breakdown": 0.7793533395393664,
+          "duration_hours": 4.435521054406088,
+          "omega_response": {
+            "initial_omega_failure": true,
+            "recalibration_attempts": 11,
+            "convergence_time": 139.47760942965397,
+            "final_omega_value": 0.2120806878087655,
+            "threshold_adjustments": 2,
+            "survived": false
+          },
+          "journey_response": {
+            "asymmetric_penalty_spike": 3.8271072764922045,
+            "journey_score_collapse": -0.6607169332025088,
+            "path_quality_deterioration": 0.7001824336776531,
+            "recovery_cycles": 29,
+            "adaptive_adjustment_success": true,
+            "survived": true
+          },
+          "circuit_breaker_response": {
+            "activation_time_ms": 111.66505801716157,
+            "lockout_duration_minutes": 16.682377028063122,
+            "drawdown_threshold_hit": true,
+            "emergency_liquidation": true,
+            "self_healing_calls": 20,
+            "activated_successfully": true
+          },
+          "system_survival": false
+        },
+        "flash_crash_friday": {
+          "crash_duration_seconds": 109.34670134946765,
+          "recovery_duration_seconds": 1130.316450267044,
+          "crash_magnitude_percent": -31.214989878328613,
+          "order_book_collapse": 0.9179275317588489,
+          "spread_explosion": 49.52515489156917,
+          "fast_circuit_response": {
+            "detection_lag_ms": 143.32044466235251,
+            "response_time_seconds": 2.6153716642725136,
+            "missed_initial_move": false,
+            "recovery_tracking": false
+          },
+          "omega_recalibration": {
+            "calculation_breakdown": true,
+            "emergency_fallback_used": true,
+            "recalibration_time": 269.80197484601814,
+            "stabilized": true
+          },
+          "rl_confusion": {
+            "exploration_spike": true,
+            "q_value_oscillation": false,
+            "action_paralysis": false,
+            "complete_breakdown": false,
+            "recovery_time": 7.173409363267693
+          },
+          "system_survival": true
+        },
+        "rl_breakdown": {
+          "breakdown_type": "Q_TABLE_CORRUPTION",
+          "severity": 0.9234348826685299,
+          "detection_time": 2.9335896117560916,
+          "recovery_attempts": 2,
+          "recovery_successful": true,
+          "recovery_time_minutes": 6.808259286751282,
+          "backup_system_activated": false,
+          "system_survival": true
+        },
+        "correlation_breakdown": {
+          "breakdown_severity": 0.6679139738547637,
+          "affected_pairs": 5,
+          "detection_lag": 15.639086579447603,
+          "recalibration_required": true,
+          "recovery_time_minutes": 49.24899689616072,
+          "recovery_successful": true,
+          "fallback_mode_activated": false,
+          "system_survival": true
+        }
+      }
+    },
+    "failure_points": {},
+    "self_healing_events": {
+      "REGIME_VOLATILE": [
+        {
+          "timestamp": "2025-12-22T15:38:46.065929",
+          "scenario": "REGIME_VOLATILE",
+          "instrument": "BTCUSD",
+          "issues": [
+            "Stability threshold breach"
+          ],
+          "healing_actions": [
+            "Dynamic threshold recalibration"
+          ],
+          "success_rate": 0.7
+        }
+      ]
+    },
+    "performance_metrics": {},
+    "correlation_tests": {
+      "USD_strength_test": {
+        "usd_strength_factor": 0.9886674573476998,
+        "gbpaud_omega_adjustment": 0.006799525591380129,
+        "xauusd_omega_adjustment": 0.009066034121840172,
+        "correlation_breakdown": false,
+        "system_adaptation_time": 15.63345012020486
+      },
+      "risk_on_risk_off": {
+        "risk_sentiment": -0.9596171063628467,
+        "btc_journey_adjustment": -1.151540527635416,
+        "ger40_journey_adjustment": -0.7676936850902774,
+        "gold_journey_adjustment": 0.47980855318142335,
+        "gbpaud_journey_adjustment": -0.575770263817708,
+        "sentiment_detection_accuracy": 0.7008171148001506
+      },
+      "volatility_contagion": {
+        "BTCUSD_to_others": 0.636567625820063,
+        "GER40_to_GBPAUD": 0.8487568344267507,
+        "XAUUSD_independence": 0.21218920860668766,
+        "contagion_speed_minutes": 13.154423390870996
+      },
+      "weekend_gaps": {
+        "friday_close_positions": 0.5654691607252134,
+        "monday_gap_btc": -0.11504380751274274,
+        "monday_gap_forex": 0.015369515026988925,
+        "gap_handling_success": 0.948390502699272,
+        "reconstruction_time": 5.805150490109767
+      }
+    }
+  },
+  "analysis_report": {
+    "summary": {
+      "total_scenarios_tested": 16,
+      "total_system_failures": 7,
+      "overall_survival_rate": 0.5625,
+      "instruments_tested": 4,
+      "self_healing_activations": 1
+    },
+    "critical_failures": [
+      {
+        "instrument": "BTCUSD",
+        "scenario": "black_swan_monday",
+        "failure_details": {
+          "price_shock_percent": -29.225018679338575,
+          "volatility_multiplier": 11.662330902798061,
+          "liquidity_drain": 0.2793738619587819,
+          "correlation_breakdown": 0.7473908077823533,
+          "duration_hours": 2.834354850008488,
+          "omega_response": {
+            "initial_omega_failure": true,
+            "recalibration_attempts": 9,
+            "convergence_time": 162.52934841655554,
+            "final_omega_value": 0.0845662088836296,
+            "threshold_adjustments": 2,
+            "survived": false
+          },
+          "journey_response": {
+            "asymmetric_penalty_spike": 4.696800051222301,
+            "journey_score_collapse": -0.6197545210359989,
+            "path_quality_deterioration": 0.9285252988857914,
+            "recovery_cycles": 45,
+            "adaptive_adjustment_success": false,
+            "survived": false
+          },
+          "circuit_breaker_response": {
+            "activation_time_ms": 193.55801780052337,
+            "lockout_duration_minutes": 11.740184184347095,
+            "drawdown_threshold_hit": true,
+            "emergency_liquidation": false,
+            "self_healing_calls": 8,
+            "activated_successfully": true
+          },
+          "system_survival": false
+        },
+        "severity": "CRITICAL"
+      },
+      {
+        "instrument": "BTCUSD",
+        "scenario": "flash_crash_friday",
+        "failure_details": {
+          "crash_duration_seconds": 129.7898173800789,
+          "recovery_duration_seconds": 1746.4014041765377,
+          "crash_magnitude_percent": -26.331590949191767,
+          "order_book_collapse": 0.8737882738869076,
+          "spread_explosion": 36.80159034841019,
+          "fast_circuit_response": {
+            "detection_lag_ms": 56.355969438919146,
+            "response_time_seconds": 0.7858046752198417,
+            "missed_initial_move": false,
+            "recovery_tracking": false
+          },
+          "omega_recalibration": {
+            "calculation_breakdown": false,
+            "emergency_fallback_used": true,
+            "recalibration_time": 267.0215399214243,
+            "stabilized": false
+          },
+          "rl_confusion": {
+            "exploration_spike": true,
+            "q_value_oscillation": false,
+            "action_paralysis": false,
+            "complete_breakdown": false,
+            "recovery_time": 13.849446613660408
+          },
+          "system_survival": false
+        },
+        "severity": "CRITICAL"
+      },
+      {
+        "instrument": "XAUUSD",
+        "scenario": "black_swan_monday",
+        "failure_details": {
+          "price_shock_percent": -30.61311765098371,
+          "volatility_multiplier": 10.650453054965961,
+          "liquidity_drain": 0.21615844150557362,
+          "correlation_breakdown": 0.8391325854762071,
+          "duration_hours": 6.862740886307502,
+          "omega_response": {
+            "initial_omega_failure": true,
+            "recalibration_attempts": 5,
+            "convergence_time": 175.86119234321808,
+            "final_omega_value": 0.0569485193620813,
+            "threshold_adjustments": 4,
+            "survived": false
+          },
+          "journey_response": {
+            "asymmetric_penalty_spike": 4.684001979926907,
+            "journey_score_collapse": -0.4733849620929636,
+            "path_quality_deterioration": 0.8873366700911558,
+            "recovery_cycles": 20,
+            "adaptive_adjustment_success": true,
+            "survived": true
+          },
+          "circuit_breaker_response": {
+            "activation_time_ms": 161.50429304694586,
+            "lockout_duration_minutes": 24.215442768113817,
+            "drawdown_threshold_hit": true,
+            "emergency_liquidation": false,
+            "self_healing_calls": 20,
+            "activated_successfully": true
+          },
+          "system_survival": false
+        },
+        "severity": "CRITICAL"
+      },
+      {
+        "instrument": "XAUUSD",
+        "scenario": "flash_crash_friday",
+        "failure_details": {
+          "crash_duration_seconds": 149.64409252881933,
+          "recovery_duration_seconds": 774.1363903766301,
+          "crash_magnitude_percent": -16.827110354421613,
+          "order_book_collapse": 0.9143594584691711,
+          "spread_explosion": 18.4981003372603,
+          "fast_circuit_response": {
+            "detection_lag_ms": 52.261340459200305,
+            "response_time_seconds": 2.309405573368937,
+            "missed_initial_move": false,
+            "recovery_tracking": true
+          },
+          "omega_recalibration": {
+            "calculation_breakdown": false,
+            "emergency_fallback_used": false,
+            "recalibration_time": 244.43810156287026,
+            "stabilized": false
+          },
+          "rl_confusion": {
+            "exploration_spike": true,
+            "q_value_oscillation": false,
+            "action_paralysis": false,
+            "complete_breakdown": false,
+            "recovery_time": 14.324524389006402
+          },
+          "system_survival": false
+        },
+        "severity": "CRITICAL"
+      },
+      {
+        "instrument": "GER40",
+        "scenario": "black_swan_monday",
+        "failure_details": {
+          "price_shock_percent": -28.37170266406142,
+          "volatility_multiplier": 12.90984261158647,
+          "liquidity_drain": 0.18239694274518617,
+          "correlation_breakdown": 0.6864346936674839,
+          "duration_hours": 6.176393623075203,
+          "omega_response": {
+            "initial_omega_failure": true,
+            "recalibration_attempts": 8,
+            "convergence_time": 154.06007652076363,
+            "final_omega_value": 0.07765916121663859,
+            "threshold_adjustments": 2,
+            "survived": false
+          },
+          "journey_response": {
+            "asymmetric_penalty_spike": 3.8958971515263245,
+            "journey_score_collapse": -0.811806994301863,
+            "path_quality_deterioration": 0.8884741456314451,
+            "recovery_cycles": 40,
+            "adaptive_adjustment_success": true,
+            "survived": true
+          },
+          "circuit_breaker_response": {
+            "activation_time_ms": 94.69862406088899,
+            "lockout_duration_minutes": 7.081276349163383,
+            "drawdown_threshold_hit": true,
+            "emergency_liquidation": false,
+            "self_healing_calls": 13,
+            "activated_successfully": true
+          },
+          "system_survival": false
+        },
+        "severity": "CRITICAL"
+      },
+      {
+        "instrument": "GER40",
+        "scenario": "flash_crash_friday",
+        "failure_details": {
+          "crash_duration_seconds": 80.69690006766021,
+          "recovery_duration_seconds": 910.0888138155459,
+          "crash_magnitude_percent": -18.967335747735664,
+          "order_book_collapse": 0.9771472266044454,
+          "spread_explosion": 24.942124480494865,
+          "fast_circuit_response": {
+            "detection_lag_ms": 114.1581953503842,
+            "response_time_seconds": 0.8621266569943564,
+            "missed_initial_move": false,
+            "recovery_tracking": false
+          },
+          "omega_recalibration": {
+            "calculation_breakdown": false,
+            "emergency_fallback_used": true,
+            "recalibration_time": 213.5142593785327,
+            "stabilized": false
+          },
+          "rl_confusion": {
+            "exploration_spike": false,
+            "q_value_oscillation": false,
+            "action_paralysis": true,
+            "complete_breakdown": false,
+            "recovery_time": 14.039928127902753
+          },
+          "system_survival": false
+        },
+        "severity": "CRITICAL"
+      },
+      {
+        "instrument": "GBPAUD",
+        "scenario": "black_swan_monday",
+        "failure_details": {
+          "price_shock_percent": -36.16132200735816,
+          "volatility_multiplier": 14.172238038141613,
+          "liquidity_drain": 0.21045096012314035,
+          "correlation_breakdown": 0.7793533395393664,
+          "duration_hours": 4.435521054406088,
+          "omega_response": {
+            "initial_omega_failure": true,
+            "recalibration_attempts": 11,
+            "convergence_time": 139.47760942965397,
+            "final_omega_value": 0.2120806878087655,
+            "threshold_adjustments": 2,
+            "survived": false
+          },
+          "journey_response": {
+            "asymmetric_penalty_spike": 3.8271072764922045,
+            "journey_score_collapse": -0.6607169332025088,
+            "path_quality_deterioration": 0.7001824336776531,
+            "recovery_cycles": 29,
+            "adaptive_adjustment_success": true,
+            "survived": true
+          },
+          "circuit_breaker_response": {
+            "activation_time_ms": 111.66505801716157,
+            "lockout_duration_minutes": 16.682377028063122,
+            "drawdown_threshold_hit": true,
+            "emergency_liquidation": true,
+            "self_healing_calls": 20,
+            "activated_successfully": true
+          },
+          "system_survival": false
+        },
+        "severity": "CRITICAL"
+      }
+    ],
+    "self_healing_performance": {
+      "total_healing_events": 1,
+      "successful_healings": 1,
+      "healing_success_rate": 1.0,
+      "most_common_issues": [
+        "Stability threshold breach"
+      ]
+    },
+    "instrument_rankings": [
+      [
+        "GBPAUD",
+        {
+          "total_score": 146.65048875977863,
+          "average_score": 14.665048875977863,
+          "instrument_type": "FOREX"
+        }
+      ],
+      [
+        "GER40",
+        {
+          "total_score": 134.4373007222605,
+          "average_score": 13.44373007222605,
+          "instrument_type": "INDEX"
+        }
+      ],
+      [
+        "XAUUSD",
+        {
+          "total_score": 132.7948189265288,
+          "average_score": 13.279481892652878,
+          "instrument_type": "COMMODITY"
+        }
+      ],
+      [
+        "BTCUSD",
+        {
+          "total_score": 126.67463999230435,
+          "average_score": 12.667463999230435,
+          "instrument_type": "CRYPTO"
+        }
+      ]
+    ],
+    "recommendations": [
+      "Implement additional circuit breaker layers for extreme scenarios",
+      "Optimize BTCUSD specific parameters and risk management",
+      "Implement real-time correlation monitoring to detect breakdown scenarios earlier",
+      "Add flash crash detection with sub-second response capabilities",
+      "Enhance Omega ratio calculation stability during extreme volatility",
+      "Implement progressive position sizing during Black Swan events"
+    ]
+  },
+  "system_final_state": {
+    "omega_calculator_health": 100.0,
+    "journey_shaper_health": 100.0,
+    "rl_agent_health": 100.0,
+    "circuit_breaker_status": "ACTIVE",
+    "self_healing_active": true
+  }
+}

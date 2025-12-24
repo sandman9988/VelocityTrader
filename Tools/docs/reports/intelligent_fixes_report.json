@@ -1,0 +1,12 @@
+{
+  "omega_calculator_fixes": 1,
+  "flash_crash_detection_added": 0,
+  "journey_penalty_limiting": 1,
+  "rl_protection_mechanisms": 0,
+  "self_healing_enhancements": 1,
+  "files_modified": [
+    "/mnt/c/DevCenter/MT5-Unified/MQL5-Development/Include/ProjectQuantum/Intelligence/CJourneyReward.mqh",
+    "/mnt/c/DevCenter/MT5-Unified/MQL5-Development/Include/ProjectQuantum/Intelligence/CJourneyReward.mqh",
+    "/mnt/c/DevCenter/MT5-Unified/MQL5-Development/Include/ProjectQuantum/Safety/CCircuitBreaker.mqh"
+  ]
+}

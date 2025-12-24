@@ -1,0 +1,239 @@
+{
+  "sync_results": {
+    "branch_status": {
+      "MQL5-Development": {
+        "exists": true,
+        "is_directory": true,
+        "contents": [
+          "Experts",
+          "Files",
+          "Include",
+          "Indicators",
+          "Libraries",
+          "README.md",
+          "Scripts",
+          "SharedIncludes"
+        ],
+        "file_count": 829,
+        "dir_count": 106
+      },
+      "MT5-Core": {
+        "exists": true,
+        "is_directory": true,
+        "contents": [
+          "Config",
+          "Profiles",
+          "README.md",
+          "Sounds",
+          "Terminal",
+          "Terminal.ico",
+          "metatester64.exe",
+          "terminal64.exe"
+        ],
+        "file_count": 70,
+        "dir_count": 12
+      },
+      "Testing": {
+        "exists": true,
+        "is_directory": true,
+        "contents": [
+          "README.md",
+          "Tester"
+        ],
+        "file_count": 68,
+        "dir_count": 99
+      }
+    },
+    "file_synchronization": {
+      "Experts/ProjectQuantum_Main.mq5": {
+        "branch_status": {
+          "MQL5-Development": {
+            "exists": true,
+            "size": 87498,
+            "modified_time": 1766410021.0448806
+          },
+          "MT5-Core": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          },
+          "Testing": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          }
+        },
+        "sync_status": "missing_in_branches",
+        "existing_branches": [
+          "MQL5-Development"
+        ]
+      },
+      "Include/ProjectQuantum/Core/Core.mqh": {
+        "branch_status": {
+          "MQL5-Development": {
+            "exists": true,
+            "size": 80355,
+            "modified_time": 1766410228.1891296
+          },
+          "MT5-Core": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          },
+          "Testing": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          }
+        },
+        "sync_status": "missing_in_branches",
+        "existing_branches": [
+          "MQL5-Development"
+        ]
+      },
+      "Include/ProjectQuantum/Architecture/ProjectQuantum_Architecture.mqh": {
+        "branch_status": {
+          "MQL5-Development": {
+            "exists": true,
+            "size": 4936,
+            "modified_time": 1766409907.378482
+          },
+          "MT5-Core": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          },
+          "Testing": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          }
+        },
+        "sync_status": "missing_in_branches",
+        "existing_branches": [
+          "MQL5-Development"
+        ]
+      },
+      "Include/ProjectQuantum/Intelligence/CRL_Agent.mqh": {
+        "branch_status": {
+          "MQL5-Development": {
+            "exists": true,
+            "size": 78146,
+            "modified_time": 1766410228.9247608
+          },
+          "MT5-Core": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          },
+          "Testing": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          }
+        },
+        "sync_status": "missing_in_branches",
+        "existing_branches": [
+          "MQL5-Development"
+        ]
+      },
+      "Include/ProjectQuantum/Risk/CRiskManager.mqh": {
+        "branch_status": {
+          "MQL5-Development": {
+            "exists": true,
+            "size": 59793,
+            "modified_time": 1766410298.8193147
+          },
+          "MT5-Core": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          },
+          "Testing": {
+            "exists": false,
+            "size": 0,
+            "modified_time": 0
+          }
+        },
+        "sync_status": "missing_in_branches",
+        "existing_branches": [
+          "MQL5-Development"
+        ]
+      }
+    },
+    "git_repositories": {
+      "MQL5-Development": {
+        "has_git": false,
+        "git_status": "unknown",
+        "current_branch": "unknown",
+        "remote_info": "unknown"
+      },
+      "MT5-Core": {
+        "has_git": false,
+        "git_status": "unknown",
+        "current_branch": "unknown",
+        "remote_info": "unknown"
+      },
+      "Testing": {
+        "has_git": false,
+        "git_status": "unknown",
+        "current_branch": "unknown",
+        "remote_info": "unknown"
+      }
+    },
+    "overall_sync_status": 0.3333333333333333,
+    "projectquantum_sync": {
+      "main_ea_files": {
+        "MQL5-Development": {
+          "found": true,
+          "paths": [
+            "/mnt/c/DevCenter/MT5-Unified/MQL5-Development/Experts/ProjectQuantum_Main.mq5",
+            "/mnt/c/DevCenter/MT5-Unified/MQL5-Development/Experts/ProjectQuantum/ProjectQuantum_Main.mq5"
+          ],
+          "primary_path": "/mnt/c/DevCenter/MT5-Unified/MQL5-Development/Experts/ProjectQuantum_Main.mq5"
+        },
+        "MT5-Core": {
+          "found": false,
+          "paths": [],
+          "primary_path": null
+        },
+        "Testing": {
+          "found": false,
+          "paths": [],
+          "primary_path": null
+        }
+      },
+      "include_structure": {
+        "MQL5-Development": {
+          "exists": true,
+          "subdirectories": [
+            "Architecture",
+            "Core",
+            "Intelligence",
+            "Monitoring",
+            "Performance",
+            "Physics",
+            "Risk",
+            "Safety"
+          ],
+          "mqh_file_count": 50
+        },
+        "MT5-Core": {
+          "exists": false,
+          "subdirectories": [],
+          "mqh_file_count": 0
+        },
+        "Testing": {
+          "exists": false,
+          "subdirectories": [],
+          "mqh_file_count": 0
+        }
+      }
+    }
+  },
+  "overall_assessment": "POOR - Major synchronization issues",
+  "recommendations": [
+    "Initialize git repositories in non-git branches",
+    "Deploy ProjectQuantum Main EA to all branches"
+  ]
+}
