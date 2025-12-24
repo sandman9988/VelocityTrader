@@ -393,27 +393,27 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Missing Rate Limit / Throttling',
             'pattern': r'for\s*\([^)]+\)\s*\{[^}]*(?:OrderSend|SymbolInfo|Copy(?:Rates|Buffer|Time))',
-            'exclude_pattern': r'Sleep|throttle|Throttle|THROTTLE|rate_limit|RateLimit|batch|Batch|BATCH|delay|Delay|cooldown|Cooldown',
+            'exclude_pattern': r'Sleep|throttle|Throttle|THROTTLE|rate_limit|RateLimit|batch|Batch|BATCH|delay|Delay|cooldown|Cooldown|AdaptiveThrottle|DynamicDelay',
             'description': 'Bulk operations in loops can hit broker rate limits or cause performance issues',
-            'recommendation': 'Add Sleep() or batch operations with throttling between broker API calls'
+            'recommendation': 'Implement DYNAMIC rate limiting: (1) Start with min delay (1-5ms), (2) Increase delay on rate limit errors, (3) Decrease delay during low-activity periods, (4) Use adaptive batch sizes based on market conditions. Example: Sleep(MathMax(1, baseDelay * (1 + errorCount * 0.5)))'
         },
         'DATA010': {
             'category': AuditCategory.DATA_INTEGRITY,
             'severity': Severity.MEDIUM,
             'title': 'Unbounded Loop Over Symbols',
             'pattern': r'for\s*\([^;]+;\s*\w+\s*<\s*(?:g_symbolCount|SymbolsTotal)',
-            'exclude_pattern': r'batch|Batch|BATCH|chunk|Chunk|MAX_BATCH|MAX_SYMBOLS_PER_TICK|limit|Limit',
+            'exclude_pattern': r'batch|Batch|BATCH|chunk|Chunk|MAX_BATCH|MAX_SYMBOLS_PER_TICK|limit|Limit|priority|Priority|ranked|Ranked',
             'description': 'Processing all symbols each tick can cause performance issues with large watchlists',
-            'recommendation': 'Process symbols in batches or limit per-tick processing'
+            'recommendation': 'Process symbols in priority order: (1) Prioritize symbols with open positions, (2) Rank by trading signal strength, (3) Rotate through remaining symbols across ticks. Use adaptive batch sizes based on tick frequency.'
         },
         'DATA011': {
             'category': AuditCategory.DATA_INTEGRITY,
             'severity': Severity.MEDIUM,
             'title': 'Missing Cooldown Between Orders',
             'pattern': r'OrderSend\s*\([^)]+\)[^}]*OrderSend\s*\(',
-            'exclude_pattern': r'Sleep|cooldown|Cooldown|COOLDOWN|delay|Delay|wait|Wait|timer|Timer',
+            'exclude_pattern': r'Sleep|cooldown|Cooldown|COOLDOWN|delay|Delay|wait|Wait|timer|Timer|lastOrderTime|g_lastOrder',
             'description': 'Multiple orders without cooldown can trigger broker anti-spam measures',
-            'recommendation': 'Add minimum delay between consecutive order submissions'
+            'recommendation': 'Implement ADAPTIVE cooldown: (1) Track time since last order, (2) Use minimum 50-100ms between orders, (3) Increase cooldown after rejections, (4) Reset to minimum during favorable conditions. Track: static datetime g_lastOrderTime = 0; if(TimeCurrent() - g_lastOrderTime < minCooldown) return;'
         },
 
         # ================================================================
