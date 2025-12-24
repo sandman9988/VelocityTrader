@@ -89,8 +89,11 @@ See `PROJECT_AUDIT.md` for comprehensive audit report.
 | PhysicsEngine | STUB | FUNCTIONAL | FIXED |
 | SymCData | STUB | FUNCTIONAL | FIXED |
 | VT_KinematicRegimes | Not integrated | Integrated | FIXED |
-| Critical violations | 310 | 278 | -32 (-10%) |
-| Total violations | 988 | 948 | -40 (-4%) |
+| VT_BrokerSpecs.mqh | 40 CRITICAL | Safe divisions | FIXED |
+| VT_Correlation.mqh | 34 CRITICAL | Safe divisions | FIXED |
+| VT_TradeQuality.mqh | 17 CRITICAL | Safe divisions | FIXED |
+| Critical violations | 310 | ~200 | -110 (-35%) |
+| Total violations | 988 | ~850 | -138 (-14%) |
 
 ### Violations by Category
 

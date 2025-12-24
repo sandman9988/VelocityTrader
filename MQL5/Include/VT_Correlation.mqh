@@ -295,11 +295,12 @@ public:
       {
          covar += (s1.returns[i] - s1.mean) * (s2.returns[i] - s2.mean);
       }
-      covar /= n;
+      covar = SafeDivide(covar, (double)n, 0.0);
 
       // Correlation
-      if(s1.stdDev > 0 && s2.stdDev > 0)
-         return covar / (s1.stdDev * s2.stdDev);
+      double denom = s1.stdDev * s2.stdDev;
+      if(denom > 0)
+         return SafeDivide(covar, denom, 0.0);
 
       return 0.0;
    }
@@ -509,7 +510,7 @@ public:
          if(sumIndividual > 0)
          {
             double portfolioVol = MathSqrt(CalculateExposureVariance(exposures));
-            m_exposure.diversificationRatio = sumIndividual / portfolioVol;
+            m_exposure.diversificationRatio = SafeDivide(sumIndividual, portfolioVol, 1.0);
          }
       }
    }
@@ -726,7 +727,7 @@ public:
       }
 
       if(count > 0)
-         avgCorr /= count;
+         avgCorr = SafeDivide(avgCorr, (double)count, 0.0);
 
       // Normalize to 0-1
       features[startIdx + 0] = (avgCorr + 1.0) / 2.0;

@@ -1075,7 +1075,7 @@ public:
       double avgVol = 0;
       for(int i = 0; i < copied; i++)
          avgVol += (double)volumes[i];
-      avgVol /= copied;
+      avgVol = SafeDivide(avgVol, (double)copied, 1.0);
 
       // Use 1/N of average daily volume per bucket
       double bucketVol = (volumePerBucket > 0) ? volumePerBucket : avgVol * 10;
@@ -1137,15 +1137,16 @@ public:
          sumSq += vpinHistory[i] * vpinHistory[i];
       }
 
-      vpinData.vpin = sum / numBuckets;
-      vpinData.vpinStdDev = MathSqrt(sumSq / numBuckets - vpinData.vpin * vpinData.vpin);
+      vpinData.vpin = SafeDivide(sum, (double)numBuckets, 0.0);
+      double variance = SafeDivide(sumSq, (double)numBuckets, 0.0) - vpinData.vpin * vpinData.vpin;
+      vpinData.vpinStdDev = MathSqrt(MathMax(0.0, variance));
 
       // Moving average (recent half)
       double recentSum = 0;
       int halfBuckets = numBuckets / 2;
       for(int i = 0; i < halfBuckets; i++)
          recentSum += vpinHistory[i];
-      vpinData.vpinMA = (halfBuckets > 0) ? recentSum / halfBuckets : vpinData.vpin;
+      vpinData.vpinMA = SafeDivide(recentSum, (double)halfBuckets, vpinData.vpin);
 
       // Store volume data
       vpinData.buyVolume = buyBuckets;

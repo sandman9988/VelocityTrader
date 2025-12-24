@@ -6,6 +6,8 @@
 #property copyright "VelocityTrader"
 #property strict
 
+#include "VT_Definitions.mqh"
+
 //+------------------------------------------------------------------+
 //| ENUMERATIONS - Trading Modes & Classifications                   |
 //+------------------------------------------------------------------+
@@ -961,17 +963,19 @@ public:
          double spreadLog = MathLog(spec.spreadCurrent + 1);
          double minLog = MathLog(m_spreadMin + 1);
          double maxLog = MathLog(m_spreadMax + 1);
+         double logRange = maxLog - minLog;
          norm.spreadNorm = MathMin(1.0, MathMax(0.0,
-            (spreadLog - minLog) / (maxLog - minLog)));
+            SafeDivide(spreadLog - minLog, logRange, 0.5)));
       }
 
       // Swap normalization (-1 to 1 range)
-      if(m_swapMax > m_swapMin)
+      double swapRange = m_swapMax - m_swapMin;
+      if(swapRange > 0)
       {
          norm.swapLongNorm = MathMin(1.0, MathMax(-1.0,
-            2.0 * (spec.swapLong - m_swapMin) / (m_swapMax - m_swapMin) - 1.0));
+            2.0 * SafeDivide(spec.swapLong - m_swapMin, swapRange, 0.5) - 1.0));
          norm.swapShortNorm = MathMin(1.0, MathMax(-1.0,
-            2.0 * (spec.swapShort - m_swapMin) / (m_swapMax - m_swapMin) - 1.0));
+            2.0 * SafeDivide(spec.swapShort - m_swapMin, swapRange, 0.5) - 1.0));
       }
 
       // Commission normalization (assume max $50 per lot)
@@ -980,8 +984,8 @@ public:
       // Margin normalization (assume 0.1% to 100% range)
       if(spec.marginInitial > 0 && spec.contractSize > 0)
       {
-         double marginPercent = (spec.marginInitial / spec.contractSize) * 100;
-         norm.marginNorm = MathMin(1.0, marginPercent / 100.0);
+         double marginPercent = SafeDivide(spec.marginInitial, spec.contractSize, 0.0) * 100;
+         norm.marginNorm = MathMin(1.0, SafeDivide(marginPercent, 100.0, 0.5));
       }
 
       // Session time normalization (time to close as fraction of session)
@@ -1362,10 +1366,11 @@ public:
    //+------------------------------------------------------------------+
    void SetClassRisk(ENUM_ASSET_CLASS assetClass, ClassRisk &risk)
    {
-      if(assetClass >= 0 && assetClass < 10)
+      int idx = (int)assetClass;
+      if(idx >= 0 && idx < 10)
       {
          risk.assetClass = assetClass;
-         m_classRisk[assetClass] = risk;
+         m_classRisk[idx] = risk;
       }
    }
 
@@ -1374,8 +1379,9 @@ public:
    //+------------------------------------------------------------------+
    ClassRisk GetClassRisk(ENUM_ASSET_CLASS assetClass)
    {
-      if(assetClass >= 0 && assetClass < 10)
-         return m_classRisk[assetClass];
+      int idx = (int)assetClass;
+      if(idx >= 0 && idx < 10)
+         return m_classRisk[idx];
 
       ClassRisk defaultRisk;
       defaultRisk.Reset();
