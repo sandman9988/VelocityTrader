@@ -11,6 +11,7 @@
 #include <Trade\OrderInfo.mqh>
 #include <Trade\DealInfo.mqh>
 #include <Trade\HistoryOrderInfo.mqh>
+#include "VT_Definitions.mqh"
 
 //+------------------------------------------------------------------+
 //| ENUMERATIONS                                                      |
@@ -698,7 +699,7 @@ public:
       if(equity > m_peakEquity)
          m_peakEquity = equity;
 
-      double dd = (m_peakEquity - equity) / m_peakEquity * 100;
+      double dd = SafeDivide(m_peakEquity - equity, m_peakEquity, 0.0) * 100;
       if(dd > m_maxDrawdown)
          m_maxDrawdown = dd;
    }
@@ -806,22 +807,24 @@ public:
          return 0.0;
 
       int n = MathMin(lookback, m_returnsCount);
+      if(n <= 0) return 0.0;
+
       int start = m_returnsCount - n;
 
       double sum = 0.0;
       for(int i = start; i < m_returnsCount; i++)
          sum += m_returns[i];
-      double mean = sum / n;
+      double mean = SafeDivide(sum, (double)n, 0.0);
 
       double sumSq = 0.0;
       for(int i = start; i < m_returnsCount; i++)
          sumSq += MathPow(m_returns[i] - mean, 2);
-      double stdDev = MathSqrt(sumSq / n);
+      double stdDev = MathSqrt(SafeDivide(sumSq, (double)n, 0.0));
 
-      if(stdDev == 0)
+      if(stdDev < 0.0001)
          return 0.0;
 
-      return mean / stdDev;
+      return SafeDivide(mean, stdDev, 0.0);
    }
 
    //+------------------------------------------------------------------+
