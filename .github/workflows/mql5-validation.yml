@@ -33,7 +33,7 @@ jobs:
         run: |
           echo "Running MQL5 code audit..."
           if [ -f "Tools/mql5_code_auditor.py" ]; then
-            python Tools/mql5_code_auditor.py --dir MQL5/ --output audit_report.json || true
+            python Tools/mql5_code_auditor.py --project . --output audit_report.json || true
             if [ -f "audit_report.json" ]; then
               echo "Audit report generated:"
               cat audit_report.json | python -m json.tool | head -100
@@ -59,7 +59,7 @@ jobs:
         run: |
           echo "Running MQL5 integrity check..."
           if [ -f "Tools/mql5_integrity_checker.py" ]; then
-            python Tools/mql5_integrity_checker.py MQL5/ || true
+            python Tools/mql5_integrity_checker.py --report || true
           else
             echo "Integrity checker not found, skipping..."
           fi
@@ -81,7 +81,7 @@ jobs:
         run: |
           echo "Running financial standards audit..."
           if [ -f "Tools/mql5_financial_auditor.py" ]; then
-            python Tools/mql5_financial_auditor.py --dir MQL5/ || true
+            python Tools/mql5_financial_auditor.py --project . || true
           else
             echo "Financial auditor not found, skipping..."
           fi
