@@ -153,6 +153,7 @@ class CSVImporter:
             '<volume>': 'volume',
             '<tickvol>': 'tick_volume',
             'tick_volume': 'tick_volume',
+            '<spread>': 'spread',
         }
 
         df = df.rename(columns=renames)
