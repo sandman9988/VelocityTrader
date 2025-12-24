@@ -1675,27 +1675,29 @@ void UpdateSymbol(int idx)
 void UpdateRanking()
 {
    g_rankCount = 0;
-   
-   for(int i = 0; i < g_symbolCount; i++)
+
+   int symLimit = MathMin(g_symbolCount, MAX_SYMBOLS);
+   for(int i = 0; i < symLimit && g_rankCount < MAX_SYMBOLS; i++)
    {
       if(!g_symbols[i].initialized || !g_symbols[i].typeAllowed) continue;
       if(g_symbols[i].halted) continue;
-      
+
       // Include symbols even if physics not fully ready (for learning)
       // Use acceleration if available, otherwise use 0.5 as default score
       double score = 0.5;
       if(g_symbols[i].physics.IsReady())
          score = MathAbs(g_symbols[i].physics.GetAcceleration()) + 0.1;
-      
+
       g_ranking[g_rankCount].symbolIdx = i;
       g_ranking[g_rankCount].score = score;
       g_rankCount++;
    }
-   
+
    // Sort by score (descending) - ready symbols will rank higher
-   for(int i = 0; i < g_rankCount - 1; i++)
+   int rankLimit = MathMin(g_rankCount, MAX_SYMBOLS);
+   for(int i = 0; i < rankLimit - 1; i++)
    {
-      for(int j = i + 1; j < g_rankCount; j++)
+      for(int j = i + 1; j < rankLimit; j++)
       {
          if(g_ranking[j].score > g_ranking[i].score)
          {
@@ -1714,24 +1716,26 @@ void ProcessSignals()
 {
    int openPos = CountOpenPositions();
    if(openPos >= InpMaxPositions) return;
-   
+
    // Debug: Check ranking status periodically
    static datetime lastDebug = 0;
    if(TimeCurrent() - lastDebug > 60 && g_rankCount == 0)
    {
       lastDebug = TimeCurrent();
       int notReady = 0;
-      for(int i = 0; i < g_symbolCount; i++)
+      int symLimit = MathMin(g_symbolCount, MAX_SYMBOLS);
+      for(int i = 0; i < symLimit; i++)
          if(g_symbols[i].initialized && !g_symbols[i].physics.IsReady()) notReady++;
       Print("DEBUG: g_rankCount=0, NotReady=", notReady, "/", g_symbolCount);
    }
-   
-   int cnt = MathMin(g_rankCount, InpTopSymbols);
-   
+
+   int cnt = MathMin(MathMin(g_rankCount, InpTopSymbols), MAX_SYMBOLS);
+
    for(int i = 0; i < cnt && openPos < InpMaxPositions; i++)
    {
+      if(!IsValidIndex(i, MAX_SYMBOLS)) continue;
       int idx = g_ranking[i].symbolIdx;
-      if(idx < 0 || idx >= g_symbolCount) continue;
+      if(!IsValidIndex(idx, MAX_SYMBOLS)) continue;
       
       // Skip if already have position on this symbol
       if(HasPositionOnSymbol(g_symbols[idx].name)) continue;
@@ -2141,27 +2145,30 @@ void ManageShadowPosition(int idx)
 //+------------------------------------------------------------------+
 void CloseShadowPosition(int idx, int reason)
 {
+   // Validate index
+   if(!IsValidIndex(idx, MAX_POSITIONS)) return;
+
    string sym = g_positions[idx].symbol;
    double exitPrice;
-   
+
    if(reason == 0)  // SL
       exitPrice = g_positions[idx].currentSL;
    else
       exitPrice = (g_positions[idx].direction > 0) ?
                   SymbolInfoDouble(sym, SYMBOL_BID) :
                   SymbolInfoDouble(sym, SYMBOL_ASK);
-   
+
    // Calculate PnL
    double diff = (g_positions[idx].direction > 0) ?
                  (exitPrice - g_positions[idx].entryPrice) :
                  (g_positions[idx].entryPrice - exitPrice);
-   
+
    double tickSize = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_SIZE);
    double tickValue = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_VALUE);
    if(tickSize <= 0) tickSize = SymbolInfoDouble(sym, SYMBOL_POINT);
    if(tickValue <= 0) tickValue = 1.0;
-   
-   double grossPnL = (diff / tickSize) * tickValue * g_positions[idx].lots;
+
+   double grossPnL = SafeDivide(diff, tickSize, 0.0) * tickValue * g_positions[idx].lots;
    double netPnL = grossPnL - g_positions[idx].frictionCost;
    
    // Update MAE/MFE excursion stats
@@ -2253,9 +2260,12 @@ void CloseShadowPosition(int idx, int reason)
 //+------------------------------------------------------------------+
 void TrailShadowPosition(int idx, double bid, double ask)
 {
+   // Validate index
+   if(!IsValidIndex(idx, MAX_POSITIONS)) return;
+
    double trailDist = g_positions[idx].entryATR * g_rlParams.GetTrailATR();
    double newSL = g_positions[idx].currentSL;
-   
+
    if(g_positions[idx].direction > 0)
    {
       double potentialSL = bid - trailDist;
@@ -2268,7 +2278,7 @@ void TrailShadowPosition(int idx, double bid, double ask)
       if(potentialSL < g_positions[idx].currentSL)
          newSL = potentialSL;
    }
-   
+
    g_positions[idx].currentSL = newSL;
 }
 
@@ -2277,6 +2287,9 @@ void TrailShadowPosition(int idx, double bid, double ask)
 //+------------------------------------------------------------------+
 void ManageRealPosition(int idx)
 {
+   // Validate index
+   if(!IsValidIndex(idx, MAX_POSITIONS)) return;
+
    // Check if position still exists
    if(!PositionSelectByTicket(g_positions[idx].ticket))
    {
@@ -2328,7 +2341,7 @@ void ManageRealPosition(int idx)
          
          // Symbol circuit breaker
          int symIdx = FindSymbolIndex(g_positions[idx].symbol);
-         if(symIdx >= 0)
+         if(IsValidIndex(symIdx, MAX_SYMBOLS))
          {
             g_symbols[symIdx].dailyPnL += pnl;
             if(pnl < 0) g_symbols[symIdx].consLosses++;
@@ -2475,7 +2488,8 @@ void UpdateEdgeStatus()
 //+------------------------------------------------------------------+
 int FindSymbolIndex(const string sym)
 {
-   for(int i = 0; i < g_symbolCount; i++)
+   int limit = MathMin(g_symbolCount, MAX_SYMBOLS);
+   for(int i = 0; i < limit; i++)
       if(g_symbols[i].name == sym) return i;
    return -1;
 }
@@ -2483,7 +2497,8 @@ int FindSymbolIndex(const string sym)
 int CountOpenPositions()
 {
    int count = 0;
-   for(int i = 0; i < g_posCount; i++)
+   int limit = MathMin(g_posCount, MAX_POSITIONS);
+   for(int i = 0; i < limit; i++)
       if(g_positions[i].active) count++;
    return count;
 }
@@ -2491,7 +2506,8 @@ int CountOpenPositions()
 int CountRealPositions()
 {
    int count = 0;
-   for(int i = 0; i < g_posCount; i++)
+   int limit = MathMin(g_posCount, MAX_POSITIONS);
+   for(int i = 0; i < limit; i++)
       if(g_positions[i].active && !g_positions[i].isShadow) count++;
    return count;
 }
@@ -2499,14 +2515,16 @@ int CountRealPositions()
 int CountShadowPositions()
 {
    int count = 0;
-   for(int i = 0; i < g_posCount; i++)
+   int limit = MathMin(g_posCount, MAX_POSITIONS);
+   for(int i = 0; i < limit; i++)
       if(g_positions[i].active && g_positions[i].isShadow) count++;
    return count;
 }
 
 bool HasPositionOnSymbol(const string sym)
 {
-   for(int i = 0; i < g_posCount; i++)
+   int limit = MathMin(g_posCount, MAX_POSITIONS);
+   for(int i = 0; i < limit; i++)
       if(g_positions[i].active && g_positions[i].symbol == sym) return true;
    return false;
 }
