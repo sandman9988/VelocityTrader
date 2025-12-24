@@ -757,8 +757,8 @@ class FinancialCodeAuditor:
                                 # Pattern 5b: ArrayResize immediately before access with count/size variable
                                 # e.g., ArrayResize(arr, count + 1); arr[count] = x;
                                 if not found_bounds_check:
-                                    # Check if previous few lines have ArrayResize with count+1 pattern
-                                    prev_lines = '\n'.join(lines[max(0, i-5):i])
+                                    # Check if previous 15 lines have ArrayResize with count+1 pattern
+                                    prev_lines = '\n'.join(lines[max(0, i-15):i])
                                     # ArrayResize(array, count + 1) followed by array[count]
                                     if re.search(rf'ArrayResize\s*\(\s*{array_name}\s*,\s*{index_var}\s*\+\s*1', prev_lines):
                                         found_bounds_check = True
@@ -816,6 +816,33 @@ class FinancialCodeAuditor:
                                         if re.search(rf'if\s*\(\s*{index_var}\s*<\s*{size_pattern}\s*\)', context_str):
                                             found_bounds_check = True
                                             break
+
+                                # Pattern 8: Counter guard - if(cnt < N) { arr[cnt] = x; cnt++; }
+                                # The guard cnt < N ensures arr[cnt] is valid for fixed-size array of N
+                                if not found_bounds_check:
+                                    # Check for if(index_var < constant) in recent context
+                                    if re.search(rf'if\s*\([^)]*{index_var}\s*<\s*\d+', context_str):
+                                        found_bounds_check = True
+                                    # Also check with && in the condition
+                                    elif re.search(rf'&&\s*{index_var}\s*<\s*\d+', context_str):
+                                        found_bounds_check = True
+
+                                # Pattern 9: Offset guard - if(base + max_offset < size) { arr[base + 0..max_offset] }
+                                # e.g., if(startIdx + 8 < size) { features[startIdx + 0] = ...; }
+                                if not found_bounds_check:
+                                    # Check if index_expr contains addition like "startIdx + N"
+                                    offset_match = re.match(r'(\w+)\s*\+\s*(\d+)', index_expr)
+                                    if offset_match:
+                                        base_var = offset_match.group(1)
+                                        offset_val = int(offset_match.group(2))
+                                        # Look for guard: if(base_var + max_offset < size)
+                                        # where max_offset >= offset_val
+                                        guard_pattern = rf'if\s*\(\s*{base_var}\s*\+\s*(\d+)\s*<\s*\w+'
+                                        guard_match = re.search(guard_pattern, context_str)
+                                        if guard_match:
+                                            max_offset = int(guard_match.group(1))
+                                            if offset_val <= max_offset:
+                                                found_bounds_check = True
                                 
                                 if found_bounds_check:
                                     continue
