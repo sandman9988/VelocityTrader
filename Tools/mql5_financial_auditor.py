@@ -388,6 +388,33 @@ class FinancialAuditRules:
             'description': 'Trading around session boundaries or rollover can cause issues',
             'recommendation': 'Check for session boundaries and handle daily rollovers properly'
         },
+        'DATA009': {
+            'category': AuditCategory.DATA_INTEGRITY,
+            'severity': Severity.HIGH,
+            'title': 'Missing Rate Limit / Throttling',
+            'pattern': r'for\s*\([^)]+\)\s*\{[^}]*(?:OrderSend|SymbolInfo|Copy(?:Rates|Buffer|Time))',
+            'exclude_pattern': r'Sleep|throttle|Throttle|THROTTLE|rate_limit|RateLimit|batch|Batch|BATCH|delay|Delay|cooldown|Cooldown',
+            'description': 'Bulk operations in loops can hit broker rate limits or cause performance issues',
+            'recommendation': 'Add Sleep() or batch operations with throttling between broker API calls'
+        },
+        'DATA010': {
+            'category': AuditCategory.DATA_INTEGRITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Unbounded Loop Over Symbols',
+            'pattern': r'for\s*\([^;]+;\s*\w+\s*<\s*(?:g_symbolCount|SymbolsTotal)',
+            'exclude_pattern': r'batch|Batch|BATCH|chunk|Chunk|MAX_BATCH|MAX_SYMBOLS_PER_TICK|limit|Limit',
+            'description': 'Processing all symbols each tick can cause performance issues with large watchlists',
+            'recommendation': 'Process symbols in batches or limit per-tick processing'
+        },
+        'DATA011': {
+            'category': AuditCategory.DATA_INTEGRITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Missing Cooldown Between Orders',
+            'pattern': r'OrderSend\s*\([^)]+\)[^}]*OrderSend\s*\(',
+            'exclude_pattern': r'Sleep|cooldown|Cooldown|COOLDOWN|delay|Delay|wait|Wait|timer|Timer',
+            'description': 'Multiple orders without cooldown can trigger broker anti-spam measures',
+            'recommendation': 'Add minimum delay between consecutive order submissions'
+        },
 
         # ================================================================
         # DEFENSIVE PROGRAMMING
@@ -525,11 +552,14 @@ class FinancialCodeAuditor:
     Main auditor implementing financial-grade checks
     """
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, use_impact_scoring: bool = True):
         self.project_root = project_root
         self.findings: List[AuditFinding] = []
         self.file_hashes: Dict[str, str] = {}
         self._display_limit = None  # Optional limit for detailed findings display
+        self._impact_analyzer = None
+        self._use_impact_scoring = use_impact_scoring
+        self._impact_scores: Dict[str, float] = {}  # file -> impact multiplier
 
     def audit_file(self, file_path: Path) -> List[AuditFinding]:
         """Audit a single file against all rules"""
@@ -812,9 +842,41 @@ class FinancialCodeAuditor:
 
         return findings
 
+    def _init_impact_analyzer(self):
+        """Initialize impact analyzer for severity weighting"""
+        if not self._use_impact_scoring:
+            return
+
+        try:
+            # Import the impact analyzer
+            import sys
+            sys.path.insert(0, str(self.project_root / "Tools"))
+            from mql5_impact_analyzer import MQL5ImpactAnalyzer
+
+            self._impact_analyzer = MQL5ImpactAnalyzer(self.project_root)
+            report = self._impact_analyzer.analyze()
+
+            # Build impact scores from file metrics
+            for file_data in report.get('top_impact_files', []):
+                path = file_data['path']
+                # Normalize impact to 1.0 - 3.0 range
+                impact = file_data['impact_score']
+                # Use log scale to prevent extreme values
+                import math
+                normalized = 1.0 + min(2.0, math.log10(max(1, impact)) / 3)
+                self._impact_scores[path] = normalized
+
+            logger.info(f"Impact analysis: {len(self._impact_scores)} files scored")
+        except Exception as e:
+            logger.warning(f"Impact analysis unavailable: {e}")
+            self._use_impact_scoring = False
+
     def audit_project(self) -> Dict:
         """Audit entire project"""
         logger.info(f"Starting financial audit of {self.project_root}")
+
+        # Initialize impact analyzer for severity weighting
+        self._init_impact_analyzer()
 
         # Find all MQL5 files
         mql5_dir = self.project_root / "MQL5"
@@ -848,6 +910,16 @@ class FinancialCodeAuditor:
             by_severity[finding.severity.name].append(finding)
             by_file[finding.file].append(finding)
 
+        # Calculate weighted severity scores per file
+        file_weighted_scores = {}
+        for file_path, findings in by_file.items():
+            impact_multiplier = self._impact_scores.get(file_path, 1.0)
+            weighted_score = sum(
+                (6 - f.severity.value) * impact_multiplier  # Higher for CRITICAL
+                for f in findings
+            )
+            file_weighted_scores[file_path] = round(weighted_score, 1)
+
         return {
             'timestamp': datetime.now().isoformat(),
             'project': str(self.project_root),
@@ -857,6 +929,10 @@ class FinancialCodeAuditor:
             'by_file': {k: len(v) for k, v in sorted(by_file.items(),
                                                      key=lambda x: len(x[1]),
                                                      reverse=True)[:20]},
+            'weighted_by_file': dict(sorted(file_weighted_scores.items(),
+                                           key=lambda x: x[1],
+                                           reverse=True)[:20]),
+            'impact_scores': self._impact_scores,
             'critical_count': len(by_severity.get('CRITICAL', [])),
             'high_count': len(by_severity.get('HIGH', [])),
             'file_hashes': self.file_hashes
@@ -888,6 +964,15 @@ class FinancialCodeAuditor:
         print("\nTop Files by Finding Count:")
         for file, count in list(summary['by_file'].items())[:10]:
             print(f"  {count:3} : {file}")
+
+        if summary.get('weighted_by_file'):
+            print("\nTop Files by Weighted Impact Score:")
+            print("  (Score = Findings * Severity * Impact Multiplier)")
+            for file, score in list(summary['weighted_by_file'].items())[:10]:
+                impact = summary.get('impact_scores', {}).get(file, 1.0)
+                from pathlib import Path
+                fname = Path(file).name
+                print(f"  {score:6.1f} : {fname} (impact: {impact:.2f}x)")
 
         # Print critical findings
         critical = [f for f in self.findings if f.severity == Severity.CRITICAL]
