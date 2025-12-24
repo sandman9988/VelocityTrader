@@ -22,17 +22,67 @@ extern double    InpLearningRateInit;
 #define PERSISTENCE_VERSION  720   // Updated for learning rate storage
 
 //+------------------------------------------------------------------+
-//| Calculate simple checksum for data validation                     |
+//| Calculate CRC32-based checksum for data validation                |
+//| Uses polynomial 0xEDB88320 for robust error detection             |
 //+------------------------------------------------------------------+
 uint CalculateChecksum(const uchar &data[], int size)
 {
-   uint checksum = 0x12345678;
+   // CRC32 lookup table
+   static uint crcTable[256];
+   static bool tableInit = false;
+
+   if(!tableInit)
+   {
+      for(uint i = 0; i < 256; i++)
+      {
+         uint crc = i;
+         for(int j = 0; j < 8; j++)
+         {
+            if(crc & 1)
+               crc = (crc >> 1) ^ 0xEDB88320;
+            else
+               crc >>= 1;
+         }
+         crcTable[i] = crc;
+      }
+      tableInit = true;
+   }
+
+   // Calculate CRC32
+   uint crc = 0xFFFFFFFF;
    for(int i = 0; i < size; i++)
    {
-      checksum ^= ((uint)data[i] << ((i % 4) * 8));
-      checksum = (checksum << 1) | (checksum >> 31);  // Rotate left
+      crc = crcTable[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
    }
-   return checksum;
+   return crc ^ 0xFFFFFFFF;
+}
+
+//+------------------------------------------------------------------+
+//| Calculate file checksum by reading entire file                    |
+//+------------------------------------------------------------------+
+uint CalculateFileChecksum(string filename, int excludeLastBytes = 4)
+{
+   int handle = FileOpen(filename, FILE_READ | FILE_BIN);
+   if(handle == INVALID_HANDLE) return 0;
+
+   long fileSize = FileSize(handle);
+   int dataSize = (int)(fileSize - excludeLastBytes);  // Exclude checksum bytes
+
+   if(dataSize <= 0)
+   {
+      FileClose(handle);
+      return 0;
+   }
+
+   uchar data[];
+   ArrayResize(data, dataSize);
+
+   uint bytesRead = FileReadArray(handle, data, 0, dataSize);
+   FileClose(handle);
+
+   if(bytesRead != (uint)dataSize) return 0;
+
+   return CalculateChecksum(data, dataSize);
 }
 
 //+------------------------------------------------------------------+
@@ -88,14 +138,31 @@ void SaveState()
    FileWriteInteger(handle, (int)g_breaker.state);
    FileWriteDouble(handle, g_breaker.peakEquity);
 
-   // Calculate and write checksum placeholder position
-   ulong checksumPos = FileTell(handle);
-   FileWriteInteger(handle, 0);  // Placeholder
+   // Write checksum placeholder (will be updated after calculation)
+   FileWriteInteger(handle, 0);  // Placeholder for checksum
 
    FileFlush(handle);
    FileClose(handle);
 
-   // Step 2: Validate temp file is readable
+   // Step 2: Calculate checksum of file content (excluding checksum bytes)
+   uint checksum = CalculateFileChecksum(tempFilename, 4);
+
+   // Write the actual checksum at the end
+   handle = FileOpen(tempFilename, FILE_READ | FILE_WRITE | FILE_BIN);
+   if(handle == INVALID_HANDLE)
+   {
+      Print("ERROR: Cannot update checksum in temp file");
+      FileDelete(tempFilename);
+      return;
+   }
+
+   // Seek to checksum position (end - 4 bytes)
+   FileSeek(handle, -4, SEEK_END);
+   FileWriteInteger(handle, (int)checksum);
+   FileFlush(handle);
+   FileClose(handle);
+
+   // Step 3: Validate temp file with checksum verification
    handle = FileOpen(tempFilename, FILE_READ | FILE_BIN);
    if(handle == INVALID_HANDLE)
    {
@@ -107,11 +174,20 @@ void SaveState()
    // Quick validation - check magic and version
    int magic = FileReadInteger(handle);
    int version = FileReadInteger(handle);
+
+   // Seek to end and read stored checksum
+   FileSeek(handle, -4, SEEK_END);
+   uint storedChecksum = (uint)FileReadInteger(handle);
    FileClose(handle);
 
-   if(magic != PERSISTENCE_MAGIC || version != PERSISTENCE_VERSION)
+   // Recalculate and verify checksum
+   uint verifyChecksum = CalculateFileChecksum(tempFilename, 4);
+
+   if(magic != PERSISTENCE_MAGIC || version != PERSISTENCE_VERSION || storedChecksum != verifyChecksum)
    {
-      Print("ERROR: Temp file validation failed");
+      Print("ERROR: Temp file validation failed - magic:", magic,
+            " version:", version,
+            " checksum match:", (storedChecksum == verifyChecksum));
       FileDelete(tempFilename);
       return;
    }
@@ -238,6 +314,27 @@ bool TryLoadFile(string filename)
       Print("Unknown version ", version, " in ", filename);
       return false;
    }
+
+   // Verify CRC32 checksum before loading
+   FileSeek(handle, -4, SEEK_END);
+   uint storedChecksum = (uint)FileReadInteger(handle);
+   FileClose(handle);
+
+   uint calculatedChecksum = CalculateFileChecksum(filename, 4);
+   if(storedChecksum != calculatedChecksum)
+   {
+      Print("CHECKSUM MISMATCH in ", filename,
+            " - stored:", storedChecksum, " calculated:", calculatedChecksum);
+      return false;
+   }
+
+   // Reopen and continue loading after checksum verified
+   handle = FileOpen(filename, FILE_READ | FILE_BIN);
+   if(handle == INVALID_HANDLE) return false;
+
+   // Skip header (already validated)
+   FileReadInteger(handle);  // magic
+   FileReadInteger(handle);  // version
 
    datetime saveTime = (datetime)FileReadLong(handle);
    Print("Loading state from ", TimeToString(saveTime));

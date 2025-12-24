@@ -1218,10 +1218,13 @@ void OnTimer()
 {
    // Update circuit breaker state
    g_breaker.Update();
-   
+
+   // Check for period resets (day/week/month)
+   CheckPeriodResets();
+
    // Check for agent swaps
    CheckAgentSwaps();
-   
+
    // Update capital allocation periodically
    static int lastAllocUpdate = 0;
    int totalTrades = g_sniper.real.totalTrades + g_berserker.real.totalTrades;
@@ -1230,16 +1233,86 @@ void OnTimer()
       UpdateCapitalAllocation();
       lastAllocUpdate = totalTrades;
    }
-   
+
    // Update edge status
    UpdateEdgeStatus();
-   
+
    // Save state periodically
    static datetime lastSave = 0;
    if(TimeCurrent() - lastSave > 300)  // Every 5 minutes
    {
       SaveState();
       lastSave = TimeCurrent();
+   }
+}
+
+//+------------------------------------------------------------------+
+//| CHECK PERIOD RESETS - Reset daily/weekly/monthly stats            |
+//+------------------------------------------------------------------+
+void CheckPeriodResets()
+{
+   static datetime lastDayCheck = 0;
+   datetime now = TimeCurrent();
+
+   // Only check once per minute to avoid overhead
+   if(now - lastDayCheck < 60) return;
+   lastDayCheck = now;
+
+   MqlDateTime dt;
+   TimeToStruct(now, dt);
+
+   MqlDateTime dtStart;
+   TimeToStruct(g_dayStats.startTime, dtStart);
+
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+
+   // Daily reset - new day started
+   if(dt.day != dtStart.day || dt.mon != dtStart.mon || dt.year != dtStart.year)
+   {
+      // Log yesterday's stats before reset
+      if(g_dayStats.trades > 0)
+      {
+         Print("DAY END: PnL=", DoubleToString(g_dayStats.pnl, 2),
+               " Trades=", g_dayStats.trades,
+               " WR=", DoubleToString(g_dayStats.GetWR(), 1), "%");
+      }
+
+      g_dayStats.Reset(equity);
+      g_sessionEquity = equity;  // Reset session equity too
+
+      // Also reset agent session stats for fresh daily comparison
+      g_sniper.ResetSession();
+      g_berserker.ResetSession();
+
+      Print("New trading day started - stats reset");
+   }
+
+   // Weekly reset - Monday (day_of_week == 1)
+   TimeToStruct(g_weekStats.startTime, dtStart);
+   if(dt.day_of_week == 1 && (dt.day != dtStart.day || dt.mon != dtStart.mon))
+   {
+      if(g_weekStats.trades > 0)
+      {
+         Print("WEEK END: PnL=", DoubleToString(g_weekStats.pnl, 2),
+               " Trades=", g_weekStats.trades,
+               " WR=", DoubleToString(g_weekStats.GetWR(), 1), "%");
+      }
+      g_weekStats.Reset(equity);
+      Print("New trading week started - weekly stats reset");
+   }
+
+   // Monthly reset - 1st of month
+   TimeToStruct(g_monthStats.startTime, dtStart);
+   if(dt.day == 1 && (dt.mon != dtStart.mon || dt.year != dtStart.year))
+   {
+      if(g_monthStats.trades > 0)
+      {
+         Print("MONTH END: PnL=", DoubleToString(g_monthStats.pnl, 2),
+               " Trades=", g_monthStats.trades,
+               " WR=", DoubleToString(g_monthStats.GetWR(), 1), "%");
+      }
+      g_monthStats.Reset(equity);
+      Print("New trading month started - monthly stats reset");
    }
 }
 
