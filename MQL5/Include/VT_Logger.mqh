@@ -1162,6 +1162,13 @@ public:
       mc.relatedTicket = ticket;
       mc.score = score;
 
+      // Final bounds check before array access
+      if(m_markedCount >= ArraySize(m_markedCandles))
+      {
+         Print("ERROR: CVTLogger::MarkCandle - array bounds check failed");
+         return false;
+      }
+
       m_markedCandles[m_markedCount] = mc;
       m_markedCount++;
 
@@ -1246,7 +1253,21 @@ public:
       }
 
       if(m_markedCount >= ArraySize(m_markedCandles))
-         ArrayResize(m_markedCandles, m_markedCount + 100);
+      {
+         int newSize = m_markedCount + 100;
+         if(ArrayResize(m_markedCandles, newSize) != newSize)
+         {
+            Print("ERROR: CVTLogger::MarkTradeOnChart - cannot allocate memory for marked candles");
+            return;
+         }
+      }
+
+      // Final bounds check before array access
+      if(m_markedCount >= ArraySize(m_markedCandles))
+      {
+         Print("ERROR: CVTLogger::MarkTradeOnChart - array bounds check failed");
+         return;
+      }
 
       m_markedCandles[m_markedCount] = mc;
       m_markedCount++;
