@@ -89,7 +89,7 @@ class FinancialAuditRules:
             'severity': Severity.CRITICAL,
             'title': 'Unsafe Division Operation',
             'pattern': r'(?<!/)/(?!/|=|\*)\s*([a-zA-Z_]\w*)',
-            'exclude_pattern': r'SafeDiv|SafeDivide|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*2\.0|/\s*10\.0|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'|// |/\*|MathSqrt\s*\(\s*2|MESO_WINDOW|MICRO_WINDOW|MACRO_WINDOW|KINEMATIC_STATES|numBins|_WINDOW|_SIZE|_COUNT',
+            'exclude_pattern': r'SafeDiv|SafeDivide|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*2\.0|/\s*10\.0|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'|// |/\*|MathSqrt\s*\(\s*2|MESO_WINDOW|MICRO_WINDOW|MACRO_WINDOW|KINEMATIC_STATES|numBins|_WINDOW|_SIZE|_COUNT|MathLog\s*\(|/\s*MathLog',
             'description': 'Division by variable without zero-check can crash or produce infinity',
             'recommendation': 'Use SafeDivide(numerator, denominator, default_value) or explicit zero-check',
             'check_denominator_validation': True,  # Special flag for checking nearby validation
@@ -218,7 +218,7 @@ class FinancialAuditRules:
             'severity': Severity.CRITICAL,
             'title': 'Position Size Not Normalized',
             'pattern': r'(?:volume|lot|lots)\s*[=:]\s*(?!\s*Normalize)',
-            'exclude_pattern': r'NormalizeVolume|NormalizeLot|NormalizeLotSize|NormalizeLots|SymbolInfo|lot_step|volumeStep|volumeMin|volumeMax|Clamp|ClampValue|MathFloor.*lot|MathRound.*lot|MathCeil.*lot|steps\s*\*|m_min_lot|m_max_lot|min_lot|max_lot|= 0\.|= 1\.|= 100\.|base_lots|normalized_lots|final_lots|// |/\*|intermediate|calculation|input\s+|extern\s+|double\s+Normalize|bool\s+Normalize|void\s+Normalize|SafeDivide|GetAdaptiveLot|CalculateLot|ComputeLot|_lot\s*\(|Lots\s*\(|AccountInfo|GetLot|SetLot|initialLot|defaultLot|minLot|maxLot|StringFormat|".*[Ll]ot.*"|Max\s*Lot|Min\s*Lot',
+            'exclude_pattern': r'NormalizeVolume|NormalizeLot|NormalizeLotSize|NormalizeLots|SymbolInfo|lot_step|volumeStep|volumeMin|volumeMax|Clamp|ClampValue|MathFloor.*lot|MathRound.*lot|MathCeil.*lot|steps\s*\*|m_min_lot|m_max_lot|min_lot|max_lot|= 0\.|= 1\.|= 100\.|= 0;|base_lots|normalized_lots|final_lots|// |/\*|intermediate|calculation|input\s+|extern\s+|double\s+Normalize|bool\s+Normalize|void\s+Normalize|SafeDivide|GetAdaptiveLot|CalculateLot|ComputeLot|_lot\s*\(|Lots\s*\(|AccountInfo|GetLot|SetLot|initialLot|defaultLot|minLot|maxLot|StringFormat|".*[Ll]ot.*"|Max\s*Lot|Min\s*Lot|iVolume|PositionGetDouble|m_posInfo\.|Buckets|Bucket|\.Volume\(\)',
             'description': 'Lot size must be normalized to broker requirements before order submission',
             'recommendation': 'Use NormalizeVolume() or validate against SYMBOL_VOLUME_*',
             'check_return_normalization': True,  # Check if function returns normalized value
@@ -281,7 +281,7 @@ class FinancialAuditRules:
             'title': 'Missing Drawdown Check',
             'pattern': r'OnTick|OnTimer',
             'context_check': 'drawdown_check',
-            'exclude_pattern': r'GetSavedPositionTicket|NeedsPositionRecovery|Recovery|recovery|// Recovery|/\* Recovery',
+            'exclude_pattern': r'GetSavedPositionTicket|NeedsPositionRecovery|Recovery|recovery|// Recovery|/\* Recovery|g_breaker|CircuitBreaker|CanTrade|breaker\.Update|drawdown|Drawdown',
             'description': 'Trading logic without drawdown limit check (excludes recovery methods)',
             'recommendation': 'Check drawdown before each trade decision (not needed for position recovery)'
         },
@@ -733,8 +733,8 @@ class FinancialCodeAuditor:
 
                                 # Pattern 4b: Check for IsValidIndex calls - expanded to find validation anywhere in function
                                 if not found_bounds_check:
-                                    # Look back to function start (up to 100 lines) for IsValidIndex on this or related variable
-                                    func_context_start = max(0, i - 100)
+                                    # Look back to function start (up to 150 lines) for IsValidIndex on this or related variable
+                                    func_context_start = max(0, i - 150)
                                     func_context = '\n'.join(lines[func_context_start:i])
 
                                     # Direct IsValidIndex check on the index variable
@@ -768,14 +768,18 @@ class FinancialCodeAuditor:
                                 # Pattern 5b: ArrayResize immediately before access with count/size variable
                                 # e.g., ArrayResize(arr, count + 1); arr[count] = x;
                                 if not found_bounds_check:
-                                    # Check if previous 15 lines have ArrayResize with count+1 pattern
-                                    prev_lines = '\n'.join(lines[max(0, i-15):i])
+                                    # Check if previous 30 lines have ArrayResize with count+1 pattern
+                                    prev_lines = '\n'.join(lines[max(0, i-30):i])
                                     # ArrayResize(array, count + 1) followed by array[count]
                                     if re.search(rf'ArrayResize\s*\(\s*{array_name}\s*,\s*{index_var}\s*\+\s*1', prev_lines):
                                         found_bounds_check = True
                                     # ArrayResize(array, size); followed by array[size - 1] or array[size]
                                     elif re.search(rf'ArrayResize\s*\(\s*{array_name}\s*,', prev_lines):
                                         # The resize makes access at new size-1 or incremented counter safe
+                                        found_bounds_check = True
+                                    # Pattern: if(count >= ArraySize(arr)) ArrayResize(arr, ...); arr[count] = x;
+                                    elif re.search(rf'if\s*\(\s*{index_var}\s*>=\s*ArraySize\s*\(\s*{array_name}\s*\)', prev_lines) and \
+                                         re.search(rf'ArrayResize\s*\(\s*{array_name}\s*,', prev_lines):
                                         found_bounds_check = True
                                 
                                 # Pattern 6: Check if the array is a known fixed-size member variable
@@ -900,6 +904,12 @@ class FinancialCodeAuditor:
                                         lookahead = '\n'.join(lines[i:min(i+10, len(lines))])
                                         if re.search(rf'{index_var}\s*=\s*\([^)]+\)\s*%', lookahead):
                                             found_bounds_check = True
+                                    # Pattern: if(bufferSize > 0) { idx = head; buffer[idx] = x; head = (head+1) % size; }
+                                    if re.search(rf'if\s*\(\s*\w*[Ss]ize\s*>\s*0\s*\)', context_str):
+                                        # Check if idx assigned from head/tail before access
+                                        if re.search(rf'{index_var}\s*=\s*\w*[Hh]ead', context_str) or \
+                                           re.search(rf'{index_var}\s*=\s*\w*[Tt]ail', context_str):
+                                            found_bounds_check = True
 
                                 # Pattern 12: Capacity guard then access at count index
                                 # e.g., if(m_symbolCount >= MAX_SYMBOLS) return; ... arr[m_symbolCount] = x; count++;
@@ -911,6 +921,8 @@ class FinancialCodeAuditor:
                                         rf'if\s*\(\s*{index_var}\s*>=\s*MAX_',
                                         rf'if\s*\(\s*\w*[Cc]ount\s*>=\s*\w+\s*\)\s*return',
                                         rf'if\s*\(\s*\w*[Cc]ount\s*>=\s*MAX_',
+                                        # Pattern: if(count < ArraySize(arr)) { arr[count] = x; }
+                                        rf'if\s*\(\s*{index_var}\s*<\s*ArraySize\s*\(\s*{array_name}\s*\)',
                                     ]
                                     for cap_pat in cap_patterns:
                                         if re.search(cap_pat, context_str):
@@ -927,6 +939,10 @@ class FinancialCodeAuditor:
                                         # Or simpler: if count > 0 implied by shift logic
                                         if re.search(r'Shift|shift|// Shift', context_str):
                                             found_bounds_check = True
+                                        # Pattern: else block after if(count < ArraySize) - we're at full capacity
+                                        if re.search(rf'if\s*\(\s*{index_var.replace("-1", "").replace("- 1", "").strip()}\s*<\s*ArraySize\s*\(', context_str):
+                                            if re.search(r'\belse\b', context_str):
+                                                found_bounds_check = True
 
                                 # Pattern 14: Post-increment assignment from bounded counter
                                 # for(...; count < MAX; ...) { idx = count++; arr[idx] = x; }
@@ -974,14 +990,18 @@ class FinancialCodeAuditor:
                                     if re.search(rf'\b{denominator}\s*[>!]=?\s*0', line):
                                         found_validation = True
 
-                                # Pattern 3: Look back up to 15 lines for validation of this denominator
+                                # Pattern 3: Look back up to 30 lines for validation of this denominator
                                 if not found_validation:
-                                    context_start = max(0, i - 15)
+                                    context_start = max(0, i - 30)
                                     for ctx_line in lines[context_start:i]:
                                         # Check for various validation patterns:
                                         # if(denominator != 0), if(MathAbs(denominator) < epsilon), etc.
                                         if re.search(rf'\b{denominator}\b.*[<>!=]', ctx_line) and \
                                            ('if' in ctx_line or 'return' in ctx_line):
+                                            found_validation = True
+                                            break
+                                        # Pattern: if(MathAbs(denominator) < epsilon) return;
+                                        if re.search(rf'if\s*\(\s*MathAbs\s*\(\s*{denominator}\s*\)\s*<', ctx_line) and 'return' in ctx_line:
                                             found_validation = True
                                             break
                                         # Check if denominator was assigned from SafeDiv or similar

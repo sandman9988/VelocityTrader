@@ -1280,8 +1280,9 @@ void CloseShadowPosition(int idx, int reason)
    
    // Debug output
    string reasonStr = (reason == 0) ? "SL" : (reason == 1) ? "TP" : "TIME";
-   // Show Q-values after update
+   // Show Q-values after update (with bounds check on regime index)
    int regIdx = g_positions[idx].regimeAtEntry;
+   if(regIdx < 0 || regIdx >= 3) regIdx = 0;  // Clamp to valid regime range
    double qB, qS;
    if(g_positions[idx].agentId == AGENT_SNIPER)
    {
