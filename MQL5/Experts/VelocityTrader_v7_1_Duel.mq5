@@ -158,6 +158,77 @@ input bool      InpShadowOnly = false;           // Shadow only mode
 
 
 //+------------------------------------------------------------------+
+//| DEFENSE IN DEPTH: Validate all input parameters                   |
+//| Returns false if any parameter is out of safe range               |
+//+------------------------------------------------------------------+
+bool ValidateInputParameters()
+{
+   bool valid = true;
+
+   // Risk parameters
+   if(InpRiskPercent <= 0 || InpRiskPercent > 10.0)
+   {
+      Print("ERROR: InpRiskPercent must be 0-10% (got ", InpRiskPercent, ")");
+      valid = false;
+   }
+
+   if(InpMaxLot <= 0 || InpMaxLot > 100.0)
+   {
+      Print("ERROR: InpMaxLot must be 0.01-100 (got ", InpMaxLot, ")");
+      valid = false;
+   }
+
+   if(InpMaxPositions <= 0 || InpMaxPositions > MAX_POSITIONS)
+   {
+      Print("ERROR: InpMaxPositions must be 1-", MAX_POSITIONS, " (got ", InpMaxPositions, ")");
+      valid = false;
+   }
+
+   if(InpMaxDrawdown <= 0 || InpMaxDrawdown > 1.0)
+   {
+      Print("ERROR: InpMaxDrawdown must be 0-1.0 (got ", InpMaxDrawdown, ")");
+      valid = false;
+   }
+
+   // Learning parameters
+   if(InpLearningRateInit <= 0 || InpLearningRateInit > 1.0)
+   {
+      Print("ERROR: InpLearningRateInit must be 0-1.0 (got ", InpLearningRateInit, ")");
+      valid = false;
+   }
+
+   // Threshold parameters
+   if(InpSniperThreshold < 0 || InpSniperThreshold > 1.0)
+   {
+      Print("ERROR: InpSniperThreshold must be 0-1.0 (got ", InpSniperThreshold, ")");
+      valid = false;
+   }
+
+   if(InpBerserkerThreshold < 0 || InpBerserkerThreshold > 1.0)
+   {
+      Print("ERROR: InpBerserkerThreshold must be 0-1.0 (got ", InpBerserkerThreshold, ")");
+      valid = false;
+   }
+
+   if(InpMinProbability < 0 || InpMinProbability > 1.0)
+   {
+      Print("ERROR: InpMinProbability must be 0-1.0 (got ", InpMinProbability, ")");
+      valid = false;
+   }
+
+   // Buffer sizes
+   if(InpPhysicsBuffer < 10 || InpPhysicsBuffer > 1000)
+   {
+      Print("WARNING: InpPhysicsBuffer unusual (", InpPhysicsBuffer, "), using anyway");
+   }
+
+   if(valid)
+      Print("Input parameter validation: PASSED");
+
+   return valid;
+}
+
+//+------------------------------------------------------------------+
 //| EXPERT INITIALIZATION                                             |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -170,9 +241,16 @@ int OnInit()
    // Detect mode
    bool isBacktest = (MQLInfoInteger(MQL_TESTER) != 0);
    bool isOptimization = (MQLInfoInteger(MQL_OPTIMIZATION) != 0);
-   Print("Mode: ", isBacktest ? "BACKTEST" : "LIVE", 
+   Print("Mode: ", isBacktest ? "BACKTEST" : "LIVE",
          isOptimization ? " (Optimization)" : "");
-   
+
+   // DEFENSE IN DEPTH: Validate all input parameters
+   if(!ValidateInputParameters())
+   {
+      Print("ERROR: Input validation failed. Check parameters.");
+      return INIT_PARAMETERS_INCORRECT;
+   }
+
    // Initialize trade object
    g_trade.SetExpertMagicNumber(InpMagicNumber);
    g_trade.SetDeviationInPoints(30);

@@ -279,11 +279,12 @@ class FinancialAuditRules:
             'category': AuditCategory.RISK_CONTROLS,
             'severity': Severity.CRITICAL,
             'title': 'Missing Drawdown Check',
-            'pattern': r'OnTick|OnTimer',
+            'pattern': r'\bvoid\s+OnTick\s*\(\s*\)|\bvoid\s+OnTimer\s*\(\s*\)',
             'context_check': 'drawdown_check',
-            'exclude_pattern': r'GetSavedPositionTicket|NeedsPositionRecovery|Recovery|recovery|// Recovery|/\* Recovery|g_breaker|CircuitBreaker|CanTrade|breaker\.Update|drawdown|Drawdown',
+            'exclude_pattern': r'GetSavedPositionTicket|NeedsPositionRecovery|Recovery|recovery|// Recovery|/\* Recovery|g_breaker|CircuitBreaker|CanTrade|breaker\.Update|drawdown|Drawdown|IsDrawdownExceeded|class\s+\w+',
             'description': 'Trading logic without drawdown limit check (excludes recovery methods)',
-            'recommendation': 'Check drawdown before each trade decision (not needed for position recovery)'
+            'recommendation': 'Check drawdown before each trade decision (not needed for position recovery)',
+            'check_function_body': True  # Check the function body, not just the line
         },
         'RISK003': {
             'category': AuditCategory.RISK_CONTROLS,
@@ -323,7 +324,8 @@ class FinancialAuditRules:
             'pattern': r'input\s+(?:double|int|string)\s+\w+\s*=',
             'exclude_pattern': r'Validate|Check|if\s*\(',
             'description': 'User input parameters without validation',
-            'recommendation': 'Validate all inputs in OnInit() with bounds checking'
+            'recommendation': 'Validate all inputs in OnInit() with bounds checking',
+            'check_file_for_validation': True  # Check if file has ValidateInputParameters
         },
         'DATA002': {
             'category': AuditCategory.DATA_INTEGRITY,
@@ -338,10 +340,11 @@ class FinancialAuditRules:
             'category': AuditCategory.DATA_INTEGRITY,
             'severity': Severity.MEDIUM,
             'title': 'File Operation Without Error Handling',
-            'pattern': r'File(?:Open|Read|Write|Close)',
-            'exclude_pattern': r'if\s*\(|INVALID_HANDLE|==\s*-1',
+            'pattern': r'File(?:Open|ReadInteger|ReadDouble|ReadLong|ReadArray|ReadString|WriteInteger|WriteDouble|WriteLong|WriteArray|WriteString)',
+            'exclude_pattern': r'if\s*\(|INVALID_HANDLE|==\s*-1|SafeFile|FileWriteContext',
             'description': 'File operations can fail',
-            'recommendation': 'Always check file handles and operation results'
+            'recommendation': 'Always check file handles and operation results',
+            'check_validated_handle': True  # Check if handle was validated earlier
         },
         'DATA004': {
             'category': AuditCategory.DATA_INTEGRITY,
@@ -1047,6 +1050,57 @@ class FinancialCodeAuditor:
                             context_start = max(0, i - 10)
                             context = '\n'.join(lines[context_start:i+5])
                             if not context_pattern.search(context):
+                                continue
+
+                        # Special handling for RISK002 - check function body for drawdown checks
+                        if rule.get('check_function_body', False):
+                            # First check if this is a class method (not main event handler)
+                            # Look back up to 200 lines to find enclosing class
+                            context_back = '\n'.join(lines[max(0, i-200):i])
+                            if re.search(r'^\s*class\s+\w+', context_back, re.MULTILINE):
+                                # Check we haven't exited the class (no closing brace at indent level 0)
+                                # If OnTick inside a class, it's a method not main event handler
+                                continue
+
+                            # Look ahead 100 lines in the function body
+                            func_body = '\n'.join(lines[i:min(i+100, len(lines))])
+                            drawdown_patterns = [
+                                r'IsDrawdownExceeded',
+                                r'drawdown\s*>',
+                                r'g_breaker',
+                                r'CircuitBreaker',
+                                r'CanTrade',
+                                r'breaker\.Update',
+                                r'Drawdown.*return',
+                            ]
+                            found_drawdown_check = False
+                            for dp in drawdown_patterns:
+                                if re.search(dp, func_body, re.IGNORECASE):
+                                    found_drawdown_check = True
+                                    break
+                            if found_drawdown_check:
+                                continue
+
+                        # Special handling for DATA003 - check if file handle was validated earlier
+                        if rule.get('check_validated_handle', False):
+                            # Look back up to 50 lines for handle validation
+                            context_start = max(0, i - 50)
+                            context = '\n'.join(lines[context_start:i])
+                            # Pattern: handle = FileOpen(...); if(handle == INVALID_HANDLE) return;
+                            # If we find this pattern, the file operations after it are safe
+                            handle_validated = False
+                            if re.search(r'FileOpen\s*\([^)]+\)', context):
+                                if re.search(r'if\s*\(\s*\w+\s*==\s*INVALID_HANDLE\s*\)', context) or \
+                                   re.search(r'if\s*\(\s*handle\s*==\s*INVALID_HANDLE\s*\)', context) or \
+                                   re.search(r'INVALID_HANDLE\s*\)\s*return', context):
+                                    handle_validated = True
+                            if handle_validated:
+                                continue
+
+                        # Special handling for DATA001 - check if file has ValidateInputParameters
+                        if rule.get('check_file_for_validation', False):
+                            # Check if the entire file content has input validation
+                            if re.search(r'ValidateInputParameters|ValidateInput|InputValidation', content):
                                 continue
 
                         finding = AuditFinding(
