@@ -693,10 +693,20 @@ bool InitializeSymbols()
       g_symbols[idx].assetType = ClassifyAsset(sym);
       g_symbols[idx].typeAllowed = IsTypeAllowed(g_symbols[idx].assetType);
       
-      g_symbols[idx].atrHandle = iATR(sym, InpTimeframe, 14);  // SAFE: 100-tick warmup in OnTick before trading
+      // Create ATR indicator with error handling and retry
+      g_symbols[idx].atrHandle = iATR(sym, InpTimeframe, 14);
       if(g_symbols[idx].atrHandle == INVALID_HANDLE)
       {
-         Print("Warning: No ATR for ", sym);
+         // Retry once with a short delay
+         Sleep(50);
+         g_symbols[idx].atrHandle = iATR(sym, InpTimeframe, 14);
+         if(g_symbols[idx].atrHandle == INVALID_HANDLE)
+         {
+            int err = GetLastError();
+            Print("WARNING: InitializeSymbols - ATR indicator failed for ", sym,
+                  " (error: ", err, "). Will use price-based fallback ATR.");
+            // Symbol can still be used - UpdateSymbol will use fallback ATR calculation
+         }
       }
       
       g_symbols[idx].physics.Init(sym);
@@ -709,25 +719,115 @@ bool InitializeSymbols()
 
 //+------------------------------------------------------------------+
 //| GET BROKER SPECIFICATION                                          |
+//| Returns false if any critical symbol property cannot be retrieved |
 //+------------------------------------------------------------------+
 bool GetBrokerSpec(string sym, BrokerSpec &spec)
 {
+   // Query all symbol properties with individual error checking
+   bool success = true;
+   int errorCount = 0;
+   string errorFields = "";
+
+   // Critical fields - must be valid for trading
    spec.point = SymbolInfoDouble(sym, SYMBOL_POINT);
-   spec.tickSize = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_SIZE);
-   spec.tickValue = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_VALUE);
-   spec.digits = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+   if(spec.point <= 0 || !MathIsValidNumber(spec.point))
+   {
+      errorCount++;
+      errorFields += "point,";
+   }
+
    spec.bid = SymbolInfoDouble(sym, SYMBOL_BID);
+   if(spec.bid <= 0 || !MathIsValidNumber(spec.bid))
+   {
+      errorCount++;
+      errorFields += "bid,";
+   }
+
    spec.ask = SymbolInfoDouble(sym, SYMBOL_ASK);
+   if(spec.ask <= 0 || !MathIsValidNumber(spec.ask))
+   {
+      errorCount++;
+      errorFields += "ask,";
+   }
+
+   spec.tickSize = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_SIZE);
+   if(spec.tickSize <= 0 || !MathIsValidNumber(spec.tickSize))
+   {
+      // Use point as fallback for tick size
+      spec.tickSize = spec.point;
+      if(spec.tickSize <= 0)
+      {
+         errorCount++;
+         errorFields += "tickSize,";
+      }
+   }
+
+   spec.tickValue = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_VALUE);
+   if(spec.tickValue <= 0 || !MathIsValidNumber(spec.tickValue))
+   {
+      // Use 1.0 as fallback - will be corrected on first trade
+      spec.tickValue = 1.0;
+      // Don't count as error since we have a fallback
+   }
+
+   spec.digits = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+   if(spec.digits < 0 || spec.digits > 8)
+   {
+      // Use 5 as default for forex pairs
+      spec.digits = 5;
+   }
+
    spec.spread = spec.ask - spec.bid;
+   if(spec.spread < 0 || !MathIsValidNumber(spec.spread))
+   {
+      spec.spread = 0;  // Will be updated on next tick
+   }
+
    spec.volumeMin = SymbolInfoDouble(sym, SYMBOL_VOLUME_MIN);
+   if(spec.volumeMin <= 0 || !MathIsValidNumber(spec.volumeMin))
+   {
+      spec.volumeMin = 0.01;  // Default minimum lot
+   }
+
    spec.volumeMax = SymbolInfoDouble(sym, SYMBOL_VOLUME_MAX);
+   if(spec.volumeMax <= 0 || !MathIsValidNumber(spec.volumeMax))
+   {
+      spec.volumeMax = 100.0;  // Default maximum lot
+   }
+
    spec.volumeStep = SymbolInfoDouble(sym, SYMBOL_VOLUME_STEP);
-   
+   if(spec.volumeStep <= 0 || !MathIsValidNumber(spec.volumeStep))
+   {
+      spec.volumeStep = 0.01;  // Default step
+   }
+
    // Estimate commission
    double contractSize = SymbolInfoDouble(sym, SYMBOL_TRADE_CONTRACT_SIZE);
+   if(contractSize <= 0 || !MathIsValidNumber(contractSize))
+   {
+      contractSize = 100000.0;  // Default forex contract size
+   }
    spec.commission = contractSize * 0.00001;  // Estimate
-   
-   return (spec.point > 0 && spec.bid > 0);
+
+   // Log errors if any critical fields failed
+   if(errorCount > 0)
+   {
+      Print("ERROR: GetBrokerSpec - Failed to get ", errorCount, " critical field(s) for ", sym, ": ", errorFields);
+      return false;
+   }
+
+   // Sanity check: ask should be >= bid
+   if(spec.ask < spec.bid)
+   {
+      Print("WARNING: GetBrokerSpec - Invalid spread for ", sym, " (ask=", spec.ask, " < bid=", spec.bid, ")");
+      // Swap them to fix
+      double temp = spec.bid;
+      spec.bid = spec.ask;
+      spec.ask = temp;
+      spec.spread = spec.ask - spec.bid;
+   }
+
+   return true;
 }
 
 //+------------------------------------------------------------------+
@@ -796,26 +896,63 @@ void UpdateSymbol(int idx)
 
    // Get ATR FIRST (needed for physics update)
    double atr = g_symbols[idx].atr;  // Use cached value initially
-   double atrBuf[];
-   if(CopyBuffer(g_symbols[idx].atrHandle, 0, 0, 1, atrBuf) > 0)
+   bool atrFromIndicator = false;
+
+   // Try to get ATR from indicator
+   if(g_symbols[idx].atrHandle != INVALID_HANDLE)
    {
-      atr = atrBuf[0];
-      g_symbols[idx].atr = atr;
+      double atrBuf[];
+      int copied = CopyBuffer(g_symbols[idx].atrHandle, 0, 0, 1, atrBuf);
+      if(copied > 0 && MathIsValidNumber(atrBuf[0]) && atrBuf[0] > 0)
+      {
+         atr = atrBuf[0];
+         g_symbols[idx].atr = atr;
+         atrFromIndicator = true;
 
-      // Store in ring buffer for rolling average
-      g_perfManager.symbolData[idx].RecordATR(atr);
+         // Store in ring buffer for rolling average
+         g_perfManager.symbolData[idx].RecordATR(atr);
 
-      // Use ring buffer average instead of EMA (more stable)
-      if(g_perfManager.symbolData[idx].atrHistory.Count() >= 5)
-         g_symbols[idx].avgATR = g_perfManager.symbolData[idx].GetAvgATR();
-      else if(g_symbols[idx].avgATR == 0)
-         g_symbols[idx].avgATR = atr;
-      else
-         g_symbols[idx].avgATR = (g_symbols[idx].avgATR * 0.98) + (atr * 0.02);
+         // Use ring buffer average instead of EMA (more stable)
+         if(g_perfManager.symbolData[idx].atrHistory.Count() >= 5)
+            g_symbols[idx].avgATR = g_perfManager.symbolData[idx].GetAvgATR();
+         else if(g_symbols[idx].avgATR == 0)
+            g_symbols[idx].avgATR = atr;
+         else
+            g_symbols[idx].avgATR = (g_symbols[idx].avgATR * 0.98) + (atr * 0.02);
+      }
+      else if(copied < 0)
+      {
+         // Log error only occasionally to avoid spam
+         static int atrErrorCount = 0;
+         if(atrErrorCount++ % 1000 == 0)
+         {
+            Print("WARNING: UpdateSymbol - CopyBuffer failed for ATR on ", g_symbols[idx].name,
+                  " (error: ", GetLastError(), "). Using fallback.");
+         }
+      }
    }
 
-   // Ensure we have a valid ATR for physics
-   if(atr <= 0) atr = bid * 0.001;  // Fallback to 0.1% of price
+   // Fallback ATR calculation if indicator not available or failed
+   if(!atrFromIndicator || atr <= 0 || !MathIsValidNumber(atr))
+   {
+      // Use price-based fallback: approximately 0.1% of price for forex
+      // Adjust for different asset types
+      double fallbackPct = 0.001;  // 0.1% default
+      if(g_symbols[idx].assetType == ASSET_CRYPTO)
+         fallbackPct = 0.02;  // 2% for crypto (more volatile)
+      else if(g_symbols[idx].assetType == ASSET_INDEX)
+         fallbackPct = 0.005;  // 0.5% for indices
+
+      double fallbackATR = bid * fallbackPct;
+
+      // If we have a previous valid ATR, blend it with fallback
+      if(g_symbols[idx].atr > 0 && MathIsValidNumber(g_symbols[idx].atr))
+         atr = (g_symbols[idx].atr * 0.9) + (fallbackATR * 0.1);
+      else
+         atr = fallbackATR;
+
+      g_symbols[idx].atr = atr;
+   }
 
    // Update physics with price and ATR (real kinematic calculations)
    g_symbols[idx].physics.UpdateWithATR(bid, atr);

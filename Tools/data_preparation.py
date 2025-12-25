@@ -170,28 +170,73 @@ class CSVImporter:
         return df
 
     def import_file(self, filepath: Path) -> pd.DataFrame:
-        """Import CSV file with auto-detection"""
+        """Import CSV file with auto-detection and comprehensive error handling"""
         filepath = Path(filepath)
 
         if not filepath.exists():
             raise FileNotFoundError(f"File not found: {filepath}")
 
-        # Detect delimiter
-        delimiter = self.detect_delimiter(filepath)
-        print(f"Detected delimiter: {repr(delimiter)}")
+        # Validate file is readable
+        if not filepath.is_file():
+            raise ValueError(f"Path is not a file: {filepath}")
 
-        # Read CSV
-        df = pd.read_csv(filepath, delimiter=delimiter)
+        # Check file size (warn if very large)
+        file_size = filepath.stat().st_size
+        if file_size == 0:
+            raise ValueError(f"File is empty: {filepath}")
+        if file_size > 1_000_000_000:  # 1GB
+            print(f"WARNING: Large file detected ({file_size / 1_000_000:.1f} MB). Processing may be slow.")
+
+        # Detect delimiter with error handling
+        try:
+            delimiter = self.detect_delimiter(filepath)
+            print(f"Detected delimiter: {repr(delimiter)}")
+        except ValueError as e:
+            raise ValueError(f"Failed to detect delimiter in {filepath}: {e}")
+        except IOError as e:
+            raise IOError(f"Cannot read file {filepath}: {e}")
+
+        # Read CSV with comprehensive error handling
+        try:
+            df = pd.read_csv(filepath, delimiter=delimiter)
+        except pd.errors.EmptyDataError:
+            raise ValueError(f"File contains no data: {filepath}")
+        except pd.errors.ParserError as e:
+            raise ValueError(f"Failed to parse CSV file {filepath}: {e}")
+        except UnicodeDecodeError as e:
+            # Try with different encoding
+            print(f"WARNING: Unicode error, trying latin-1 encoding...")
+            try:
+                df = pd.read_csv(filepath, delimiter=delimiter, encoding='latin-1')
+            except Exception as e2:
+                raise ValueError(f"Failed to read file with any encoding: {e2}")
+        except MemoryError:
+            raise MemoryError(f"File too large to load into memory: {filepath}")
+        except Exception as e:
+            raise RuntimeError(f"Unexpected error reading {filepath}: {type(e).__name__}: {e}")
+
+        if df.empty:
+            raise ValueError(f"File parsed but contains no data: {filepath}")
+
         print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
         print(f"Original columns: {list(df.columns)}")
 
         # Detect format
-        self.detected_format = self.detect_format(df)
-        print(f"Detected format: {self.detected_format}")
+        try:
+            self.detected_format = self.detect_format(df)
+            print(f"Detected format: {self.detected_format}")
+        except Exception as e:
+            print(f"WARNING: Could not detect format: {e}. Using 'unknown'.")
+            self.detected_format = 'unknown'
 
-        # Normalize
-        df = self.normalize_columns(df)
-        print(f"Normalized columns: {list(df.columns)}")
+        # Normalize columns with error handling
+        try:
+            df = self.normalize_columns(df)
+            print(f"Normalized columns: {list(df.columns)}")
+        except KeyError as e:
+            raise ValueError(f"Missing expected column during normalization: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to normalize columns: {type(e).__name__}: {e}")
 
         return df
 
