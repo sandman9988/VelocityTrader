@@ -13,7 +13,6 @@ Author: VelocityTrader Team
 Version: 1.0.0
 """
 
-import os
 import re
 import sys
 import json
