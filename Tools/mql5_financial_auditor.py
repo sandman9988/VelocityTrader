@@ -122,7 +122,8 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Hardcoded Numeric Constant',
             'pattern': r'(?<![\w.])(?:0\.0[0-9]{3,}|[1-9]\d{3,}(?:\.\d+)?)(?![\w.])',
-            'exclude_pattern': r'#define|const\s+|FNV|2166136261|16777619|0\.0001|32768|1440|10080|43200|86400|/ 100\.0|tolerance|epsilon',
+            # Exclude: constants, FNV hash, time calculations, forex standards, scaling factors, error codes
+            'exclude_pattern': r'#define|const\s+|FNV|2166136261|16777619|0\.0001|32768|1440|10080|43200|86400|/ 100\.0|tolerance|epsilon|100000|10000|1000000|0\.00001|1024|4200|4201|4202|4203|swapLong|swapShort|point\s*\*|lotMin|lotStep|contractSize|tickSize|lotMax',
             'description': 'Magic numbers should be defined as named constants',
             'recommendation': 'Define as const or #define with descriptive name'
         },
