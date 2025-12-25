@@ -81,15 +81,29 @@ jobs:
           # Copy our MQL5 folder to MT5's MQL5 directory
           $targetMql5 = "$mt5Path\MQL5"
 
+          # Create target directories if they don't exist (fresh MT5 install may not have them)
+          $expertsDir = "$targetMql5\Experts"
+          $includeDir = "$targetMql5\Include"
+
+          if (-not (Test-Path $expertsDir)) {
+            New-Item -ItemType Directory -Path $expertsDir -Force | Out-Null
+            Write-Host "Created: $expertsDir"
+          }
+
+          if (-not (Test-Path $includeDir)) {
+            New-Item -ItemType Directory -Path $includeDir -Force | Out-Null
+            Write-Host "Created: $includeDir"
+          }
+
           # Copy Experts
           if (Test-Path "MQL5\Experts") {
-            Copy-Item -Path "MQL5\Experts\*" -Destination "$targetMql5\Experts\" -Recurse -Force
+            Copy-Item -Path "MQL5\Experts\*" -Destination "$expertsDir\" -Recurse -Force
             Write-Host "Copied Experts"
           }
 
           # Copy Include
           if (Test-Path "MQL5\Include") {
-            Copy-Item -Path "MQL5\Include\*" -Destination "$targetMql5\Include\" -Recurse -Force
+            Copy-Item -Path "MQL5\Include\*" -Destination "$includeDir\" -Recurse -Force
             Write-Host "Copied Include files"
           }
 
