@@ -197,12 +197,12 @@ class MQL5SuperAudit:
             "CRITICAL: Must check OrderSend return - failed orders lose money!",
             Severity.ERROR
         ),
-        r'ArrayResize\s*\([^)]+\)\s*;': (
+        r'^\s*ArrayResize\s*\([^)]+\)\s*;': (
             "Unchecked ArrayResize",
             "Memory failure = trading on garbage data! Check return value",
             Severity.WARNING
         ),
-        r'(CopyBuffer|CopyRates|CopyClose|CopyHigh|CopyLow)\s*\([^)]+\)\s*;': (
+        r'^\s*(CopyBuffer|CopyRates|CopyClose|CopyHigh|CopyLow)\s*\([^)]+\)\s*;': (
             "Unchecked Copy* function",
             "Indicator data may not be ready - trading on stale/missing data!",
             Severity.WARNING
@@ -336,6 +336,9 @@ class MQL5SuperAudit:
             # Check best practice patterns
             for pattern, (name, suggestion, severity) in self.BEST_PRACTICE_PATTERNS.items():
                 if re.search(pattern, line):
+                    # Skip ArrayResize(x, 0) - clearing arrays is always safe
+                    if 'ArrayResize' in name and re.search(r'ArrayResize\s*\([^,]+,\s*0\s*\)', line):
+                        continue
                     issues.append(Issue(
                         file=rel_path,
                         line=i,

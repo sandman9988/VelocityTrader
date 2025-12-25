@@ -674,14 +674,22 @@ public:
    //+------------------------------------------------------------------+
    //| Refresh indicator buffers                                         |
    //+------------------------------------------------------------------+
-   void RefreshIndicators(int count = 10)
+   bool RefreshIndicators(int count = 10)
    {
-      CopyBuffer(m_hATR, 0, 0, count, m_atr);
-      CopyBuffer(m_hRSI, 0, 0, count, m_rsi);
-      CopyBuffer(m_hADX, 0, 0, count, m_adx);
-      CopyBuffer(m_hMA_fast, 0, 0, count, m_maFast);
-      CopyBuffer(m_hMA_medium, 0, 0, count, m_maMedium);
-      CopyBuffer(m_hMA_slow, 0, 0, count, m_maSlow);
+      int copied = 0;
+      copied += CopyBuffer(m_hATR, 0, 0, count, m_atr);
+      copied += CopyBuffer(m_hRSI, 0, 0, count, m_rsi);
+      copied += CopyBuffer(m_hADX, 0, 0, count, m_adx);
+      copied += CopyBuffer(m_hMA_fast, 0, 0, count, m_maFast);
+      copied += CopyBuffer(m_hMA_medium, 0, 0, count, m_maMedium);
+      copied += CopyBuffer(m_hMA_slow, 0, 0, count, m_maSlow);
+
+      if(copied < count * 6)  // All 6 buffers should have 'count' elements
+      {
+         Print("WARNING: CopyBuffer incomplete - indicator data may be stale (", copied, "/", count * 6, ")");
+         return false;
+      }
+      return true;
    }
 
    //+------------------------------------------------------------------+
@@ -906,7 +914,11 @@ public:
 
       // Calculate returns
       double returns[];
-      ArrayResize(returns, lookback);
+      if(ArrayResize(returns, lookback) != lookback)
+      {
+         Print("ERROR: ArrayResize failed for returns array in entropy calc");
+         return;
+      }
 
       for(int i = 0; i < lookback; i++)
          returns[i] = SafeDivide(closes[i] - closes[i + 1], closes[i + 1], 0.0) * 100.0;
@@ -915,7 +927,11 @@ public:
       int numBins = 10;
       double binWidth = 0.1;  // 0.1% per bin
       int bins[];
-      ArrayResize(bins, numBins);
+      if(ArrayResize(bins, numBins) != numBins)
+      {
+         Print("ERROR: ArrayResize failed for bins array in entropy calc");
+         return;
+      }
       ArrayInitialize(bins, 0);
 
       for(int i = 0; i < lookback; i++)
@@ -1088,7 +1104,11 @@ public:
       int numBuckets = 0;
 
       double vpinHistory[];
-      ArrayResize(vpinHistory, bucketCount);
+      if(ArrayResize(vpinHistory, bucketCount) != bucketCount)
+      {
+         Print("ERROR: ArrayResize failed for VPIN history - cannot calculate");
+         return;
+      }
 
       for(int i = 1; i < MathMin(copied, copiedClose) && numBuckets < bucketCount; i++)
       {

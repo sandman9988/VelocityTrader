@@ -212,7 +212,11 @@ struct AgentSensorProfile
    // Calculate sensor vector (normalized 0-1) for RL input
    void CalculateSensorVector(KinematicState &kin, double atr, double &vector[])
    {
-      ArrayResize(vector, SENSOR_DIM);
+      if(ArrayResize(vector, SENSOR_DIM) != SENSOR_DIM)
+      {
+         Print("ERROR: ArrayResize failed for sensor vector - cannot compute kinematics");
+         return;
+      }
 
       // Core kinematics (indices 0-5)
       vector[0] = ClampNormalize(kin.velocity, -2.0, 2.0);
@@ -583,9 +587,14 @@ public:
       m_historyIdx = 0;
       m_initialized = false;
       m_prevState = KIN_CRUISING;
-      ArrayResize(m_priceHistory, m_historySize);
-      ArrayResize(m_velocityHistory, m_historySize);
-      ArrayResize(m_accelHistory, m_historySize);
+      if(ArrayResize(m_priceHistory, m_historySize) != m_historySize ||
+         ArrayResize(m_velocityHistory, m_historySize) != m_historySize ||
+         ArrayResize(m_accelHistory, m_historySize) != m_historySize)
+      {
+         Print("CRITICAL: ArrayResize failed in CKinematicRegimeDetector - regime detection disabled!");
+         m_historySize = 0;  // Mark as unusable
+         return;
+      }
       ArrayInitialize(m_priceHistory, 0);
       ArrayInitialize(m_velocityHistory, 0);
       ArrayInitialize(m_accelHistory, 0);

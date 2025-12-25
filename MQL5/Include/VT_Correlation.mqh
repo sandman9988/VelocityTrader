@@ -39,7 +39,12 @@ struct SymbolReturns
    void Init(string sym, int periods)
    {
       symbol = sym;
-      ArrayResize(returns, periods);
+      if(ArrayResize(returns, periods) != periods)
+      {
+         Print("ERROR: ArrayResize failed for returns array - correlation data invalid for: ", sym);
+         count = 0;
+         return;
+      }
       ArrayInitialize(returns, 0.0);
       count = 0;
       mean = 0.0;
@@ -363,8 +368,13 @@ public:
          double corr = m_corrMatrix[idx][i];
          if(MathAbs(corr) >= m_highCorrThreshold)
          {
-            ArrayResize(correlated, count + 1);
-            ArrayResize(correlations, count + 1);
+            int newSize = count + 1;
+            if(ArrayResize(correlated, newSize) != newSize ||
+               ArrayResize(correlations, newSize) != newSize)
+            {
+               Print("ERROR: ArrayResize failed in correlation search - incomplete results");
+               break;
+            }
             correlated[count] = m_symbolData[i].symbol;
             correlations[count] = corr;
             count++;
@@ -395,8 +405,13 @@ public:
          double corr = m_corrMatrix[idx][i];
          if(corr <= m_negCorrThreshold)
          {
-            ArrayResize(hedges, count + 1);
-            ArrayResize(correlations, count + 1);
+            int newSize = count + 1;
+            if(ArrayResize(hedges, newSize) != newSize ||
+               ArrayResize(correlations, newSize) != newSize)
+            {
+               Print("ERROR: ArrayResize failed in hedge search - incomplete results");
+               break;
+            }
             hedges[count] = m_symbolData[i].symbol;
             correlations[count] = corr;
             count++;
@@ -449,7 +464,11 @@ public:
       m_exposure.lastUpdate = TimeCurrent();
 
       double exposures[];
-      ArrayResize(exposures, m_symbolCount);
+      if(ArrayResize(exposures, m_symbolCount) != m_symbolCount)
+      {
+         Print("ERROR: ArrayResize failed for exposures array - cannot calculate exposure");
+         return;
+      }
       ArrayInitialize(exposures, 0.0);
 
       // Calculate exposures from positions
@@ -697,8 +716,15 @@ public:
 
       // Features: avg correlation, max correlation, min correlation,
       //           exposure ratio, diversification
-      if(ArraySize(features) < startIdx + 5)
-         ArrayResize(features, startIdx + 5);
+      int requiredSize = startIdx + 5;
+      if(ArraySize(features) < requiredSize)
+      {
+         if(ArrayResize(features, requiredSize) != requiredSize)
+         {
+            Print("ERROR: ArrayResize failed for RL features - cannot populate correlation data");
+            return;
+         }
+      }
 
       if(idx < 0)
       {

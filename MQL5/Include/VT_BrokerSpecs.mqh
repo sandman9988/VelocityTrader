@@ -126,7 +126,13 @@ struct NormalizedSpecs
    {
       int requiredSize = startIdx + 9;
       if(ArraySize(features) < requiredSize)
-         ArrayResize(features, requiredSize);
+      {
+         if(ArrayResize(features, requiredSize) != requiredSize)
+         {
+            Print("ERROR: ArrayResize failed for features vector - cannot populate broker data");
+            return;
+         }
+      }
 
       // Bounds-safe assignment
       int size = ArraySize(features);
@@ -1108,8 +1114,13 @@ public:
       }
       else
       {
-         ArrayResize(m_specs, m_specCount + 1);
-         ArrayResize(m_symbolMap, m_specCount + 1);
+         int newSize = m_specCount + 1;
+         if(ArrayResize(m_specs, newSize) != newSize ||
+            ArrayResize(m_symbolMap, newSize) != newSize)
+         {
+            Print("ERROR: ArrayResize failed for specs cache - spec not added: ", spec.symbol);
+            return;
+         }
          m_specs[m_specCount] = spec;
          m_symbolMap[m_specCount] = spec.symbol;
          m_specCount++;
@@ -1316,7 +1327,11 @@ public:
       if(m_specCount == 0)
          return 0;
 
-      ArrayResize(specs, m_specCount);
+      if(ArrayResize(specs, m_specCount) != m_specCount)
+      {
+         Print("ERROR: ArrayResize failed for specs output array");
+         return 0;
+      }
       for(int i = 0; i < m_specCount; i++)
          specs[i] = m_specs[i];
 
@@ -1342,7 +1357,12 @@ public:
          }
       }
 
-      ArrayResize(m_instrRisk, count + 1);
+      int newSize = count + 1;
+      if(ArrayResize(m_instrRisk, newSize) != newSize)
+      {
+         Print("ERROR: ArrayResize failed for instrument risk - data not saved: ", symbol);
+         return;
+      }
       m_instrRisk[count] = risk;
    }
 
@@ -1644,7 +1664,7 @@ public:
    int GetPositionsSorted(string symbol, PositionInfo &positions[],
                           ENUM_CLOSE_PRIORITY priority, long magicFilter = 0)
    {
-      ArrayResize(positions, 0);
+      ArrayResize(positions, 0);  // Clear array - always succeeds
       int count = 0;
 
       // Collect all positions for this symbol
@@ -1661,7 +1681,12 @@ public:
          if(magicFilter != 0 && PositionGetInteger(POSITION_MAGIC) != magicFilter)
             continue;
 
-         ArrayResize(positions, count + 1);
+         int newSize = count + 1;
+         if(ArrayResize(positions, newSize) != newSize)
+         {
+            Print("ERROR: ArrayResize failed for positions array - incomplete data");
+            break;  // Return what we have so far
+         }
          positions[count].ticket = ticket;
          positions[count].symbol = symbol;
          positions[count].openTime = (datetime)PositionGetInteger(POSITION_TIME);
@@ -1849,7 +1874,7 @@ public:
                             ENUM_POSITION_TYPE type, ulong &tickets[],
                             double &volumes[], long magic = 0)
    {
-      ArrayResize(tickets, 0);
+      ArrayResize(tickets, 0);   // Clear arrays - always succeeds
       ArrayResize(volumes, 0);
 
       if(!m_accountSettings.fifoRequired)
@@ -1866,8 +1891,13 @@ public:
          if(positions[i].type != type)
             continue;
 
-         ArrayResize(tickets, closeCount + 1);
-         ArrayResize(volumes, closeCount + 1);
+         int newSize = closeCount + 1;
+         if(ArrayResize(tickets, newSize) != newSize ||
+            ArrayResize(volumes, newSize) != newSize)
+         {
+            Print("ERROR: ArrayResize failed in FIFO sequence - aborting to prevent invalid trades");
+            return closeCount;  // Return what we have so far
+         }
 
          tickets[closeCount] = positions[i].ticket;
 

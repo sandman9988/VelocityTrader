@@ -133,8 +133,15 @@ struct MarketState
    // Export to normalized feature array (0-1)
    void ToFeatures(double &features[], int startIdx = 0)
    {
-      if(ArraySize(features) < startIdx + 8)
-         ArrayResize(features, startIdx + 8);
+      int requiredSize = startIdx + 8;
+      if(ArraySize(features) < requiredSize)
+      {
+         if(ArrayResize(features, requiredSize) != requiredSize)
+         {
+            Print("ERROR: ArrayResize failed for market state features");
+            return;
+         }
+      }
 
       features[startIdx + 0] = MathMin(1.0, spread / 50.0);  // Spread norm
       features[startIdx + 1] = rsi / 100.0;                   // RSI norm
@@ -1255,7 +1262,14 @@ public:
       }
 
       if(m_markedCount >= ArraySize(m_markedCandles))
-         ArrayResize(m_markedCandles, m_markedCount + 100);
+      {
+         int newSize = m_markedCount + 100;
+         if(ArrayResize(m_markedCandles, newSize) != newSize)
+         {
+            Print("ERROR: ArrayResize failed for marked candles - marker not saved");
+            return;
+         }
+      }
 
       m_markedCandles[m_markedCount] = mc;
       m_markedCount++;
@@ -1370,14 +1384,19 @@ public:
    //+------------------------------------------------------------------+
    int GetMarkedByTag(ENUM_TRADE_TAG tag, MarkedCandle &result[])
    {
-      ArrayResize(result, 0);
+      ArrayResize(result, 0);  // Clear array - always succeeds
       int count = 0;
 
       for(int i = 0; i < m_markedCount; i++)
       {
          if(m_markedCandles[i].tag == tag)
          {
-            ArrayResize(result, count + 1);
+            int newSize = count + 1;
+            if(ArrayResize(result, newSize) != newSize)
+            {
+               Print("ERROR: ArrayResize failed in GetMarkedByTag - incomplete results");
+               break;
+            }
             result[count] = m_markedCandles[i];
             count++;
          }

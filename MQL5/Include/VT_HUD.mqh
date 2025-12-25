@@ -44,7 +44,12 @@ void HUD_Create(string name, int x, int y, string text, color clr, int size = 8)
    if(ObjectFind(0, name) < 0)
    {
       ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
-      ArrayResize(g_hudObjects, g_hudCount + 1);
+      int newSize = g_hudCount + 1;
+      if(ArrayResize(g_hudObjects, newSize) != newSize)
+      {
+         Print("ERROR: ArrayResize failed for HUD objects - UI element not tracked: ", name);
+         return;
+      }
       g_hudObjects[g_hudCount++] = name;
       ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetString(0, name, OBJPROP_FONT, "Consolas");
@@ -65,7 +70,12 @@ void HUD_Rect(string name, int x, int y, int w, int h, color bg, color border)
    if(ObjectFind(0, name) < 0)
    {
       ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-      ArrayResize(g_hudObjects, g_hudCount + 1);
+      int newSize = g_hudCount + 1;
+      if(ArrayResize(g_hudObjects, newSize) != newSize)
+      {
+         Print("ERROR: ArrayResize failed for HUD objects - UI element not tracked: ", name);
+         return;
+      }
       g_hudObjects[g_hudCount++] = name;
       ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetInteger(0, name, OBJPROP_BACK, false);
