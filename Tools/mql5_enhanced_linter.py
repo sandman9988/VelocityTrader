@@ -360,6 +360,120 @@ class MQL5Linter:
                         "severity": "info"
                     })
 
+                # 6. FINANCIAL SAFETY: Lossy type conversions (critical for money)
+                # Explicit casts that lose precision
+                lossy_casts = [
+                    (r'\(int\)\s*\w+', 'Cast to int loses decimal precision'),
+                    (r'\(short\)\s*\w+', 'Cast to short may overflow'),
+                    (r'\(char\)\s*\w+', 'Cast to char loses data'),
+                    (r'\(float\)\s*\w+', 'Cast to float loses double precision'),
+                    (r'\(uint\)\s*-', 'Cast negative to unsigned'),
+                    (r'\(ulong\)\s*-', 'Cast negative to unsigned long'),
+                ]
+                for pattern, msg in lossy_casts:
+                    if re.search(pattern, line_stripped):
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": f"FINANCIAL RISK: {msg}",
+                            "severity": "warning"
+                        })
+
+                # 7. FINANCIAL SAFETY: Implicit integer division (loses decimals)
+                # Pattern: int/int without explicit double conversion
+                if re.search(r'\b\d+\s*/\s*\d+\b', line_stripped):
+                    # Check if not already in a double context
+                    if not re.search(r'\d+\.\d*\s*/|\s*/\s*\d+\.\d*', line_stripped):
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": "FINANCIAL RISK: Integer division may lose decimal precision",
+                            "severity": "warning"
+                        })
+
+                # 8. SECURITY: Magic numbers in financial context
+                # Large numbers that look like prices/amounts without constants
+                if re.search(r'[=<>+\-*/]\s*\d{4,}\.?\d*\s*[;,)\]]', line_stripped):
+                    if not line_stripped.startswith('#define') and 'const' not in line_stripped:
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": "SECURITY: Magic number detected - use named constant",
+                            "severity": "warning"
+                        })
+
+                # 9. SECURITY: Hardcoded lot sizes or monetary values
+                lot_patterns = [
+                    r'OrderSend\s*\([^)]*,\s*\d+\.?\d*\s*,',  # Hardcoded lot in OrderSend
+                    r'PositionOpen\s*\([^)]*,\s*\d+\.?\d*\s*,',
+                    r'lotSize\s*=\s*\d+\.?\d*\s*;',
+                    r'volume\s*=\s*\d+\.?\d*\s*;',
+                ]
+                for pattern in lot_patterns:
+                    if re.search(pattern, line_stripped, re.IGNORECASE):
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": "SECURITY: Hardcoded trading volume - use parameter",
+                            "severity": "warning"
+                        })
+
+            # Track variable declarations and usage for unused variable detection
+            declared_vars = {}
+            used_vars = set()
+            in_struct_or_class = False
+            struct_brace_depth = 0
+
+            # Second pass: detect unused variables (attack vector)
+            # Only flag function-local variables, not struct/class members
+            var_decl_pattern = re.compile(
+                r'^\s*(?:int|double|float|string|bool|long|ulong|datetime|color)\s+'
+                r'(\w+)\s*[;=]'
+            )
+
+            for i, line in enumerate(lines, 1):
+                line_stripped = line.strip()
+                if line_stripped.startswith('//') or not line_stripped:
+                    continue
+
+                # Track struct/class context to avoid flagging member fields
+                if re.match(r'^\s*(struct|class|enum)\s+\w+', line_stripped):
+                    in_struct_or_class = True
+                    struct_brace_depth = 0
+
+                if in_struct_or_class:
+                    struct_brace_depth += line_stripped.count('{')
+                    struct_brace_depth -= line_stripped.count('}')
+                    if struct_brace_depth <= 0 and '}' in line_stripped:
+                        in_struct_or_class = False
+                    continue  # Skip struct/class member declarations
+
+                # Find declarations (only in function scope)
+                match = var_decl_pattern.match(line_stripped)
+                if match:
+                    var_name = match.group(1)
+                    # Skip loop vars, globals (g_), and member vars (m_)
+                    if var_name not in ['i', 'j', 'k', 'n', 'x', 'y', 'm']:
+                        if not var_name.startswith('g_') and not var_name.startswith('m_'):
+                            declared_vars[var_name] = i
+
+                # Find usages (simple word boundary check)
+                for var in list(declared_vars.keys()):
+                    if re.search(rf'\b{var}\b', line_stripped):
+                        # Check if it's not just the declaration line
+                        if declared_vars[var] != i:
+                            used_vars.add(var)
+
+            # Report unused variables (potential dead code / attack vector)
+            for var, line_num in declared_vars.items():
+                if var not in used_vars:
+                    result["warnings"].append({
+                        "line": line_num,
+                        "column": 1,
+                        "message": f"SECURITY: Unused variable '{var}' - dead code is an attack vector",
+                        "severity": "warning"
+                    })
+
             # Final brace balance check
             if brace_count != 0:
                 result["errors"].append({

@@ -166,10 +166,7 @@ void DrawHUD()
    string rlSt = g_status.rlActive ? "~" : "o";
    string riskSt = g_status.riskOK ? "~" : "!";
 
-   color brokerClr = g_status.brokerConnected ? CLR_POSITIVE : CLR_NEGATIVE;
-   color netClr = g_status.networkOK ? CLR_POSITIVE : CLR_NEGATIVE;
-   color rlClr = g_status.rlActive ? CLR_POSITIVE : CLR_NEUTRAL;
-   color riskClr = g_status.riskOK ? CLR_POSITIVE : CLR_NEGATIVE;
+   // Colors removed - using combined color in HUD_Create call
 
    bool isBacktest = (MQLInfoInteger(MQL_TESTER) != 0);
    string modeStr = isBacktest ? "BACKTEST" : "LIVE";
@@ -641,7 +638,6 @@ void DrawTab_Instruments(int x, int &y, int h, int sec)
 
       ENUM_REGIME regime = g_symbols[idx].symc.GetRegime();
       double accel = g_symbols[idx].physics.GetAcceleration();
-      double score = MathAbs(accel);
 
       if(regime == REGIME_TREND && trdCnt < 5)
       {
