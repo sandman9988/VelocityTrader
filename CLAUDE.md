@@ -72,6 +72,8 @@ This codebase manages **real financial trades**. Every bug can cause **real mone
 | Logarithm | `MathLog(x)` | `SafeLog(x)` or `if(x > 0)` |
 | OrderSend | `OrderSend(...);` | Check `ResultRetcode()` after |
 | External data | Use directly | `MathIsValidNumber()` first |
+| **ATR for SL** | `sl = entry - atr * x` | Validate `atr > 0` first |
+| **Trade fail** | Silent failure | Log retcode + context |
 
 ---
 
@@ -284,6 +286,44 @@ if(!trade.Buy(lots, symbol, price, sl, tp))
     return false;
 }
 ```
+
+### EXEC006: Pre-Trade Data Validation - CRITICAL
+**DO NO HARM**: Always validate ATR and price data before calculating stop loss.
+
+Invalid ATR leads to invalid stop loss = potential unlimited loss.
+
+```mql5
+// NEVER:
+double sl = entry - atr * multiplier;  // If atr is 0 or NaN, sl = entry = no protection!
+trade.Buy(lots, symbol, entry, sl, tp);
+
+// ALWAYS:
+// 1. Validate ATR before using for stop loss
+if(atr <= 0 || !MathIsValidNumber(atr))
+{
+    Log(LOG_ERROR, StringFormat("Invalid ATR for %s (ATR=%.5f). Trade rejected.", symbol, atr));
+    return;  // REJECT trade - do no harm
+}
+
+// 2. Validate entry price
+if(entryPrice <= 0 || !MathIsValidNumber(entryPrice))
+{
+    Log(LOG_ERROR, StringFormat("Invalid entry price for %s", symbol));
+    return;  // REJECT trade
+}
+
+// 3. Now safe to calculate stops
+double sl = NormalizeDouble(entry - atr * multiplier, _Digits);
+
+// 4. Execute with full error logging
+if(!trade.Buy(lots, symbol, entry, sl, tp))
+{
+    Log(LOG_ERROR, StringFormat("Trade FAILED: %s | Retcode: %d | %s | Lots: %.2f | SL: %.5f",
+        symbol, trade.ResultRetcode(), trade.ResultRetcodeDescription(), lots, sl));
+}
+```
+
+**Key Insight**: A trade with invalid stop loss data is more dangerous than no trade at all.
 
 ---
 
@@ -583,6 +623,8 @@ Before committing any MQL5 code, verify:
 8. [ ] All lots normalized to broker requirements
 9. [ ] Drawdown check exists in OnTick()
 10. [ ] Input parameters validated in OnInit()
+11. [ ] **ATR/volatility data validated before stop loss calculation**
+12. [ ] **Trade failures logged with full context (retcode, lots, SL)**
 
 ---
 

@@ -1322,11 +1322,27 @@ void ExecuteRealTrade(int symIdx, int direction, double lots, int agentId,
    if(!IsValidIndex(symIdx, MAX_SYMBOLS)) return;
    if(g_posCount >= MAX_POSITIONS) return;
 
+   // DO NO HARM: Validate ATR before using for stop loss
+   double atr = g_symbols[symIdx].atr;
+   if(atr <= 0 || !MathIsValidNumber(atr))
+   {
+      Print("ERROR: ExecuteRealTrade - invalid ATR for ", g_symbols[symIdx].name,
+            " (ATR=", atr, "). Trade rejected to prevent harm.");
+      return;
+   }
+
    double entryPrice = (direction > 0) ?
                        g_symbols[symIdx].spec.ask :
                        g_symbols[symIdx].spec.bid;
 
-   double slDistance = g_symbols[symIdx].atr * 2.0;
+   // Validate entry price
+   if(entryPrice <= 0 || !MathIsValidNumber(entryPrice))
+   {
+      Print("ERROR: ExecuteRealTrade - invalid entry price for ", g_symbols[symIdx].name);
+      return;
+   }
+
+   double slDistance = atr * 2.0;
    double sl = (direction > 0) ? (entryPrice - slDistance) : (entryPrice + slDistance);
    sl = NormalizeDouble(sl, g_symbols[symIdx].spec.digits);
 
@@ -1345,7 +1361,16 @@ void ExecuteRealTrade(int symIdx, int direction, double lots, int agentId,
    {
       int slot = g_posCount++;
       if(!IsValidIndex(slot, MAX_POSITIONS)) { g_posCount--; return; }
-      g_positions[slot].ticket = g_trade.ResultDeal();
+
+      ulong ticket = g_trade.ResultDeal();
+      if(ticket == 0)
+      {
+         Print("WARNING: Trade executed but ResultDeal() returned 0 - check broker");
+         g_posCount--;
+         return;
+      }
+
+      g_positions[slot].ticket = ticket;
       g_positions[slot].symbol = g_symbols[symIdx].name;
       g_positions[slot].direction = direction;
       g_positions[slot].entryPrice = entryPrice;
@@ -1359,11 +1384,21 @@ void ExecuteRealTrade(int symIdx, int direction, double lots, int agentId,
       g_positions[slot].openTime = TimeCurrent();
       g_positions[slot].pWinAtEntry = pWin;
       g_positions[slot].active = true;
-      
-      Print("REAL Trade: ", agentName, " ", 
+
+      Print("REAL Trade: ", agentName, " ",
             (direction > 0 ? "BUY" : "SELL"), " ",
             g_symbols[symIdx].name, " @ ", entryPrice,
             " P(Win)=", DoubleToString(pWin * 100, 1), "%");
+   }
+   else
+   {
+      // DO NO HARM: Log trade failures for monitoring and debugging
+      uint retcode = g_trade.ResultRetcode();
+      Print("ERROR: Trade FAILED for ", g_symbols[symIdx].name,
+            " | Retcode: ", retcode,
+            " | ", g_trade.ResultRetcodeDescription(),
+            " | Lots: ", lots,
+            " | SL: ", sl);
    }
 }
 
