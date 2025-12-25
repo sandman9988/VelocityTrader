@@ -1432,10 +1432,10 @@ class FinancialCodeAuditor:
 
             try:
                 content = current_file.read_text(encoding='utf-8-sig')
-            except (UnicodeDecodeError, OSError):
+            except Exception:
                 try:
                     content = current_file.read_text(encoding='latin-1')
-                except (UnicodeDecodeError, OSError):
+                except Exception:
                     continue
 
             # Find all #include statements
@@ -1461,7 +1461,7 @@ class FinancialCodeAuditor:
             try:
                 size = orphan_path.stat().st_size
                 size_kb = size / 1024
-            except (OSError, PermissionError):
+            except Exception:
                 size_kb = 0
 
             findings.append(AuditFinding(
@@ -1489,10 +1489,10 @@ class FinancialCodeAuditor:
         for mqh_file in include_dir.glob("*.mqh"):
             try:
                 content = mqh_file.read_text(encoding='utf-8-sig')
-            except (UnicodeDecodeError, OSError):
+            except Exception:
                 try:
                     content = mqh_file.read_text(encoding='latin-1')
-                except (UnicodeDecodeError, OSError):
+                except Exception:
                     continue
 
             lines = content.split('\n')
