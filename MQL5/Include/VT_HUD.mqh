@@ -11,10 +11,37 @@
 
 #include "VT_Definitions.mqh"
 #include "VT_Globals.mqh"
+#include "VT_Performance.mqh"
+#include <Canvas\Canvas.mqh>
 
 // Note: Input parameters (InpShowHUD, InpRiskPercent, etc.) are defined
 // in the main EA file and are automatically globally accessible.
 // DO NOT redeclare them with 'extern' as this causes type conflicts.
+
+//+------------------------------------------------------------------+
+//| Futuristic HUD Canvas Skin (neon teal/purple theme)               |
+//+------------------------------------------------------------------+
+#define HUD_CANVAS_NAME        "VT_HUD_CANVAS"
+#define HUD_CANVAS_ZORDER      0
+
+// ARGB colors for canvas drawing
+#define HUD_BG                ARGB(170, 10, 12, 16)       // translucent dark
+#define HUD_BG2               ARGB(210,  6,  8, 12)       // deeper inset
+#define HUD_BORDER_ARGB       ARGB(220, 40, 70, 80)       // muted teal border
+#define HUD_TEAL              ARGB(255,  85, 223, 210)    // neon teal
+#define HUD_TEAL_DIM          ARGB(180,  60, 160, 150)    // dim teal
+#define HUD_PURPLE            ARGB(255, 109,  55, 180)    // neon purple
+#define HUD_PURPLE_DIM        ARGB(170,  70,  40, 120)    // dim purple
+#define HUD_TEXT_DIM          ARGB(220, 150, 170, 175)    // gray-cyan text
+
+//+------------------------------------------------------------------+
+//| Canvas backing for the HUD (single bitmap object)                 |
+//+------------------------------------------------------------------+
+CCanvas  g_hudCanvas;
+bool     g_hudCanvasReady = false;
+int      g_hudCanvasW = 480;   // keep in sync with panelWidth
+int      g_hudCanvasH = 420;   // keep in sync with panelHeight
+datetime g_hudCanvasLast = 0;  // throttle redraw
 
 //+------------------------------------------------------------------+
 //| HUD_Create: Create/Update Text Label                              |
@@ -113,6 +140,177 @@ void CleanupHUD()
       ObjectDelete(0, g_hudObjects[i]);
    g_hudCount = 0;
    ArrayResize(g_hudObjects, 0);
+
+   // Also clean up canvas
+   if(g_hudCanvasReady)
+   {
+      g_hudCanvas.Destroy();
+      g_hudCanvasReady = false;
+   }
+   ObjectDelete(0, HUD_CANVAS_NAME);
+}
+
+//+------------------------------------------------------------------+
+//| Create/ensure the bitmap canvas exists                            |
+//+------------------------------------------------------------------+
+bool HUD_EnsureCanvas(int x, int y, int w, int h)
+{
+   g_hudCanvasW = w;
+   g_hudCanvasH = h;
+
+   // Create bitmap label if missing
+   if(ObjectFind(0, HUD_CANVAS_NAME) < 0)
+   {
+      if(!ObjectCreate(0, HUD_CANVAS_NAME, OBJ_BITMAP_LABEL, 0, 0, 0))
+         return false;
+
+      ObjectSetInteger(0, HUD_CANVAS_NAME, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, HUD_CANVAS_NAME, OBJPROP_ZORDER, HUD_CANVAS_ZORDER);
+      ObjectSetInteger(0, HUD_CANVAS_NAME, OBJPROP_BACK, true);
+      ObjectSetInteger(0, HUD_CANVAS_NAME, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, HUD_CANVAS_NAME, OBJPROP_HIDDEN, true);
+   }
+
+   ObjectSetInteger(0, HUD_CANVAS_NAME, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, HUD_CANVAS_NAME, OBJPROP_YDISTANCE, y);
+
+   // (Re)create canvas if size changed or not ready
+   if(!g_hudCanvasReady || g_hudCanvas.Width() != w || g_hudCanvas.Height() != h)
+   {
+      g_hudCanvas.Destroy();
+
+      // CreateBitmapLabel binds the canvas to OBJ_BITMAP_LABEL
+      if(!g_hudCanvas.CreateBitmapLabel(0, HUD_CANVAS_NAME, 0, 0, w, h, COLOR_FORMAT_ARGB_NORMALIZE))
+      {
+         g_hudCanvasReady = false;
+         return false;
+      }
+      g_hudCanvasReady = true;
+   }
+
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Draw corner frame with neon accents                               |
+//+------------------------------------------------------------------+
+void HUD_DrawCornerFrame(CCanvas &c, int w, int h)
+{
+   // Outer frame
+   c.Rectangle(6, 6, w-7, h-7, HUD_BORDER_ARGB);
+   c.Rectangle(7, 7, w-8, h-8, ARGB(120, 20, 40, 45));
+
+   // Corner accents (teal neon effect)
+   int L = 26;  // accent length
+   int T = 4;   // inner offset
+
+   // Top-Left
+   c.Line(10, 10, 10+L, 10, HUD_TEAL);
+   c.Line(10, 10, 10, 10+L, HUD_TEAL);
+   c.Line(10+T, 10+T, 10+L, 10+T, HUD_TEAL_DIM);
+   c.Line(10+T, 10+T, 10+T, 10+L, HUD_TEAL_DIM);
+
+   // Top-Right
+   c.Line(w-11, 10, w-11-L, 10, HUD_TEAL);
+   c.Line(w-11, 10, w-11, 10+L, HUD_TEAL);
+   c.Line(w-11-T, 10+T, w-11-L, 10+T, HUD_TEAL_DIM);
+   c.Line(w-11-T, 10+T, w-11-T, 10+L, HUD_TEAL_DIM);
+
+   // Bottom-Left
+   c.Line(10, h-11, 10+L, h-11, HUD_TEAL);
+   c.Line(10, h-11, 10, h-11-L, HUD_TEAL);
+   c.Line(10+T, h-11-T, 10+L, h-11-T, HUD_TEAL_DIM);
+   c.Line(10+T, h-11-T, 10+T, h-11-L, HUD_TEAL_DIM);
+
+   // Bottom-Right
+   c.Line(w-11, h-11, w-11-L, h-11, HUD_TEAL);
+   c.Line(w-11, h-11, w-11, h-11-L, HUD_TEAL);
+   c.Line(w-11-T, h-11-T, w-11-L, h-11-T, HUD_TEAL_DIM);
+   c.Line(w-11-T, h-11-T, w-11-T, h-11-L, HUD_TEAL_DIM);
+}
+
+//+------------------------------------------------------------------+
+//| Draw concentric ring (radar style)                                |
+//+------------------------------------------------------------------+
+void HUD_DrawRing(CCanvas &c, int cx, int cy, int rOuter, int rInner, uint colOuter, uint colInner)
+{
+   c.Circle(cx, cy, rOuter, colOuter);
+   c.Circle(cx, cy, rOuter-1, colOuter);
+   c.Circle(cx, cy, rInner, colInner);
+}
+
+//+------------------------------------------------------------------+
+//| Draw horizontal bar (0..1 fill ratio)                             |
+//+------------------------------------------------------------------+
+void HUD_DrawBar(CCanvas &c, int x, int y, int w, int h, double v01, uint colFill, uint colOutline)
+{
+   v01 = MathMax(0.0, MathMin(1.0, v01));
+   c.FillRectangle(x, y, x+w, y+h, ARGB(70, 15, 25, 28));  // dark bg
+   c.Rectangle(x, y, x+w, y+h, colOutline);
+   int fw = (int)MathRound(w * v01);
+   if(fw > 0)
+      c.FillRectangle(x+1, y+1, x+fw-1, y+h-1, colFill);
+}
+
+//+------------------------------------------------------------------+
+//| Draw the futuristic panel background with metrics                 |
+//+------------------------------------------------------------------+
+void HUD_DrawFuturisticPanel(int panelW, int panelH)
+{
+   if(!g_hudCanvasReady)
+      return;
+
+   CCanvas &c = g_hudCanvas;
+
+   // Clear and draw background
+   c.Erase(ARGB(0,0,0,0));
+   c.FillRectangle(0, 0, panelW, panelH, HUD_BG);
+   c.FillRectangle(16, 34, panelW-16, panelH-16, HUD_BG2);
+
+   HUD_DrawCornerFrame(c, panelW, panelH);
+
+   // Center ring/radar
+   int cx = panelW / 2;
+   int cy = 170;
+   HUD_DrawRing(c, cx, cy, 86, 78, HUD_TEAL, HUD_PURPLE_DIM);
+
+   // Animated spokes (based on time)
+   double t = (double)(TimeLocal() % 60) / 60.0;
+   for(int i = 0; i < 14; i++)
+   {
+      double a = (t * 6.28318530718) + (i * 0.44879895);
+      int x2 = cx + (int)(MathCos(a) * 70);
+      int y2 = cy + (int)(MathSin(a) * 70);
+      uint col = (i % 2 == 0) ? HUD_TEAL_DIM : HUD_PURPLE_DIM;
+      c.Line(cx, cy, x2, y2, col);
+   }
+
+   // Get real metrics for the bars
+   double hitRate01 = SafeDivide(g_perfManager.GetCacheHitRate(), 100.0, 0.0);
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double dd01 = 0.0;
+   if(g_breaker.peakEquity > 0.0)
+      dd01 = MathMax(0.0, MathMin(1.0, SafeDivide(g_breaker.peakEquity - equity, g_breaker.peakEquity, 0.0)));
+
+   // Left mini panel bars
+   int lx = 26, ly = 70;
+   HUD_DrawBar(c, lx, ly, 150, 10, hitRate01, HUD_TEAL, HUD_BORDER_ARGB);         // cache hit rate
+   HUD_DrawBar(c, lx, ly+18, 150, 10, 1.0 - dd01, HUD_PURPLE, HUD_BORDER_ARGB);   // health (inverse DD)
+
+   // Right bars
+   int rx = panelW - 190, ry = 70;
+   HUD_DrawBar(c, rx, ry, 150, 10, hitRate01, HUD_PURPLE, HUD_BORDER_ARGB);
+   HUD_DrawBar(c, rx, ry+18, 150, 10, MathMin(1.0, SafeDivide((double)g_perfManager.symbolsUpdated, 50.0, 0.0)), HUD_TEAL, HUD_BORDER_ARGB);
+   HUD_DrawBar(c, rx, ry+36, 150, 10, MathMin(1.0, SafeDivide((double)g_perfManager.ticksProcessed, 5000.0, 0.0)), HUD_TEAL_DIM, HUD_BORDER_ARGB);
+
+   // Bottom status line
+   string s = StringFormat("Ticks:%d  Updated:%d  CacheHit:%.1f%%",
+                           g_perfManager.ticksProcessed,
+                           g_perfManager.symbolsUpdated,
+                           g_perfManager.GetCacheHitRate());
+   c.TextOut(18, panelH-22, s, HUD_TEXT_DIM);  // default alignment is left
+
+   c.Update();
 }
 
 //+------------------------------------------------------------------+
@@ -186,8 +384,21 @@ void DrawHUD()
    int panelWidth = 480;
    int panelHeight = 420;
 
-   // Draw background
-   HUD_Rect("H_Bg", x, yStart, panelWidth, panelHeight, CLR_PANEL_BG, CLR_BORDER);
+   // Draw canvas-based futuristic background (throttled to 1 Hz)
+   bool canvasOK = HUD_EnsureCanvas(x, yStart, panelWidth, panelHeight);
+   if(canvasOK)
+   {
+      if(TimeCurrent() != g_hudCanvasLast)
+      {
+         g_hudCanvasLast = TimeCurrent();
+         HUD_DrawFuturisticPanel(panelWidth, panelHeight);
+      }
+   }
+   else
+   {
+      // Fallback to simple rectangle if canvas fails
+      HUD_Rect("H_Bg", x, yStart, panelWidth, panelHeight, CLR_PANEL_BG, CLR_BORDER);
+   }
 
    // ===============================================================
    // HEADER (Always visible)
