@@ -20,7 +20,7 @@
 #define CACHE_TTL_SHORT       5      // 5 seconds for hot cache
 #define CACHE_TTL_MEDIUM      30     // 30 seconds for warm cache
 #define CACHE_TTL_LONG        300    // 5 minutes for cold cache
-#define UPDATE_QUEUE_SIZE     64     // Max pending symbol updates (increased for backpressure handling)
+#define UPDATE_QUEUE_SIZE     64     // Max pending symbol updates (sized for backpressure handling)
 #define TIMER_INTERVAL_MS     250    // OnTimer interval (milliseconds)
 
 //+------------------------------------------------------------------+
@@ -338,8 +338,7 @@ struct AsyncUpdateQueue
    int             dropCountSession;   // Session total drops
    datetime        lastDropLog;        // Throttle drop logging
    int             peakDepth;          // High water mark for tuning
-   // Note: We use scan-based slot finding instead of head/tail
-   // because Dequeue clears arbitrary slots based on priority, not FIFO order
+   int             dropped;            // Legacy compatibility field
 
    void Init()
    {
@@ -348,6 +347,7 @@ struct AsyncUpdateQueue
       dropCountSession = 0;
       lastDropLog = 0;
       peakDepth = 0;
+      dropped = 0;
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
          items[i].active = false;
    }
@@ -359,6 +359,7 @@ struct AsyncUpdateQueue
          // Queue full - track and log periodically
          dropCount++;
          dropCountSession++;
+         dropped++;
 
          // Log every 60 seconds max to avoid spam
          datetime now = TimeCurrent();
@@ -446,6 +447,7 @@ struct AsyncUpdateQueue
    }
 
    int Count() { return count; }
+   int Dropped() { return dropped; }
    bool IsEmpty() { return count == 0; }
    bool IsFull() { return count >= UPDATE_QUEUE_SIZE; }
    int GetDropCount() { return dropCountSession; }
@@ -469,6 +471,7 @@ struct AsyncUpdateQueue
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
          items[i].active = false;
       count = 0;
+      dropped = 0;
    }
 };
 
@@ -781,9 +784,11 @@ void InitPerformance()
 //+------------------------------------------------------------------+
 string GetPerfStatsString()
 {
-   return StringFormat("Ticks:%d Updated:%d CacheHit:%.1f%%",
+   return StringFormat("Ticks:%d Updated:%d Queue:%d Dropped:%d CacheHit:%.1f%%",
                        g_perfManager.ticksProcessed,
                        g_perfManager.symbolsUpdated,
+                       g_perfManager.updateQueue.Count(),
+                       g_perfManager.updateQueue.Dropped(),
                        g_perfManager.GetCacheHitRate());
 }
 
