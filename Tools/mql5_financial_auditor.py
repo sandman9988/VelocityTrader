@@ -170,7 +170,8 @@ class FinancialAuditRules:
             'category': AuditCategory.MEMORY_SAFETY,
             'severity': Severity.HIGH,
             'title': 'Dynamic Memory Without Null Check',
-            'pattern': r'new\s+\w+',
+            # Match 'new ClassName(' for actual allocations, not "New" in strings
+            'pattern': r'=\s*new\s+[A-Z]\w*\s*\(',
             'exclude_pattern': r'==\s*NULL|!=\s*NULL|if\s*\(',
             'description': 'Dynamic allocation may fail, returning NULL',
             'recommendation': 'Always check: if(ptr == NULL) { handle error }'
@@ -179,7 +180,8 @@ class FinancialAuditRules:
             'category': AuditCategory.MEMORY_SAFETY,
             'severity': Severity.HIGH,
             'title': 'Potential Memory Leak',
-            'pattern': r'\bnew\s+\w+',
+            # Match 'new ClassName(' for actual allocations, not "New" in strings
+            'pattern': r'=\s*new\s+[A-Z]\w*\s*\(',
             'context_check': 'delete_tracking',
             'description': 'Dynamic allocation without corresponding delete',
             'recommendation': 'Ensure every new has matching delete or use RAII pattern'
