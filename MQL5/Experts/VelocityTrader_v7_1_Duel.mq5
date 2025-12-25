@@ -630,11 +630,16 @@ void OnTick()
          // MEDIUM/LOW priority: queue for deferred processing
          else if(priority <= PRIORITY_LOW)
          {
-            g_perfManager.updateQueue.Enqueue(i, (int)priority);
+            if(!g_perfManager.updateQueue.Enqueue(i, (int)priority))
+            {
+               // Queue is saturated — fall back to inline update to avoid stale data
+               UpdateSymbol(i);
+               g_perfManager.OnSymbolUpdated();
+            }
          }
          // IDLE priority: skip, will be updated in OnTimer
       }
-   }
+      }
 
    // ════════════════════════════════════════════════════════════════
    // UPDATE PRIORITIES: Based on current state

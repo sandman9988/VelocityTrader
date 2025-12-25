@@ -20,7 +20,7 @@
 #define CACHE_TTL_SHORT       5      // 5 seconds for hot cache
 #define CACHE_TTL_MEDIUM      30     // 30 seconds for warm cache
 #define CACHE_TTL_LONG        300    // 5 minutes for cold cache
-#define UPDATE_QUEUE_SIZE     16     // Max pending symbol updates
+#define UPDATE_QUEUE_SIZE     64     // Max pending symbol updates (expanded for bursty feeds)
 #define TIMER_INTERVAL_MS     250    // OnTimer interval (milliseconds)
 
 //+------------------------------------------------------------------+
@@ -318,12 +318,14 @@ struct AsyncUpdateQueue
    int             head;
    int             tail;
    int             count;
+   int             dropped;
 
    void Init()
    {
       head = 0;
       tail = 0;
       count = 0;
+      dropped = 0;
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
          items[i].active = false;
    }
@@ -331,7 +333,10 @@ struct AsyncUpdateQueue
    bool Enqueue(int symbolIdx, int priority)
    {
       if(count >= UPDATE_QUEUE_SIZE)
+      {
+         dropped++;
          return false;  // Queue full
+      }
 
       // Check if already in queue
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
@@ -378,6 +383,7 @@ struct AsyncUpdateQueue
    }
 
    int Count() { return count; }
+   int Dropped() { return dropped; }
    bool IsEmpty() { return count == 0; }
    bool IsFull() { return count >= UPDATE_QUEUE_SIZE; }
 
@@ -386,6 +392,7 @@ struct AsyncUpdateQueue
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
          items[i].active = false;
       count = 0;
+      dropped = 0;
    }
 };
 
@@ -698,9 +705,11 @@ void InitPerformance()
 //+------------------------------------------------------------------+
 string GetPerfStatsString()
 {
-   return StringFormat("Ticks:%d Updated:%d CacheHit:%.1f%%",
+   return StringFormat("Ticks:%d Updated:%d Queue:%d Dropped:%d CacheHit:%.1f%%",
                        g_perfManager.ticksProcessed,
                        g_perfManager.symbolsUpdated,
+                       g_perfManager.updateQueue.Count(),
+                       g_perfManager.updateQueue.Dropped(),
                        g_perfManager.GetCacheHitRate());
 }
 
