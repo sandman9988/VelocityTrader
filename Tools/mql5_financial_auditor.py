@@ -1325,11 +1325,106 @@ class FinancialCodeAuditor:
         if files_with_errors > 0:
             logger.warning(f"{files_with_errors} file(s) could not be audited")
 
+        # Check for orphaned include files
+        orphan_findings = self._check_orphaned_includes(mql5_dir)
+        all_findings.extend(orphan_findings)
+
         self.findings = all_findings
 
         # Generate summary
         summary = self._generate_summary()
         return summary
+
+    def _check_orphaned_includes(self, mql5_dir: Path) -> List[AuditFinding]:
+        """Check for .mqh files that are not included in the build chain"""
+        findings = []
+
+        if not mql5_dir.exists():
+            return findings
+
+        include_dir = mql5_dir / "Include"
+        experts_dir = mql5_dir / "Experts"
+
+        if not include_dir.exists():
+            return findings
+
+        # Get all .mqh files in Include folder
+        try:
+            all_mqh_files = set(f.name for f in include_dir.glob("*.mqh"))
+        except (OSError, PermissionError):
+            return findings
+
+        if not all_mqh_files:
+            return findings
+
+        # Find all includes by tracing from .mq5 files
+        included_files = set()
+        files_to_process = []
+
+        # Start with main EA files
+        if experts_dir.exists():
+            try:
+                files_to_process.extend(experts_dir.glob("*.mq5"))
+            except (OSError, PermissionError):
+                pass
+
+        # Also start from any .mqh that might be entry points
+        processed = set()
+
+        while files_to_process:
+            current_file = files_to_process.pop(0)
+            if current_file in processed:
+                continue
+            processed.add(current_file)
+
+            try:
+                content = current_file.read_text(encoding='utf-8-sig')
+            except:
+                try:
+                    content = current_file.read_text(encoding='latin-1')
+                except:
+                    continue
+
+            # Find all #include statements
+            import re
+            includes = re.findall(r'#include\s*[<"]([^>"]+)[>"]', content)
+
+            for inc in includes:
+                # Extract just the filename
+                inc_name = inc.split('/')[-1].split('\\')[-1]
+
+                if inc_name.endswith('.mqh'):
+                    included_files.add(inc_name)
+
+                    # Add to processing queue if it's in our Include folder
+                    inc_path = include_dir / inc_name
+                    if inc_path.exists() and inc_path not in processed:
+                        files_to_process.append(inc_path)
+
+        # Find orphaned files
+        orphaned = all_mqh_files - included_files
+
+        for orphan in sorted(orphaned):
+            orphan_path = include_dir / orphan
+            try:
+                size = orphan_path.stat().st_size
+                size_kb = size / 1024
+            except:
+                size_kb = 0
+
+            findings.append(AuditFinding(
+                file=f"MQL5/Include/{orphan}",
+                line=0,
+                category=AuditCategory.CODE_QUALITY,
+                severity=Severity.HIGH if size_kb > 10 else Severity.MEDIUM,
+                rule_id="QUAL004",
+                title="Orphaned Include File",
+                description=f"File not included in build chain ({size_kb:.1f} KB of unused code)",
+                recommendation="Either include this file or remove it from the project",
+                code_context=f"#include \"{orphan}\" is missing from include chain"
+            ))
+
+        return findings
 
     def _generate_summary(self) -> Dict:
         """Generate audit summary"""
