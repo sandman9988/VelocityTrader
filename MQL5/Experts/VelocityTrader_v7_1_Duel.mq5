@@ -168,8 +168,9 @@ input bool      InpShadowOnly = false;           // Shadow only mode
 bool ValidateInputParameters()
 {
    bool valid = true;
+   int warnings = 0;
 
-   // Risk parameters
+   // ═══ CORE RISK PARAMETERS ═══
    if(InpRiskPercent <= 0 || InpRiskPercent > 10.0)
    {
       Print("ERROR: InpRiskPercent must be 0-10% (got ", InpRiskPercent, ")");
@@ -194,14 +195,32 @@ bool ValidateInputParameters()
       valid = false;
    }
 
-   // Learning parameters
+   // ═══ LEARNING PARAMETERS ═══
    if(InpLearningRateInit <= 0 || InpLearningRateInit > 1.0)
    {
       Print("ERROR: InpLearningRateInit must be 0-1.0 (got ", InpLearningRateInit, ")");
       valid = false;
    }
 
-   // Signal threshold parameters (sigma thresholds, not 0-1 probabilities)
+   if(InpLearningRateMin <= 0 || InpLearningRateMin > InpLearningRateInit)
+   {
+      Print("ERROR: InpLearningRateMin must be 0-", InpLearningRateInit, " (got ", InpLearningRateMin, ")");
+      valid = false;
+   }
+
+   if(InpLearningDecay <= 0 || InpLearningDecay > 1.0)
+   {
+      Print("ERROR: InpLearningDecay must be 0-1.0 (got ", InpLearningDecay, ")");
+      valid = false;
+   }
+
+   if(InpExplorationRate < 0 || InpExplorationRate > 1.0)
+   {
+      Print("ERROR: InpExplorationRate must be 0-1.0 (got ", InpExplorationRate, ")");
+      valid = false;
+   }
+
+   // ═══ SIGNAL THRESHOLDS ═══
    if(InpSniperThreshold <= 0 || InpSniperThreshold > 10.0)
    {
       Print("ERROR: InpSniperThreshold must be 0-10σ (got ", InpSniperThreshold, ")");
@@ -220,14 +239,153 @@ bool ValidateInputParameters()
       valid = false;
    }
 
-   // Buffer sizes
+   // ═══ OMEGA SIZING ═══
+   if(InpOmegaBaseline <= 0)
+   {
+      Print("ERROR: InpOmegaBaseline must be > 0 (got ", InpOmegaBaseline, ")");
+      valid = false;
+   }
+
+   if(InpOmegaMaxScale < 1.0 || InpOmegaMaxScale > 5.0)
+   {
+      Print("ERROR: InpOmegaMaxScale must be 1.0-5.0 (got ", InpOmegaMaxScale, ")");
+      valid = false;
+   }
+
+   // ═══ STATISTICAL GATE ═══
+   if(InpMinWinRate < 0 || InpMinWinRate > 1.0)
+   {
+      Print("ERROR: InpMinWinRate must be 0-1.0 (got ", InpMinWinRate, ")");
+      valid = false;
+   }
+
+   if(InpMaxPValue <= 0 || InpMaxPValue > 0.5)
+   {
+      Print("ERROR: InpMaxPValue must be 0-0.5 (got ", InpMaxPValue, ")");
+      valid = false;
+   }
+
+   if(InpMinTradesForEdge < 10)
+   {
+      Print("WARNING: InpMinTradesForEdge too low (", InpMinTradesForEdge, "), minimum 10 recommended");
+      warnings++;
+   }
+
+   // ═══ CIRCUIT BREAKER ═══
+   // NOTE: <=0 values disable the trigger (handled in VT_CircuitBreaker.mqh)
+   if(InpMaxDailyLoss > 0.5)
+   {
+      Print("WARNING: InpMaxDailyLoss > 50% is very high (", InpMaxDailyLoss * 100, "%)");
+      warnings++;
+   }
+
+   if(InpCooldownMinutes < 0)
+   {
+      Print("ERROR: InpCooldownMinutes must be >= 0 (got ", InpCooldownMinutes, ")");
+      valid = false;
+   }
+
+   if(InpRetrainMinTrades < 0)
+   {
+      Print("ERROR: InpRetrainMinTrades must be >= 0 (got ", InpRetrainMinTrades, ")");
+      valid = false;
+   }
+
+   if(InpRetrainMinWR < 0 || InpRetrainMinWR > 1.0)
+   {
+      Print("ERROR: InpRetrainMinWR must be 0-1.0 (got ", InpRetrainMinWR, ")");
+      valid = false;
+   }
+
+   if(InpRetrainMinPF <= 0)
+   {
+      Print("ERROR: InpRetrainMinPF must be > 0 (got ", InpRetrainMinPF, ")");
+      valid = false;
+   }
+
+   // ═══ CAPITAL ALLOCATION ═══
+   if(InpMinAllocation < 0 || InpMinAllocation > 1.0)
+   {
+      Print("ERROR: InpMinAllocation must be 0-1.0 (got ", InpMinAllocation, ")");
+      valid = false;
+   }
+
+   if(InpMaxAllocation < InpMinAllocation || InpMaxAllocation > 1.0)
+   {
+      Print("ERROR: InpMaxAllocation must be ", InpMinAllocation, "-1.0 (got ", InpMaxAllocation, ")");
+      valid = false;
+   }
+
+   if(InpAllocationPeriod < 1)
+   {
+      Print("ERROR: InpAllocationPeriod must be >= 1 (got ", InpAllocationPeriod, ")");
+      valid = false;
+   }
+
+   // ═══ SHADOW TRADING ═══
+   if(InpShadowTimeoutMin < 1)
+   {
+      Print("ERROR: InpShadowTimeoutMin must be >= 1 (got ", InpShadowTimeoutMin, ")");
+      valid = false;
+   }
+
+   if(InpShadowSL_ATR <= 0 || InpShadowSL_ATR > 10.0)
+   {
+      Print("ERROR: InpShadowSL_ATR must be 0-10 (got ", InpShadowSL_ATR, ")");
+      valid = false;
+   }
+
+   if(InpShadowTP_ATR <= 0 || InpShadowTP_ATR > 10.0)
+   {
+      Print("ERROR: InpShadowTP_ATR must be 0-10 (got ", InpShadowTP_ATR, ")");
+      valid = false;
+   }
+
+   if(InpSwapThreshold < 1.0)
+   {
+      Print("ERROR: InpSwapThreshold must be >= 1.0 (got ", InpSwapThreshold, ")");
+      valid = false;
+   }
+
+   if(InpSwapMinTrades < 5)
+   {
+      Print("WARNING: InpSwapMinTrades < 5 may cause premature swaps (", InpSwapMinTrades, ")");
+      warnings++;
+   }
+
+   // ═══ DISPLAY ═══
+   if(InpTopSymbols < 1 || InpTopSymbols > MAX_SYMBOLS)
+   {
+      Print("ERROR: InpTopSymbols must be 1-", MAX_SYMBOLS, " (got ", InpTopSymbols, ")");
+      valid = false;
+   }
+
+   // ═══ BUFFER SIZES ═══
    if(InpPhysicsBuffer < 10 || InpPhysicsBuffer > 1000)
    {
       Print("WARNING: InpPhysicsBuffer unusual (", InpPhysicsBuffer, "), using anyway");
+      warnings++;
+   }
+
+   // ═══ SANITY CHECKS ═══
+   // Check that at least one asset type is enabled
+   if(!InpTradeForex && !InpTradeMetals && !InpTradeIndices && !InpTradeCrypto)
+   {
+      Print("ERROR: At least one asset type must be enabled");
+      valid = false;
+   }
+
+   // Warn if max positions * risk exceeds safety threshold
+   double maxTotalRisk = InpMaxPositions * InpRiskPercent;
+   if(maxTotalRisk > 10.0)
+   {
+      Print("WARNING: Max concurrent risk = ", DoubleToString(maxTotalRisk, 1),
+            "% (", InpMaxPositions, " x ", InpRiskPercent, "%) - consider reducing");
+      warnings++;
    }
 
    if(valid)
-      Print("Input parameter validation: PASSED");
+      Print("Input parameter validation: PASSED (", warnings, " warnings)");
 
    return valid;
 }
@@ -630,7 +788,12 @@ void OnTick()
          // MEDIUM/LOW priority: queue for deferred processing
          else if(priority <= PRIORITY_LOW)
          {
-            g_perfManager.updateQueue.Enqueue(i, (int)priority);
+            // Fall back to direct update if queue is full (backpressure handling)
+            if(!g_perfManager.updateQueue.Enqueue(i, (int)priority))
+            {
+               UpdateSymbol(i);
+               g_perfManager.OnSymbolUpdated();
+            }
          }
          // IDLE priority: skip, will be updated in OnTimer
       }
@@ -673,31 +836,51 @@ void OnTick()
 
 //+------------------------------------------------------------------+
 //| INITIALIZE SYMBOLS                                                |
+//| Filters by asset type BEFORE allocating resources (memory-safe)   |
 //+------------------------------------------------------------------+
 bool InitializeSymbols()
 {
    int total = SymbolsTotal(true);
    g_symbolCount = 0;
-   
+
+   int skippedType = 0;      // Skipped due to asset type filter
+   int skippedNoBid = 0;     // Skipped due to no bid price
+   int skippedSpec = 0;      // Skipped due to broker spec failure
+
    for(int i = 0; i < total && g_symbolCount < MAX_SYMBOLS; i++)
    {
       string sym = SymbolName(i, true);
-      
-      if(SymbolInfoDouble(sym, SYMBOL_BID) <= 0) continue;
-      
+
+      // Early filter: skip symbols with no bid (not tradeable)
+      if(SymbolInfoDouble(sym, SYMBOL_BID) <= 0)
+      {
+         skippedNoBid++;
+         continue;
+      }
+
+      // Early filter: skip symbols by asset type BEFORE allocating resources
+      // This prevents memory bloat from untraded symbols
+      ENUM_ASSET_TYPE assetType = ClassifyAsset(sym);
+      if(!IsTypeAllowed(assetType))
+      {
+         skippedType++;
+         continue;
+      }
+
       int idx = g_symbolCount++;
       g_symbols[idx].Clear();
       g_symbols[idx].name = sym;
-      
+
       if(!GetBrokerSpec(sym, g_symbols[idx].spec))
       {
          g_symbolCount--;
+         skippedSpec++;
          continue;
       }
-      
-      g_symbols[idx].assetType = ClassifyAsset(sym);
-      g_symbols[idx].typeAllowed = IsTypeAllowed(g_symbols[idx].assetType);
-      
+
+      g_symbols[idx].assetType = assetType;
+      g_symbols[idx].typeAllowed = true;  // Already filtered above
+
       // Create ATR indicator with error handling and retry
       g_symbols[idx].atrHandle = iATR(sym, InpTimeframe, 14);
       if(g_symbols[idx].atrHandle == INVALID_HANDLE)
@@ -713,11 +896,17 @@ bool InitializeSymbols()
             // Symbol can still be used - UpdateSymbol will use fallback ATR calculation
          }
       }
-      
+
       g_symbols[idx].physics.Init(sym);
       g_symbols[idx].symc.Init();
       g_symbols[idx].initialized = true;
    }
+
+   // Log symbol discovery stats for tuning
+   Print("Symbol discovery: ", total, " available, ", g_symbolCount, " initialized");
+   Print("  Skipped: ", skippedNoBid, " no bid, ", skippedType, " filtered type, ", skippedSpec, " spec failed");
+   if(g_symbolCount >= MAX_SYMBOLS)
+      Print("  WARNING: Hit MAX_SYMBOLS cap (", MAX_SYMBOLS, ") - some symbols not tracked");
    
    return (g_symbolCount > 0);
 }
@@ -1318,6 +1507,46 @@ void ExecuteShadowTrade(int symIdx, int direction, double lots, int agentId,
 }
 
 //+------------------------------------------------------------------+
+//| CALCULATE PORTFOLIO EXPOSURE                                       |
+//| Returns total risk as percentage of equity                         |
+//+------------------------------------------------------------------+
+double GetPortfolioRiskPercent()
+{
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(equity <= 0) return 100.0;  // Safety: treat as max risk
+
+   double totalRisk = 0.0;
+
+   // Sum risk from all open real positions
+   for(int i = 0; i < g_posCount; i++)
+   {
+      if(g_positions[i].isShadow) continue;  // Skip shadow trades
+
+      double entryPrice = g_positions[i].entryPrice;
+      double sl = g_positions[i].currentSL;
+      double lots = g_positions[i].lots;
+
+      // Find symbol spec
+      int symIdx = FindSymbolIndex(g_positions[i].symbol);
+      if(symIdx < 0) continue;
+
+      double tickValue = g_symbols[symIdx].spec.tickValue;
+      double tickSize = g_symbols[symIdx].spec.tickSize;
+      if(tickValue <= 0) tickValue = 1.0;
+      if(tickSize <= 0) tickSize = g_symbols[symIdx].spec.point;
+
+      // Calculate risk in account currency
+      double slDistance = MathAbs(entryPrice - sl);
+      double slTicks = SafeDivide(slDistance, tickSize, 0.0);
+      double posRisk = slTicks * tickValue * lots;
+
+      totalRisk += posRisk;
+   }
+
+   return SafeDivide(totalRisk, equity, 0.0) * 100.0;
+}
+
+//+------------------------------------------------------------------+
 //| EXECUTE REAL TRADE                                                |
 //+------------------------------------------------------------------+
 void ExecuteRealTrade(int symIdx, int direction, double lots, int agentId,
@@ -1326,6 +1555,27 @@ void ExecuteRealTrade(int symIdx, int direction, double lots, int agentId,
    // Validate indices
    if(!IsValidIndex(symIdx, MAX_SYMBOLS)) return;
    if(g_posCount >= MAX_POSITIONS) return;
+
+   // ═══ PORTFOLIO-LEVEL EXPOSURE CHECK ═══
+   // Max total risk = positions * risk per trade (with 1.5x buffer for new trade)
+   double currentRisk = GetPortfolioRiskPercent();
+   double maxPortfolioRisk = InpMaxPositions * InpRiskPercent;
+   if(currentRisk + InpRiskPercent > maxPortfolioRisk * 1.2)  // 20% tolerance
+   {
+      Print("WARNING: Portfolio risk ", DoubleToString(currentRisk, 1),
+            "% would exceed limit. Trade rejected for ", g_symbols[symIdx].name);
+      return;
+   }
+
+   // ═══ FREE MARGIN CHECK ═══
+   double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+   double requiredMargin = lots * SymbolInfoDouble(g_symbols[symIdx].name, SYMBOL_MARGIN_INITIAL);
+   if(freeMargin < requiredMargin * 1.5)  // 50% buffer
+   {
+      Print("WARNING: Insufficient margin (free=", DoubleToString(freeMargin, 2),
+            ", required=", DoubleToString(requiredMargin, 2), "). Trade rejected.");
+      return;
+   }
 
    // DO NO HARM: Validate ATR before using for stop loss
    double atr = g_symbols[symIdx].atr;

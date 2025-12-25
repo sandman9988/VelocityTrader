@@ -20,7 +20,7 @@
 #define CACHE_TTL_SHORT       5      // 5 seconds for hot cache
 #define CACHE_TTL_MEDIUM      30     // 30 seconds for warm cache
 #define CACHE_TTL_LONG        300    // 5 minutes for cold cache
-#define UPDATE_QUEUE_SIZE     16     // Max pending symbol updates
+#define UPDATE_QUEUE_SIZE     64     // Max pending symbol updates (increased for backpressure handling)
 #define TIMER_INTERVAL_MS     250    // OnTimer interval (milliseconds)
 
 //+------------------------------------------------------------------+
@@ -334,12 +334,20 @@ struct AsyncUpdateQueue
 {
    UpdateQueueItem items[UPDATE_QUEUE_SIZE];
    int             count;
+   int             dropCount;          // Track dropped enqueues for telemetry
+   int             dropCountSession;   // Session total drops
+   datetime        lastDropLog;        // Throttle drop logging
+   int             peakDepth;          // High water mark for tuning
    // Note: We use scan-based slot finding instead of head/tail
    // because Dequeue clears arbitrary slots based on priority, not FIFO order
 
    void Init()
    {
       count = 0;
+      dropCount = 0;
+      dropCountSession = 0;
+      lastDropLog = 0;
+      peakDepth = 0;
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
          items[i].active = false;
    }
@@ -347,17 +355,36 @@ struct AsyncUpdateQueue
    bool Enqueue(int symbolIdx, int priority)
    {
       if(count >= UPDATE_QUEUE_SIZE)
-         return false;  // Queue full
+      {
+         // Queue full - track and log periodically
+         dropCount++;
+         dropCountSession++;
 
-      // Check if already in queue
+         // Log every 60 seconds max to avoid spam
+         datetime now = TimeCurrent();
+         if(now - lastDropLog >= 60)
+         {
+            Print("WARNING: Update queue full - dropped ", dropCount,
+                  " updates in last period (session total: ", dropCountSession, ")");
+            dropCount = 0;
+            lastDropLog = now;
+         }
+         return false;
+      }
+
+      // Check if already in queue - upgrade priority if needed
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
       {
          if(items[i].active && items[i].symbolIdx == symbolIdx)
-            return true;  // Already queued
+         {
+            // Upgrade priority if new request is higher
+            if(priority < items[i].priority)
+               items[i].priority = priority;
+            return true;  // Already queued (possibly upgraded)
+         }
       }
 
-      // Find next inactive slot (not just tail, which could overwrite active items)
-      // This is the correct approach since Dequeue clears arbitrary slots, not head
+      // Find next inactive slot
       int slot = -1;
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
       {
@@ -376,6 +403,11 @@ struct AsyncUpdateQueue
       items[slot].queuedTime = TimeCurrent();
       items[slot].active = true;
       count++;
+
+      // Track peak depth
+      if(count > peakDepth)
+         peakDepth = count;
+
       return true;
    }
 
@@ -384,16 +416,23 @@ struct AsyncUpdateQueue
       if(count == 0)
          return false;
 
-      // Find highest priority (lowest number) item
+      // Find highest priority (lowest number) item, with age-based tie-breaking
       int bestIdx = -1;
       int bestPriority = 999;
+      datetime oldestTime = TimeCurrent() + 86400; // Far future
 
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
       {
-         if(items[i].active && items[i].priority < bestPriority)
+         if(items[i].active)
          {
-            bestPriority = items[i].priority;
-            bestIdx = i;
+            // Prefer higher priority, then older items for fairness
+            if(items[i].priority < bestPriority ||
+               (items[i].priority == bestPriority && items[i].queuedTime < oldestTime))
+            {
+               bestPriority = items[i].priority;
+               oldestTime = items[i].queuedTime;
+               bestIdx = i;
+            }
          }
       }
 
@@ -409,6 +448,21 @@ struct AsyncUpdateQueue
    int Count() { return count; }
    bool IsEmpty() { return count == 0; }
    bool IsFull() { return count >= UPDATE_QUEUE_SIZE; }
+   int GetDropCount() { return dropCountSession; }
+   int GetPeakDepth() { return peakDepth; }
+
+   // Get oldest item age in seconds (for staleness monitoring)
+   int GetOldestAge()
+   {
+      if(count == 0) return 0;
+      datetime oldest = TimeCurrent();
+      for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
+      {
+         if(items[i].active && items[i].queuedTime < oldest)
+            oldest = items[i].queuedTime;
+      }
+      return (int)(TimeCurrent() - oldest);
+   }
 
    void Clear()
    {
