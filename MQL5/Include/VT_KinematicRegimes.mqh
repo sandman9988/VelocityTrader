@@ -9,6 +9,8 @@
 #property copyright "VelocityTrader v7.1"
 
 #include "VT_Definitions.mqh"
+#include "VT_Structures.mqh"    // For WelfordStats
+#include "VT_Logger.mqh"        // For ENUM_TRADE_TAG
 #include "VT_RLParameters.mqh"
 
 //+------------------------------------------------------------------+
