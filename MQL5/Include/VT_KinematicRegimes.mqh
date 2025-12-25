@@ -7,7 +7,6 @@
 #define VT_KINEMATIC_REGIMES_MQH
 
 #property copyright "VelocityTrader v7.1"
-#property strict
 
 #include "VT_Definitions.mqh"
 #include "VT_RLParameters.mqh"

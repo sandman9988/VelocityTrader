@@ -4,7 +4,6 @@
 //|                 Portfolio Correlation & Risk Management          |
 //+------------------------------------------------------------------+
 #property copyright "VelocityTrader"
-#property strict
 
 #include "VT_Performance.mqh"
 

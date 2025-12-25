@@ -16,9 +16,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  code-audit:
-    name: MQL5 Code Audit
+  super-audit:
+    name: MQL5 Super Audit (Primary Gate)
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run MQL5 Super Audit
+        run: |
+          echo "Running MQL5 Super Audit (Comprehensive Code Quality Check)..."
+          python Tools/mql5_super_audit.py --project . --output super_audit_report.json --verbose --fail-on-error
+
+      - name: Upload Audit Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mql5-super-audit-report
+          path: super_audit_report.json
+          retention-days: 30
+
+  code-audit:
+    name: MQL5 Code Auditor (Legacy)
+    runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -45,6 +72,7 @@ jobs:
   integrity-check:
     name: MQL5 Integrity Check
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -67,6 +95,7 @@ jobs:
   financial-audit:
     name: Financial Standards Audit
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -89,6 +118,7 @@ jobs:
   syntax-validation:
     name: MQL5 Syntax Validation
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -121,6 +151,7 @@ jobs:
   include-check:
     name: Include Dependencies Check
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -148,6 +179,7 @@ jobs:
   mql4-deprecation:
     name: MQL4 Deprecation Check
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -195,6 +227,7 @@ jobs:
   cpp-compatibility:
     name: C++ Compatibility Check
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -257,6 +290,7 @@ jobs:
   best-practices:
     name: Best Practices Check
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -324,6 +358,7 @@ jobs:
   metrics:
     name: Code Metrics
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -362,3 +397,43 @@ jobs:
 
           echo ""
           echo "=== Metrics Complete ==="
+
+  validation-summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [super-audit, code-audit, integrity-check, financial-audit, syntax-validation, include-check, mql4-deprecation, cpp-compatibility, best-practices, metrics]
+    if: always()
+
+    steps:
+      - name: Check validation status
+        run: |
+          echo "=== MQL5 Validation Summary ==="
+          echo ""
+          echo "Super Audit (Primary Gate): ${{ needs.super-audit.result }}"
+          echo "Code Audit: ${{ needs.code-audit.result }}"
+          echo "Integrity Check: ${{ needs.integrity-check.result }}"
+          echo "Financial Audit: ${{ needs.financial-audit.result }}"
+          echo "Syntax Validation: ${{ needs.syntax-validation.result }}"
+          echo "Include Check: ${{ needs.include-check.result }}"
+          echo "MQL4 Deprecation: ${{ needs.mql4-deprecation.result }}"
+          echo "C++ Compatibility: ${{ needs.cpp-compatibility.result }}"
+          echo "Best Practices: ${{ needs.best-practices.result }}"
+          echo "Metrics: ${{ needs.metrics.result }}"
+          echo ""
+
+          if [ "${{ needs.super-audit.result }}" != "success" ]; then
+            echo "❌ VALIDATION FAILED - Super audit did not pass"
+            exit 1
+          fi
+
+          if [ "${{ needs.mql4-deprecation.result }}" != "success" ]; then
+            echo "❌ VALIDATION FAILED - MQL4 deprecation check failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.cpp-compatibility.result }}" != "success" ]; then
+            echo "❌ VALIDATION FAILED - C++ compatibility check failed"
+            exit 1
+          fi
+
+          echo "✅ VALIDATION PASSED - All critical checks succeeded"

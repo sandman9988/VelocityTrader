@@ -7,7 +7,6 @@
 #define VT_TRADE_QUALITY_MQH
 
 #property copyright "VelocityTrader"
-#property strict
 
 #include "VT_Logger.mqh"
 #include "VT_Definitions.mqh"

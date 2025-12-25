@@ -4,7 +4,6 @@
 //|                        Dynamic Broker Contract Specifications    |
 //+------------------------------------------------------------------+
 #property copyright "VelocityTrader"
-#property strict
 
 #include "VT_Definitions.mqh"
 

@@ -29,7 +29,6 @@
 #property copyright "VelocityTrader v7.1"
 #property link      "Kinematic Duel Architecture"
 #property version   "7.10"
-#property strict
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>

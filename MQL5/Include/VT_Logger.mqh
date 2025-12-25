@@ -4,7 +4,6 @@
 //|                    Central Logger for RL Replay Learning         |
 //+------------------------------------------------------------------+
 #property copyright "VelocityTrader"
-#property strict
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
