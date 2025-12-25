@@ -3,6 +3,9 @@
 //|                                       VelocityTrader Framework   |
 //|                    Central Logger for RL Replay Learning         |
 //+------------------------------------------------------------------+
+#ifndef VT_LOGGER_MQH
+#define VT_LOGGER_MQH
+
 #property copyright "VelocityTrader"
 
 #include <Trade\Trade.mqh>
@@ -686,14 +689,17 @@ public:
             }
          }
 
-         // Flush with error check
-         if(!FileFlush(m_hLog))
+         // Flush with error check (FileFlush returns void, check GetLastError)
+         ResetLastError();
+         FileFlush(m_hLog);
+         int flushErr = GetLastError();
+         if(flushErr != 0)
          {
             // Flush failed - not critical, data is still buffered
             static int flushErrorCount = 0;
             if(flushErrorCount++ % 100 == 0)
             {
-               Print("WARNING: CVTLogger::Log - FileFlush failed (error: ", GetLastError(), ")");
+               Print("WARNING: CVTLogger::Log - FileFlush failed (error: ", flushErr, ")");
             }
          }
       }
@@ -1117,9 +1123,11 @@ public:
          // Flush periodically to avoid losing data on crash
          if(exportedCount > 0 && exportedCount % 1000 == 0)
          {
-            if(!FileFlush(h))
+            ResetLastError();
+            FileFlush(h);
+            int err = GetLastError();
+            if(err != 0)
             {
-               int err = GetLastError();
                Log(LOG_WARNING, StringFormat("ExportReplayBuffer - FileFlush failed at entry %d (error: %d)", i, err));
             }
          }

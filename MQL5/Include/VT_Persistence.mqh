@@ -18,8 +18,7 @@ extern string    InpFilePrefix;
 extern int       InpMagicNumber;
 extern double    InpLearningRateInit;
 
-// Persistence version for file format compatibility
-#define PERSISTENCE_VERSION  720   // Updated for learning rate storage
+// Persistence version defined in VT_Definitions.mqh (PERSISTENCE_VERSION = 720)
 
 //+------------------------------------------------------------------+
 //| Calculate CRC32-based checksum for data validation                |

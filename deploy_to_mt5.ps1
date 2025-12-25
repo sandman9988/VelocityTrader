@@ -29,31 +29,18 @@ $sourceExperts = Join-Path $repoRoot "MQL5\Experts"
 $destInclude = Join-Path $MT5Path "Include"
 $destExperts = Join-Path $MT5Path "Experts"
 
-# Copy Include files
+# Copy ALL Include files (VT_*.mqh)
 Write-Host "Copying Include files..." -ForegroundColor Yellow
-$includeFiles = @(
-    "VT_CircuitBreaker.mqh",
-    "VT_Definitions.mqh",
-    "VT_Globals.mqh",
-    "VT_HUD.mqh",
-    "VT_KinematicRegimes.mqh",
-    "VT_Performance.mqh",
-    "VT_Persistence.mqh",
-    "VT_Predictor.mqh",
-    "VT_RLParameters.mqh",
-    "VT_Structures.mqh"
-)
+$includeFiles = Get-ChildItem -Path $sourceInclude -Filter "VT_*.mqh" -ErrorAction SilentlyContinue
 
 foreach ($file in $includeFiles) {
-    $src = Join-Path $sourceInclude $file
-    $dst = Join-Path $destInclude $file
+    $dst = Join-Path $destInclude $file.Name
+    Copy-Item -Path $file.FullName -Destination $dst -Force
+    Write-Host "  Copied: $($file.Name)" -ForegroundColor Green
+}
 
-    if (Test-Path $src) {
-        Copy-Item -Path $src -Destination $dst -Force
-        Write-Host "  Copied: $file" -ForegroundColor Green
-    } else {
-        Write-Host "  MISSING: $file" -ForegroundColor Red
-    }
+if ($includeFiles.Count -eq 0) {
+    Write-Host "  WARNING: No VT_*.mqh files found in $sourceInclude" -ForegroundColor Red
 }
 
 # Copy Expert files
