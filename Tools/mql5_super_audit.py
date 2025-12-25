@@ -42,6 +42,7 @@ class Category(Enum):
     FINANCIAL_SAFETY = "FINANCIAL_SAFETY"
     POINTER_SAFETY = "POINTER_SAFETY"
     RESOURCE_LEAK = "RESOURCE_LEAK"
+    DATA_INTEGRITY = "DATA_INTEGRITY"  # Repainting, warmup, buffer issues
 
 
 @dataclass
@@ -255,6 +256,108 @@ class MQL5SuperAudit:
         ),
     }
 
+    # Data integrity patterns - repainting, warmup, buffer issues
+    # CRITICAL for avoiding trading on invalid/stale data
+    DATA_INTEGRITY_PATTERNS = {
+        # REPAINTING: Using current bar (index 0) for signals - bar is still forming!
+        r'\[\s*0\s*\]\s*(>|<|>=|<=|==|!=)\s*\w+\[\s*0\s*\]': (
+            "Current bar comparison [0] vs [0]",
+            "REPAINTING: Bar 0 is still forming! Use [1] for confirmed signals",
+            Severity.WARNING
+        ),
+        r'(close|open|high|low|volume)\[\s*0\s*\]\s*(>|<|>=|<=|==|!=)': (
+            "Signal using current bar price[0]",
+            "REPAINTING: Current bar incomplete! Use [1] for confirmed signals",
+            Severity.WARNING
+        ),
+        # Only flag when comparing indicator[0] to another indicator or price, not constants
+        r'(m_ma|ma|ema|sma|rsi|macd)\w*\[\s*0\s*\]\s*(>|<|>=|<=)\s*\w+\[': (
+            "Signal comparing indicator[0] vs array",
+            "REPAINTING: Indicator on bar 0 will change! Use [1] for confirmed signals",
+            Severity.WARNING
+        ),
+        # WARMUP: Not checking if enough bars available before calculation
+        r'(iMA|iRSI|iATR|iMACD|iADX|iBands|iStochastic)\s*\([^,]+,\s*[^,]+,\s*(\d{2,3})': (
+            "Indicator with large period",
+            "Ensure sufficient warmup bars (Bars > period) before first signal",
+            Severity.INFO
+        ),
+        # BUFFER: CopyBuffer starting from 0 without ArraySetAsSeries
+        r'CopyBuffer\s*\([^,]+,\s*[^,]+,\s*0\s*,': (
+            "CopyBuffer from index 0",
+            "Ensure ArraySetAsSeries(buffer, true) for newest-first indexing",
+            Severity.INFO
+        ),
+        # BUFFER: Indicator buffer not initialized
+        r'SetIndexBuffer\s*\([^)]+\)\s*;(?!\s*(ArraySetAsSeries|ArrayInitialize|PlotIndexSetDouble))': (
+            "SetIndexBuffer without initialization",
+            "Initialize buffer with EMPTY_VALUE or ArrayInitialize after SetIndexBuffer",
+            Severity.INFO
+        ),
+        # ARRAY DIRECTION: Potential confusion with array direction
+        r'for\s*\(\s*int\s+\w+\s*=\s*0\s*;[^;]+<[^;]+;[^)]+\+\+\s*\)\s*\{[^}]*\[\s*\w+\s*\]\s*=': (
+            "Forward loop filling array",
+            "Verify array direction: SetAsSeries(true)=[0]=newest, false=[0]=oldest",
+            Severity.INFO
+        ),
+        # LOOK-AHEAD BIAS: Using future data (negative shift)
+        r'(iClose|iOpen|iHigh|iLow|iTime|CopyClose|CopyOpen|CopyHigh|CopyLow)\s*\([^,]+,\s*[^,]+,\s*-\d+': (
+            "Negative shift/index in price function",
+            "LOOK-AHEAD BIAS: Negative index accesses future data - invalid backtest!",
+            Severity.ERROR
+        ),
+        # WARMUP: Trading immediately on init without warmup check
+        r'OnInit\s*\(\s*\)\s*\{[^}]*(OrderSend|PositionOpen)': (
+            "Trading in OnInit",
+            "No warmup period! Indicators need history before valid signals",
+            Severity.WARNING
+        ),
+        # BUFFER EMPTY: Not checking for EMPTY_VALUE before using indicator
+        r'\w+Buffer\[\s*\w+\s*\]\s*(>|<|>=|<=|==|!=)\s*(?!EMPTY_VALUE)': (
+            "Indicator buffer used without EMPTY_VALUE check",
+            "Check buffer[i] != EMPTY_VALUE before using - indicator may not be ready",
+            Severity.INFO
+        ),
+        # OFF-BY-ONE: Common boundary errors
+        r'for\s*\([^;]+;\s*\w+\s*<=\s*ArraySize\s*\(': (
+            "Loop with <= ArraySize()",
+            "OFF-BY-ONE: Use < ArraySize(), not <= (array is 0 to size-1)",
+            Severity.ERROR
+        ),
+        r'for\s*\([^;]+;\s*\w+\s*<=\s*Bars\b': (
+            "Loop with <= Bars",
+            "OFF-BY-ONE: Use < Bars, not <= (bars are 0 to Bars-1)",
+            Severity.ERROR
+        ),
+        r'\[\s*ArraySize\s*\([^)]+\)\s*\]': (
+            "Array access at ArraySize()",
+            "OFF-BY-ONE: Last valid index is ArraySize()-1, not ArraySize()",
+            Severity.ERROR
+        ),
+        r'\[\s*Bars\s*\]': (
+            "Array access at Bars",
+            "OFF-BY-ONE: Last valid bar is Bars-1, not Bars",
+            Severity.ERROR
+        ),
+        r'for\s*\(\s*int\s+\w+\s*=\s*1\s*;[^;]+;\s*\w+\s*<\s*ArraySize': (
+            "Loop starting at 1 with < ArraySize",
+            "Verify intent: Starting at 1 skips element [0] - intentional?",
+            Severity.INFO
+        ),
+        # RATES: Common confusion - rates[0] is OLDEST when not SetAsSeries
+        r'CopyRates\s*\([^)]+\)\s*;(?![^;]*ArraySetAsSeries)': (
+            "CopyRates without ArraySetAsSeries",
+            "rates[0] is OLDEST bar by default! Use ArraySetAsSeries for newest-first",
+            Severity.WARNING
+        ),
+        # NEGATIVE INDEX: Buffer underrun risk
+        r'\[\s*\w+\s*-\s*\d+\s*\]': (
+            "Array access with subtraction [i-n]",
+            "Verify i >= n to prevent negative index / buffer underrun",
+            Severity.INFO
+        ),
+    }
+
     # Safe cast patterns - these are intentional and don't need flagging
     SAFE_CAST_PATTERNS = [
         r'\(int\)\s*SymbolInfoInteger',      # Already integer, just type conversion
@@ -370,6 +473,20 @@ class MQL5SuperAudit:
                             suggestion=suggestion,
                             context=stripped[:80]
                         ))
+
+            # Check data integrity patterns (repainting, warmup, off-by-one, buffers)
+            for pattern, (name, suggestion, severity) in self.DATA_INTEGRITY_PATTERNS.items():
+                if re.search(pattern, line, re.IGNORECASE):
+                    issues.append(Issue(
+                        file=rel_path,
+                        line=i,
+                        category=Category.DATA_INTEGRITY,
+                        severity=severity,
+                        rule=name,
+                        message=f"Data integrity: {name}",
+                        suggestion=suggestion,
+                        context=stripped[:80]
+                    ))
 
             # Check for additional dangerous patterns not covered above
             self._check_dangerous_patterns(line, stripped, rel_path, i, issues)
