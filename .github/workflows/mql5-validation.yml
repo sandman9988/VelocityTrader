@@ -259,9 +259,10 @@ jobs:
             ERRORS=$((ERRORS+1))
           fi
 
-          # Check for exception handling
+          # Check for exception handling (exclude comments - "try" often appears in comments)
           echo "Checking for exception handling..."
-          if grep -rn --include="*.mq5" --include="*.mqh" -E '\b(try|catch|throw)\b' MQL5/ 2>/dev/null; then
+          # Look for actual C++ exception syntax: try { or catch( or throw expression
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '^\s*try\s*\{|\bcatch\s*\(|\bthrow\s+\w' MQL5/ 2>/dev/null | grep -v "//.*try\|//.*catch\|//.*throw"; then
             echo "ERROR: Exception handling not supported in MQL5."
             ERRORS=$((ERRORS+1))
           fi
