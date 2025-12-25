@@ -4,3 +4,4 @@ __pycache__/
 # Local integrity state files
 MQL5/.integrity_manifest.json
 Tools/.audit_baseline.json
+Tools/.audit_findings_cache.json
