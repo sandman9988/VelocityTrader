@@ -200,6 +200,46 @@ bool ValidateInputParameters()
       Print("ERROR: InpLearningRateInit must be 0-1.0 (got ", InpLearningRateInit, ")");
       valid = false;
    }
+   if(InpLearningRateMin <= 0 || InpLearningRateMin > InpLearningRateInit)
+   {
+      Print("ERROR: InpLearningRateMin must be >0 and <= InpLearningRateInit (got ", InpLearningRateMin, ")");
+      valid = false;
+   }
+   if(InpLearningDecay <= 0.90 || InpLearningDecay > 1.0)
+   {
+      Print("ERROR: InpLearningDecay must be 0.90-1.0 (got ", InpLearningDecay, ")");
+      valid = false;
+   }
+   if(InpExplorationRate < 0.0 || InpExplorationRate > 1.0)
+   {
+      Print("ERROR: InpExplorationRate must be 0-1.0 (got ", InpExplorationRate, ")");
+      valid = false;
+   }
+   if(InpShadowTimeoutMin < 1 || InpShadowTimeoutMin > 240)
+   {
+      Print("ERROR: InpShadowTimeoutMin must be 1-240 minutes (got ", InpShadowTimeoutMin, ")");
+      valid = false;
+   }
+   if(InpShadowSL_ATR <= 0.1 || InpShadowSL_ATR > 10.0)
+   {
+      Print("ERROR: InpShadowSL_ATR must be 0.1-10.0 (got ", InpShadowSL_ATR, ")");
+      valid = false;
+   }
+   if(InpShadowTP_ATR <= 0.1 || InpShadowTP_ATR > 10.0)
+   {
+      Print("ERROR: InpShadowTP_ATR must be 0.1-10.0 (got ", InpShadowTP_ATR, ")");
+      valid = false;
+   }
+   if(InpSwapThreshold < 1.0 || InpSwapThreshold > 5.0)
+   {
+      Print("ERROR: InpSwapThreshold must be 1.0-5.0 (got ", InpSwapThreshold, ")");
+      valid = false;
+   }
+   if(InpSwapMinTrades < 1 || InpSwapMinTrades > 1000)
+   {
+      Print("ERROR: InpSwapMinTrades must be 1-1000 (got ", InpSwapMinTrades, ")");
+      valid = false;
+   }
 
    // Signal threshold parameters (sigma thresholds, not 0-1 probabilities)
    if(InpSniperThreshold <= 0 || InpSniperThreshold > 10.0)
@@ -219,11 +259,72 @@ bool ValidateInputParameters()
       Print("ERROR: InpMinProbability must be 0-1.0 (got ", InpMinProbability, ")");
       valid = false;
    }
+   if(InpOmegaBaseline <= 0.0 || InpOmegaBaseline > 5.0)
+   {
+      Print("ERROR: InpOmegaBaseline must be 0-5.0 (got ", InpOmegaBaseline, ")");
+      valid = false;
+   }
+   if(InpOmegaMaxScale <= 0.1 || InpOmegaMaxScale > 5.0)
+   {
+      Print("ERROR: InpOmegaMaxScale must be 0.1-5.0 (got ", InpOmegaMaxScale, ")");
+      valid = false;
+   }
 
    // Buffer sizes
    if(InpPhysicsBuffer < 10 || InpPhysicsBuffer > 1000)
    {
       Print("WARNING: InpPhysicsBuffer unusual (", InpPhysicsBuffer, "), using anyway");
+   }
+
+   // Allocation and scheduling
+   if(InpMinAllocation < 0.0 || InpMinAllocation > 1.0 ||
+      InpMaxAllocation < 0.0 || InpMaxAllocation > 1.0 ||
+      InpMinAllocation > InpMaxAllocation)
+   {
+      Print("ERROR: Allocation bounds invalid (min ", InpMinAllocation, " max ", InpMaxAllocation, ")");
+      valid = false;
+   }
+   if(InpAllocationPeriod < 1 || InpAllocationPeriod > 10000)
+   {
+      Print("ERROR: InpAllocationPeriod must be 1-10000 trades (got ", InpAllocationPeriod, ")");
+      valid = false;
+   }
+   if(InpCooldownMinutes < 1 || InpCooldownMinutes > 24*60)
+   {
+      Print("ERROR: InpCooldownMinutes must be 1-1440 (got ", InpCooldownMinutes, ")");
+      valid = false;
+   }
+   if(InpRetrainMinTrades < 1 || InpRetrainMinTrades > 5000)
+   {
+      Print("ERROR: InpRetrainMinTrades must be 1-5000 (got ", InpRetrainMinTrades, ")");
+      valid = false;
+   }
+   if(InpRetrainMinWR < 0.0 || InpRetrainMinWR > 1.0)
+   {
+      Print("ERROR: InpRetrainMinWR must be 0-1.0 (got ", InpRetrainMinWR, ")");
+      valid = false;
+   }
+   if(InpRetrainMinPF <= 0.0 || InpRetrainMinPF > 10.0)
+   {
+      Print("ERROR: InpRetrainMinPF must be 0-10.0 (got ", InpRetrainMinPF, ")");
+      valid = false;
+   }
+
+   // HUD/display bounds
+   if(InpHUD_X < 0 || InpHUD_Y < 0)
+   {
+      Print("ERROR: HUD coordinates must be non-negative (got ", InpHUD_X, ",", InpHUD_Y, ")");
+      valid = false;
+   }
+   if(InpDefaultTab < 0 || InpDefaultTab > 5)
+   {
+      Print("ERROR: InpDefaultTab must be 0-5 (got ", InpDefaultTab, ")");
+      valid = false;
+   }
+   if(InpTopSymbols < 1 || InpTopSymbols > MAX_SYMBOLS)
+   {
+      Print("ERROR: InpTopSymbols must be 1-", MAX_SYMBOLS, " (got ", InpTopSymbols, ")");
+      valid = false;
    }
 
    if(valid)
@@ -639,7 +740,7 @@ void OnTick()
          }
          // IDLE priority: skip, will be updated in OnTimer
       }
-      }
+   }
 
    // ════════════════════════════════════════════════════════════════
    // UPDATE PRIORITIES: Based on current state
@@ -702,6 +803,13 @@ bool InitializeSymbols()
       
       g_symbols[idx].assetType = ClassifyAsset(sym);
       g_symbols[idx].typeAllowed = IsTypeAllowed(g_symbols[idx].assetType);
+
+      // Skip symbols that are not allowed by asset filters to avoid wasting buffers
+      if(!g_symbols[idx].typeAllowed)
+      {
+         g_symbolCount--;
+         continue;
+      }
       
       // Create ATR indicator with error handling and retry
       g_symbols[idx].atrHandle = iATR(sym, InpTimeframe, 14);
