@@ -37,6 +37,10 @@
 		</dict>
 		<dict>
 			<key>include</key>
+			<string>#best_practices</string>
+		</dict>
+		<dict>
+			<key>include</key>
 			<string>#keywords</string>
 		</dict>
 		<dict>
@@ -530,6 +534,236 @@
 					<string>:\s*(public|private|protected)\s+\w+\s*,\s*(public|private|protected)</string>
 					<key>name</key>
 					<string>invalid.illegal.unsupported-cpp.multiple-inheritance.mql5</string>
+				</dict>
+			</array>
+		</dict>
+		<key>best_practices</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>comment</key>
+					<string>POINTER SYNTAX: Arrow operator - correct for pointer access</string>
+					<key>match</key>
+					<string>\w+\s*-&gt;\s*\w+</string>
+					<key>name</key>
+					<string>punctuation.accessor.pointer.valid.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: GetPointer() returns pointer - use arrow after</string>
+					<key>match</key>
+					<string>GetPointer\s*\([^)]+\)\s*\.</string>
+					<key>name</key>
+					<string>invalid.warning.pointer-dot.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: new returns pointer - should use arrow</string>
+					<key>match</key>
+					<string>\bnew\s+\w+[^;]*;\s*\n[^;]*\w+\s*\.\s*\w+</string>
+					<key>name</key>
+					<string>invalid.warning.new-pointer-dot.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>ANTI-PATTERN: Sleep() in OnTick - blocks tick processing</string>
+					<key>match</key>
+					<string>\bSleep\s*\([^)]*\)</string>
+					<key>name</key>
+					<string>invalid.warning.sleep-blocking.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>ANTI-PATTERN: Direct double comparison - use MathAbs(a-b) &lt; epsilon</string>
+					<key>match</key>
+					<string>\b(double|float)\s+\w+[^;]*;\s*[^}]*\w+\s*(==|!=)\s*\w+</string>
+					<key>name</key>
+					<string>invalid.warning.double-comparison.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Hardcoded lot size - use calculated or input</string>
+					<key>match</key>
+					<string>\b(volume|lot|lots)\s*=\s*[0-9]+\.[0-9]+</string>
+					<key>name</key>
+					<string>invalid.warning.hardcoded-lot.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Hardcoded symbol - use _Symbol or input</string>
+					<key>match</key>
+					<string>"(EURUSD|GBPUSD|USDJPY|USDCHF|AUDUSD|USDCAD|NZDUSD|EURGBP|EURJPY|GBPJPY|XAUUSD|BTCUSD|US30|SPX500|NAS100)"</string>
+					<key>name</key>
+					<string>invalid.warning.hardcoded-symbol.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Hardcoded timeframe - use _Period or input</string>
+					<key>match</key>
+					<string>\b(PERIOD_M1|PERIOD_M5|PERIOD_M15|PERIOD_M30|PERIOD_H1|PERIOD_H4|PERIOD_D1|PERIOD_W1|PERIOD_MN1)\b(?!\s*\))</string>
+					<key>name</key>
+					<string>invalid.warning.hardcoded-timeframe.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Magic number 0 - likely missing magic number</string>
+					<key>match</key>
+					<string>\.magic\s*=\s*0\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.zero-magic.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Price without NormalizeDouble - may cause requotes</string>
+					<key>match</key>
+					<string>\.(price|sl|tp|stoplimit)\s*=\s*(?!NormalizeDouble)[^;]+;</string>
+					<key>name</key>
+					<string>invalid.warning.unnormalized-price.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: OrderSend without result check</string>
+					<key>match</key>
+					<string>\bOrderSend\s*\([^)]+\)\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.unchecked-ordersend.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: PositionSelect without result check</string>
+					<key>match</key>
+					<string>\bPositionSelect\s*\([^)]+\)\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.unchecked-positionselect.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Indicator handle not stored - causes memory leak</string>
+					<key>match</key>
+					<string>\b(iMA|iRSI|iMACD|iBands|iATR|iADX|iStochastic|iCCI|iCustom)\s*\([^)]+\)\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.unstored-handle.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: FileOpen without close - resource leak</string>
+					<key>match</key>
+					<string>\bFileOpen\s*\([^)]+\)\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.unclosed-file.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Array access with literal index - check bounds</string>
+					<key>match</key>
+					<string>\w+\[\s*[0-9]+\s*\]</string>
+					<key>name</key>
+					<string>invalid.warning.literal-array-index.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: while(true) infinite loop - ensure break condition</string>
+					<key>match</key>
+					<string>\bwhile\s*\(\s*(true|1)\s*\)</string>
+					<key>name</key>
+					<string>invalid.warning.infinite-loop.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Empty catch block - handle or log errors</string>
+					<key>match</key>
+					<string>\{\s*\}\s*//\s*(empty|ignore|todo)</string>
+					<key>name</key>
+					<string>invalid.warning.empty-block.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Recursive function - ensure termination</string>
+					<key>match</key>
+					<string>\b(\w+)\s*\([^)]*\)\s*\{[^}]*\1\s*\(</string>
+					<key>name</key>
+					<string>invalid.warning.recursion.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Division without zero check</string>
+					<key>match</key>
+					<string>/\s*\w+(?!\s*[!=&gt;&lt;])</string>
+					<key>name</key>
+					<string>meta.division.check-zero.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Hardcoded deviation/slippage</string>
+					<key>match</key>
+					<string>\.deviation\s*=\s*[0-9]+\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.hardcoded-deviation.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: Trade during weekend check</string>
+					<key>match</key>
+					<string>\bTimeDayOfWeek\s*\(\s*TimeCurrent\s*\(\s*\)\s*\)\s*(==|!=)\s*(0|6|SUNDAY|SATURDAY)</string>
+					<key>name</key>
+					<string>entity.name.function.weekend-check.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>POINTER: Dynamic object creation - remember to delete</string>
+					<key>match</key>
+					<string>\w+\s*\*\s*\w+\s*=\s*new\s+\w+</string>
+					<key>name</key>
+					<string>meta.pointer.dynamic-allocation.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>POINTER: Object pointer declaration</string>
+					<key>match</key>
+					<string>\b(class|struct)\s+\w+\s*\*</string>
+					<key>name</key>
+					<string>storage.type.pointer.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>POINTER: CheckPointer before use - good practice</string>
+					<key>match</key>
+					<string>\bCheckPointer\s*\(\s*\w+\s*\)\s*(==|!=)\s*POINTER_INVALID</string>
+					<key>name</key>
+					<string>entity.name.function.pointer-check.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>POINTER: NULL check before pointer use - good practice</string>
+					<key>match</key>
+					<string>\w+\s*(==|!=)\s*NULL\s*(&amp;&amp;|\|\||\))</string>
+					<key>name</key>
+					<string>entity.name.function.null-check.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: ArrayResize without size check</string>
+					<key>match</key>
+					<string>\bArrayResize\s*\([^)]+\)\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.unchecked-resize.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: CopyBuffer/CopyRates without checking return</string>
+					<key>match</key>
+					<string>\b(CopyBuffer|CopyRates|CopyTime|CopyOpen|CopyHigh|CopyLow|CopyClose|CopyTickVolume)\s*\([^)]+\)\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.unchecked-copy.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>BEST PRACTICE: SymbolInfoDouble for price - check success</string>
+					<key>match</key>
+					<string>\bSymbolInfoDouble\s*\([^)]+\)\s*;</string>
+					<key>name</key>
+					<string>invalid.warning.unchecked-symbolinfo.mql5</string>
 				</dict>
 			</array>
 		</dict>
