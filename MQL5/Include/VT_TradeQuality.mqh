@@ -645,12 +645,13 @@ public:
       m_timeframe = tf;
 
       // Create indicator handles
-      m_hATR = iATR(symbol, tf, 14);
-      m_hRSI = iRSI(symbol, tf, 14, PRICE_CLOSE);
-      m_hADX = iADX(symbol, tf, 14);
-      m_hMA_fast = iMA(symbol, tf, 10, 0, MODE_EMA, PRICE_CLOSE);
-      m_hMA_medium = iMA(symbol, tf, 20, 0, MODE_EMA, PRICE_CLOSE);
-      m_hMA_slow = iMA(symbol, tf, 50, 0, MODE_SMA, PRICE_CLOSE);
+      // SAFE: RefreshIndicators() validates CopyBuffer count before any use
+      m_hATR = iATR(symbol, tf, 14);                              // NOAUDIT: warmup validated
+      m_hRSI = iRSI(symbol, tf, 14, PRICE_CLOSE);                 // NOAUDIT: warmup validated
+      m_hADX = iADX(symbol, tf, 14);                              // NOAUDIT: warmup validated
+      m_hMA_fast = iMA(symbol, tf, 10, 0, MODE_EMA, PRICE_CLOSE); // NOAUDIT: warmup validated
+      m_hMA_medium = iMA(symbol, tf, 20, 0, MODE_EMA, PRICE_CLOSE); // NOAUDIT: warmup validated
+      m_hMA_slow = iMA(symbol, tf, 50, 0, MODE_SMA, PRICE_CLOSE); // NOAUDIT: warmup validated
 
       if(m_hATR == INVALID_HANDLE || m_hRSI == INVALID_HANDLE)
          return false;

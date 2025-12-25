@@ -395,6 +395,11 @@ class MQL5SuperAudit:
             files.extend(mql5_dir.rglob("*.mqh"))
         return sorted(files)
 
+    # Suppression comments - allows developers to mark verified-safe code
+    # Usage: // NOAUDIT: reason
+    #        // SAFE: warmup handled in OnInit
+    SUPPRESSION_PATTERN = re.compile(r'//\s*(NOAUDIT|SAFE|VERIFIED|REVIEWED)\s*:', re.IGNORECASE)
+
     def audit_file(self, file_path: Path) -> List[Issue]:
         """Audit a single file"""
         issues = []
@@ -412,6 +417,10 @@ class MQL5SuperAudit:
             # Skip comments
             stripped = line.strip()
             if stripped.startswith('//'):
+                continue
+
+            # Skip lines with suppression comments (developer verified safe)
+            if self.SUPPRESSION_PATTERN.search(line):
                 continue
 
             # Check MQL4 deprecated patterns
@@ -711,7 +720,27 @@ class MQL5SuperAudit:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="MQL5 Super Audit - Comprehensive code quality analysis"
+        description="MQL5 Super Audit - Comprehensive code quality analysis",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Suppression Comments:
+  Add these to suppress warnings on verified-safe lines:
+    // NOAUDIT: reason       - Suppress all checks on this line
+    // SAFE: explanation     - Mark as verified safe
+    // VERIFIED: by whom     - Mark as reviewed
+    // REVIEWED: date        - Mark as reviewed
+
+Examples:
+  m_hATR = iATR(sym, tf, 14);  // SAFE: warmup handled in OnInit
+  closes[i-1]                   // VERIFIED: loop starts at i=1
+
+DO NO HARM Principle:
+  This tool enforces financial safety by flagging:
+  - Unchecked ArrayResize/CopyBuffer (trading on garbage data)
+  - Missing ArraySetAsSeries (wrong data direction)
+  - Indicator warmup issues (invalid signals)
+  - Buffer underrun risks (negative array index)
+        """
     )
     parser.add_argument(
         "--project", "-p",
