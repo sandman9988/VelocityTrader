@@ -184,27 +184,28 @@ class MQL5SuperAudit:
         ),
     }
 
-    # Best practice patterns
+    # Best practice patterns - FINANCIAL CODE: DO NO HARM!
+    # Every unchecked operation is a potential point of failure that could cause financial loss
     BEST_PRACTICE_PATTERNS = {
         r'\bSleep\s*\([^)]*\)': (
             "Sleep() call",
-            "Blocks tick processing - consider EventSetTimer",
+            "Blocks tick processing - missed trades possible! Use EventSetTimer",
             Severity.WARNING
         ),
         r'OrderSend\s*\([^)]+\)\s*;': (
             "Unchecked OrderSend",
-            "Always check OrderSend return value",
-            Severity.WARNING
+            "CRITICAL: Must check OrderSend return - failed orders lose money!",
+            Severity.ERROR
         ),
         r'ArrayResize\s*\([^)]+\)\s*;': (
             "Unchecked ArrayResize",
-            "Check return value matches requested size",
-            Severity.INFO
+            "Memory failure = trading on garbage data! Check return value",
+            Severity.WARNING
         ),
         r'(CopyBuffer|CopyRates|CopyClose|CopyHigh|CopyLow)\s*\([^)]+\)\s*;': (
             "Unchecked Copy* function",
-            "Check return value for copy count",
-            Severity.INFO
+            "Indicator data may not be ready - trading on stale/missing data!",
+            Severity.WARNING
         ),
         r'\.magic\s*=\s*0\s*;': (
             "Magic number = 0",
