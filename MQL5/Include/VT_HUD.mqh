@@ -47,6 +47,10 @@ void HUD_Create(string name, int x, int y, string text, color clr, int size = 8)
       ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetString(0, name, OBJPROP_FONT, "Consolas");
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 10);
+      // Make non-selectable and hidden from object list
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, name, OBJPROP_SELECTED, false);
+      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
    }
    ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
    ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
@@ -84,8 +88,13 @@ void HUD_Rect(string name, int x, int y, int w, int h, color bg, color border)
       }
       g_hudObjects[g_hudCount++] = name;
       ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-      ObjectSetInteger(0, name, OBJPROP_BACK, false);
+      // BACK=true draws rectangle behind chart elements (proper layering)
+      ObjectSetInteger(0, name, OBJPROP_BACK, true);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
+      // Make non-selectable and hidden from object list
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, name, OBJPROP_SELECTED, false);
+      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
    }
    ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
    ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
@@ -118,13 +127,20 @@ void DrawTab_Instruments(int x, int &y, int h, int sec);
 
 //+------------------------------------------------------------------+
 //| DrawHUD: Main HUD rendering function                              |
+//| Throttled to 1 Hz to reduce chart overhead                        |
 //+------------------------------------------------------------------+
 void DrawHUD()
 {
    if(!InpShowHUD) return;
 
-   // Track tab changes to clear old content
+   // Track tab changes and throttle updates
    static int lastTab = -1;
+   static datetime lastDraw = 0;
+
+   // Throttle: only update at 1 Hz unless tab changed
+   bool tabChanged = (lastTab != g_hudTab);
+   if(!tabChanged && (TimeCurrent() == lastDraw))
+      return;  // Same second, no tab change - skip update
 
    // Initialize tab on first run
    static bool tabInit = false;
@@ -140,14 +156,17 @@ void DrawHUD()
    {
       g_hudTab = (g_hudTab + 1) % TAB_COUNT;
       g_hudLastTabSwitch = TimeCurrent();
+      tabChanged = true;
    }
 
    // Clear ALL HUD objects when tab changes
-   if(lastTab != g_hudTab)
+   if(tabChanged)
    {
       CleanupHUD();
       lastTab = g_hudTab;
    }
+
+   lastDraw = TimeCurrent();
 
    // Update system status periodically
    static datetime lastStatusUpdate = 0;
@@ -304,26 +323,31 @@ void DrawTab_Dashboard(int x, int &y, int h, int sec)
    HUD_Create("H_D10", x+8, y, StringFormat("Circuit Breaker: %s", stateStr), stateClr);
    y += h;
 
-   // Open positions status - find oldest
+   // Open positions status - find oldest, count shadow and real separately
    int oldestAge = 0;
-   int openCount = 0;
+   int openShadow = 0;
+   int openReal = 0;
    for(int i = 0; i < g_posCount && i < MAX_POSITIONS; i++)
    {
-      if(!IsValidIndex(i, MAX_POSITIONS)) continue;
-      if(g_positions[i].active && g_positions[i].isShadow)
+      if(i < 0 || i >= ArraySize(g_positions)) continue;
+      if(g_positions[i].active)
       {
-         openCount++;
+         if(g_positions[i].isShadow)
+            openShadow++;
+         else
+            openReal++;
          int age = (int)((TimeCurrent() - g_positions[i].openTime) / 60);
          if(age > oldestAge) oldestAge = age;
       }
    }
 
-   int closedTrades = g_sniper.shadow.totalTrades + g_berserker.shadow.totalTrades;
+   // Use session trades (not all-time totalTrades which persists across restarts)
+   int sessShadowClosed = g_sniper.shadow.sessTotalTrades + g_berserker.shadow.sessTotalTrades;
    int timeToClose = MathMax(0, InpShadowTimeoutMin - oldestAge);
 
-   color learnClr = (closedTrades > 0) ? CLR_POSITIVE : CLR_NEUTRAL;
-   HUD_Create("H_D11", x+8, y, StringFormat("Open:%d Closed:%d | Oldest:%dmin (close in %dm)",
-      openCount, closedTrades, oldestAge, timeToClose), learnClr);
+   color learnClr = (sessShadowClosed > 0) ? CLR_POSITIVE : CLR_NEUTRAL;
+   HUD_Create("H_D11", x+8, y, StringFormat("Shadow:%d Real:%d Sess:%d | Oldest:%dmin (close in %dm)",
+      openShadow, openReal, sessShadowClosed, oldestAge, timeToClose), learnClr);
    y += h;
 
    // Regime distribution
@@ -483,9 +507,14 @@ void DrawTab_Training(int x, int &y, int h, int sec)
       g_berserker.shadow.regime[2].learningRate, berAvg), CLR_BERSERKER);
    y += h + sec;
 
-   // Convergence
-   double convSni = (1.0 - SafeDivide(sniAvg, InpLearningRateInit, 1.0)) * 100;
-   double convBer = (1.0 - SafeDivide(berAvg, InpLearningRateInit, 1.0)) * 100;
+   // Convergence: ratio of current learning rate to initial
+   // When LR decays toward 0, convergence approaches 100%
+   // Clamp to [0, 100] - ratio > 1 means LR hasn't decayed (0% converged)
+   double ratioSni = SafeDivide(sniAvg, InpLearningRateInit, 1.0);
+   double convSni = MathMax(0.0, MathMin(1.0, 1.0 - ratioSni)) * 100.0;
+   double ratioBer = SafeDivide(berAvg, InpLearningRateInit, 1.0);
+   double convBer = MathMax(0.0, MathMin(1.0, 1.0 - ratioBer)) * 100.0;
+
    string status = (convSni > 80 && convBer > 80) ? "CONVERGED" :
                    (convSni > 50 || convBer > 50) ? "LEARNING" : "EXPLORING";
    color statClr = (convSni > 80 && convBer > 80) ? CLR_POSITIVE :
@@ -574,11 +603,14 @@ void DrawTab_Risk(int x, int &y, int h, int sec)
    if(g_breaker.peakEquity > 0)
       dd = SafeDivide(g_breaker.peakEquity - equity, g_breaker.peakEquity, 0.0) * 100;
 
-   color ddClr = (dd < InpMaxDrawdown * 50) ? CLR_POSITIVE :
-                 (dd < InpMaxDrawdown * 100) ? CLR_NEUTRAL : CLR_NEGATIVE;
+   // Explicit risk thresholds for display coloring
+   double ddMaxPct = InpMaxDrawdown * 100.0;           // Max drawdown as percent (e.g., 5.0%)
+   double ddWarnPct = ddMaxPct * 0.5;                  // Warning at 50% of max (e.g., 2.5%)
+   color ddClr = (dd < ddWarnPct) ? CLR_POSITIVE :
+                 (dd < ddMaxPct) ? CLR_NEUTRAL : CLR_NEGATIVE;
 
-   HUD_Create("H_R2", x+8, y, StringFormat("Current: %.2f%% / %.0f%% max | Peak: $%.0f",
-      dd, InpMaxDrawdown * 100, g_breaker.peakEquity), ddClr);
+   HUD_Create("H_R2", x+8, y, StringFormat("Current: %.2f%% / %.1f%% max | Peak: $%.0f",
+      dd, ddMaxPct, g_breaker.peakEquity), ddClr);
    y += h + sec;
 
    HUD_Create("H_R3", x+8, y, "--- DAILY LIMITS ---", CLR_HEADER);
@@ -586,12 +618,16 @@ void DrawTab_Risk(int x, int &y, int h, int sec)
 
    double sessionPnL = equity - g_sessionEquity;
    double dailyLossPct = SafeDivide(MathMin(0, sessionPnL), g_sessionEquity, 0.0) * 100;
+   double dailyLossAbs = MathAbs(dailyLossPct);
 
-   color dayClr = (MathAbs(dailyLossPct) < InpMaxDailyLoss * 50) ? CLR_POSITIVE :
-                  (MathAbs(dailyLossPct) < InpMaxDailyLoss * 100) ? CLR_NEUTRAL : CLR_NEGATIVE;
+   // Explicit daily loss thresholds for display coloring
+   double dailyMaxPct = InpMaxDailyLoss * 100.0;       // Max daily loss as percent (e.g., 2.0%)
+   double dailyWarnPct = dailyMaxPct * 0.5;            // Warning at 50% of max (e.g., 1.0%)
+   color dayClr = (dailyLossAbs < dailyWarnPct) ? CLR_POSITIVE :
+                  (dailyLossAbs < dailyMaxPct) ? CLR_NEUTRAL : CLR_NEGATIVE;
 
-   HUD_Create("H_R4", x+8, y, StringFormat("Daily Loss: %.2f%% / %.0f%% max",
-      MathAbs(dailyLossPct), InpMaxDailyLoss * 100), dayClr);
+   HUD_Create("H_R4", x+8, y, StringFormat("Daily Loss: %.2f%% / %.1f%% max",
+      dailyLossAbs, dailyMaxPct), dayClr);
    y += h + sec;
 
    HUD_Create("H_R5", x+8, y, "--- CIRCUIT BREAKER ---", CLR_HEADER);
@@ -647,9 +683,9 @@ void DrawTab_Instruments(int x, int &y, int h, int sec)
 
    for(int i = 0; i < g_rankCount && i < 50 && i < MAX_SYMBOLS; i++)
    {
-      if(!IsValidIndex(i, MAX_SYMBOLS)) continue;
+      // Note: i is already bounds-checked by loop condition (i < MAX_SYMBOLS)
       int idx = g_ranking[i].symbolIdx;
-      if(!IsValidIndex(idx, MAX_SYMBOLS)) continue;
+      if(!IsValidIndex(idx, MAX_SYMBOLS)) continue;  // idx from g_ranking needs validation
       if(!g_symbols[idx].initialized) continue;
 
       ENUM_REGIME regime = g_symbols[idx].symc.GetRegime();
