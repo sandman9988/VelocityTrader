@@ -722,7 +722,7 @@ Header files should have include guards with #define.
 #endif  // VT_MYHEADER_MQH
 ```
 
-### LANG008: Operator Precedence – Mixed && and || Without Parentheses - MEDIUM
+### LANG008: Operator Precedence - Mixed && and || Without Parentheses - MEDIUM
 When combining `&&` and `||` in a single condition, always use parentheses to make the intended logic explicit.
 
 ```mql5
@@ -759,7 +759,7 @@ Always include required header files for types you use.
 #include "VT_Logger.mqh"        // If using ENUM_TRADE_TAG or TAG_*
 ```
 
-### LANG010: FileFlush Returns Void – Cannot Use in Boolean Context - HIGH
+### LANG010: FileFlush Returns Void - Cannot Use in Boolean Context - HIGH
 `FileFlush()` returns `void` in MQL5, not `bool`. Cannot use with `!` or in conditions.
 
 ```mql5
