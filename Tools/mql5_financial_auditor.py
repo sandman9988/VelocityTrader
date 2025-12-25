@@ -1461,7 +1461,7 @@ class FinancialCodeAuditor:
             try:
                 size = orphan_path.stat().st_size
                 size_kb = size / 1024
-            except OSError:
+            except (OSError, PermissionError):
                 size_kb = 0
 
             findings.append(AuditFinding(
