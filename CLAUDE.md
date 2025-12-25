@@ -709,6 +709,38 @@ All header files must have proper include guards.
 #endif // VT_MYHEADER_MQH
 ```
 
+### LANG009: No Extern for Input Parameters in Includes - HIGH
+Include files should NOT use `extern` for input parameters.
+
+```mql5
+// NEVER in .mqh files:
+extern double InpRiskPercent;      // Causes type conflict!
+extern int    InpMaxPositions;     // Causes type conflict!
+
+// CORRECT: Input parameters defined in main EA are automatically global.
+// Just use them directly without redeclaration:
+void SomeFunction()
+{
+    double risk = InpRiskPercent;  // Works - no extern needed
+}
+```
+
+### LANG010: No Standalone Function Declarations in Includes - MEDIUM
+Standalone function forward declarations cause `#import` errors.
+
+```mql5
+// NEVER in .mqh files (outside class):
+int CountPositions();              // Error: no #import declaration!
+double CalculateRisk();            // Error: no #import declaration!
+
+// CORRECT: Either provide full implementation or use class:
+class CPositionManager
+{
+public:
+    int CountPositions();          // OK - inside class
+};
+```
+
 ---
 
 ## Project-Specific Helpers

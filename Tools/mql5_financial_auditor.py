@@ -665,6 +665,26 @@ class FinancialAuditRules:
             'description': 'Bare open/close/high/low may need struct prefix (candle.open, bar.close)',
             'recommendation': 'Use explicit prefix: candle.open, bar.close, rates[i].high, etc.'
         },
+        'LANG013': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'Extern Declaration of Input Parameter in Include File',
+            'pattern': r'^extern\s+\w+\s+Inp\w+\s*;',
+            'exclude_pattern': r'//|/\*',
+            'file_type': '.mqh',
+            'description': 'Include files should not redeclare input parameters with extern. Input parameters are globally accessible.',
+            'recommendation': 'Remove extern declarations. Input parameters defined in main EA are automatically available.'
+        },
+        'LANG014': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Function Forward Declaration Outside Class (Causes #import Error)',
+            'pattern': r'^\s*(?:int|double|bool|void|string|datetime|color)\s+\w+\s*\([^)]*\)\s*;',
+            'exclude_pattern': r'//|/\*|class\s+|struct\s+|#import',
+            'file_type': '.mqh',
+            'description': 'Standalone function declarations in .mqh files cause "no #import declaration" errors',
+            'recommendation': 'Move function declaration inside a class, or provide full function definition'
+        },
     }
 
 
