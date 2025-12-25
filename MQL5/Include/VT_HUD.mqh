@@ -43,11 +43,24 @@ void HUD_Create(string name, int x, int y, string text, color clr, int size = 8)
 {
    if(ObjectFind(0, name) < 0)
    {
-      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
-      int newSize = g_hudCount + 1;
-      if(ArrayResize(g_hudObjects, newSize) < 0)
+      // Create object with error handling
+      if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0))
       {
-         Print("ERROR: ArrayResize failed for HUD objects - UI element not tracked: ", name);
+         int err = GetLastError();
+         // Error 4200 = object already exists (race condition), not a real error
+         if(err != 4200 && err != 0)
+         {
+            Print("ERROR: HUD_Create - ObjectCreate failed for '", name, "' (error: ", err, ")");
+            return;
+         }
+      }
+
+      int newSize = g_hudCount + 1;
+      if(ArrayResize(g_hudObjects, newSize) != newSize)
+      {
+         Print("ERROR: HUD_Create - ArrayResize failed for HUD objects - UI element not tracked: ", name);
+         // Clean up the object we just created since we can't track it
+         ObjectDelete(0, name);
          return;
       }
       g_hudObjects[g_hudCount++] = name;
@@ -69,11 +82,24 @@ void HUD_Rect(string name, int x, int y, int w, int h, color bg, color border)
 {
    if(ObjectFind(0, name) < 0)
    {
-      ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+      // Create object with error handling
+      if(!ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
+      {
+         int err = GetLastError();
+         // Error 4200 = object already exists (race condition), not a real error
+         if(err != 4200 && err != 0)
+         {
+            Print("ERROR: HUD_Rect - ObjectCreate failed for '", name, "' (error: ", err, ")");
+            return;
+         }
+      }
+
       int newSize = g_hudCount + 1;
       if(ArrayResize(g_hudObjects, newSize) != newSize)
       {
-         Print("ERROR: ArrayResize failed for HUD objects - UI element not tracked: ", name);
+         Print("ERROR: HUD_Rect - ArrayResize failed for HUD objects - UI element not tracked: ", name);
+         // Clean up the object we just created since we can't track it
+         ObjectDelete(0, name);
          return;
       }
       g_hudObjects[g_hudCount++] = name;

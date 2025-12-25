@@ -665,43 +665,53 @@ void LoadProfile(int handle, AgentProfile &profile)
 
    for(int i = 0; i < loopCount; i++)
    {
-      // Load Q-values (no strict bounds, but validate they're finite)
+      // Explicit bounds check for safety - skip iteration if out of bounds
+      if(i < 0 || i >= ArraySize(profile.regime))
+      {
+         Print("ERROR: LoadProfile - index out of bounds: ", i, " >= ", ArraySize(profile.regime));
+         continue;
+      }
+
+      // Load all values from file first (before any array access)
       double qBuy = FileReadDouble(handle);
       double qSell = FileReadDouble(handle);
       double qHold = FileReadDouble(handle);
+      int trades = FileReadInteger(handle);
+      int wins = FileReadInteger(handle);
+      double pnl = FileReadDouble(handle);
+      double upside = FileReadDouble(handle);
+      double downside = FileReadDouble(handle);
+      double learningRate = FileReadDouble(handle);
 
-      // Validate Q-values are finite (not NaN or Inf)
+      // Validate all values
       if(!MathIsValidNumber(qBuy)) qBuy = 0.0;
       if(!MathIsValidNumber(qSell)) qSell = 0.0;
       if(!MathIsValidNumber(qHold)) qHold = 0.0;
-
-      profile.regime[i].qBuy = qBuy;
-      profile.regime[i].qSell = qSell;
-      profile.regime[i].qHold = qHold;
-
-      // Load and validate trade counts (must be non-negative)
-      int trades = FileReadInteger(handle);
-      int wins = FileReadInteger(handle);
-      profile.regime[i].trades = MathMax(0, trades);
-      profile.regime[i].wins = MathMax(0, MathMin(wins, trades));  // wins <= trades
-
-      // Load and validate PnL (no strict bounds but must be finite)
-      double pnl = FileReadDouble(handle);
-      profile.regime[i].pnl = MathIsValidNumber(pnl) ? pnl : 0.0;
-
-      // Load and validate upside/downside (must be non-negative)
-      double upside = FileReadDouble(handle);
-      double downside = FileReadDouble(handle);
-      profile.regime[i].upside = MathIsValidNumber(upside) ? MathMax(0.0, upside) : 0.0;
-      profile.regime[i].downside = MathIsValidNumber(downside) ? MathMax(0.0, downside) : 0.0;
-
-      // Load and validate learning rate (must be positive, reasonable range)
-      double learningRate = FileReadDouble(handle);
+      trades = MathMax(0, trades);
+      wins = MathMax(0, MathMin(wins, trades));
+      if(!MathIsValidNumber(pnl)) pnl = 0.0;
+      if(!MathIsValidNumber(upside)) upside = 0.0;
+      upside = MathMax(0.0, upside);
+      if(!MathIsValidNumber(downside)) downside = 0.0;
+      downside = MathMax(0.0, downside);
       if(!MathIsValidNumber(learningRate) || learningRate <= 0.0 || learningRate > 1.0)
-         learningRate = InpLearningRateInit;  // Use default if invalid
-      profile.regime[i].learningRate = learningRate;
+         learningRate = InpLearningRateInit;
 
-      profile.regime[i].InvalidateCache();
+      // Now perform all array assignments with bounds-checked index
+      // Using ArraySize check immediately before access satisfies static analysis
+      if(i >= 0 && i < ArraySize(profile.regime))
+      {
+         profile.regime[i].qBuy = qBuy;
+         profile.regime[i].qSell = qSell;
+         profile.regime[i].qHold = qHold;
+         profile.regime[i].trades = trades;
+         profile.regime[i].wins = wins;
+         profile.regime[i].pnl = pnl;
+         profile.regime[i].upside = upside;
+         profile.regime[i].downside = downside;
+         profile.regime[i].learningRate = learningRate;
+         profile.regime[i].InvalidateCache();
+      }
    }
 }
 

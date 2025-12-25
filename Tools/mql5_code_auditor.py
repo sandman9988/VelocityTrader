@@ -193,8 +193,15 @@ class MQL5Parser:
         self.current_file = str(file_path)
 
         # Read file and compute hash
-        with open(file_path, 'rb') as f:
-            content_bytes = f.read()
+        try:
+            with open(file_path, 'rb') as f:
+                content_bytes = f.read()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: {file_path}")
+        except PermissionError:
+            raise PermissionError(f"Permission denied reading: {file_path}")
+        except (IOError, OSError) as e:
+            raise IOError(f"I/O error reading '{file_path}': {e}")
 
         sha256 = hashlib.sha256(content_bytes).hexdigest()
         size_bytes = len(content_bytes)
@@ -202,24 +209,38 @@ class MQL5Parser:
         # Check BOM
         has_bom = content_bytes.startswith(b'\xef\xbb\xbf')
 
-        # Detect encoding
-        try:
-            content = content_bytes.decode('utf-8-sig')
-            encoding = 'utf-8'
-        except UnicodeDecodeError:
+        # Detect encoding with fallback chain
+        content = None
+        encoding = 'unknown'
+        encodings_to_try = [
+            ('utf-8-sig', 'utf-8'),
+            ('utf-16', 'utf-16'),
+            ('latin-1', 'latin-1'),
+        ]
+        for enc, enc_name in encodings_to_try:
             try:
-                content = content_bytes.decode('utf-16')
-                encoding = 'utf-16'
+                content = content_bytes.decode(enc)
+                encoding = enc_name
+                break
             except UnicodeDecodeError:
-                content = content_bytes.decode('latin-1')
-                encoding = 'latin-1'
+                continue
+
+        if content is None:
+            # Last resort: decode with errors='replace'
+            content = content_bytes.decode('utf-8', errors='replace')
+            encoding = 'utf-8-lossy'
+            logger.warning(f"File '{file_path}' has encoding issues, some characters replaced")
 
         self.lines = content.split('\n')
         line_count = len(self.lines)
 
         # Get file modification time
-        mtime = os.path.getmtime(file_path)
-        last_modified = datetime.fromtimestamp(mtime).isoformat()
+        try:
+            mtime = os.path.getmtime(file_path)
+            last_modified = datetime.fromtimestamp(mtime).isoformat()
+        except (OSError, ValueError) as e:
+            logger.warning(f"Could not get modification time for '{file_path}': {e}")
+            last_modified = datetime.now().isoformat()
 
         # Create audit record
         audit = FileAudit(
@@ -539,13 +560,21 @@ class MQL5CodeAuditor:
 
         # Find all MQL5 files
         if paths is None:
-            paths = self._find_mql5_files()
+            try:
+                paths = self._find_mql5_files()
+            except (OSError, PermissionError) as e:
+                logger.error(f"Error finding MQL5 files: {e}")
+                paths = []
+
+        if not paths:
+            logger.warning("No MQL5 files found to audit")
 
         logger.info(f"Found {len(paths)} MQL5 files")
 
         # Parse each file
         file_audits = []
         total_lines = 0
+        files_with_errors = 0
 
         for path in paths:
             try:
@@ -557,8 +586,21 @@ class MQL5CodeAuditor:
                 if issue_count > 0:
                     logger.info(f"  {path.name}: {issue_count} issues")
 
+            except FileNotFoundError:
+                files_with_errors += 1
+                logger.warning(f"File not found: {path}")
+            except PermissionError:
+                files_with_errors += 1
+                logger.warning(f"Permission denied: {path}")
+            except (IOError, OSError) as e:
+                files_with_errors += 1
+                logger.error(f"I/O error parsing {path}: {e}")
             except Exception as e:
+                files_with_errors += 1
                 logger.error(f"Failed to parse {path}: {e}")
+
+        if files_with_errors > 0:
+            logger.warning(f"{files_with_errors} file(s) could not be parsed")
 
         # Build dependency graph
         self.resolver.build_dependency_graph(file_audits)
@@ -616,10 +658,21 @@ class MQL5CodeAuditor:
         if self.report is None:
             raise ValueError("No audit report available. Run audit() first.")
 
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(self.report.to_dict(), f, indent=2)
-
-        logger.info(f"Report saved to {output_path}")
+        try:
+            # Ensure parent directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(self.report.to_dict(), f, indent=2)
+            logger.info(f"Report saved to {output_path}")
+        except PermissionError:
+            logger.error(f"Permission denied writing to: {output_path}")
+            raise
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to save report to '{output_path}': {e}")
+            raise
+        except (TypeError, ValueError) as e:
+            logger.error(f"Failed to serialize report to JSON: {e}")
+            raise
 
     def print_summary(self) -> None:
         """Print audit summary to console"""
@@ -686,36 +739,64 @@ Examples:
         logging.getLogger().setLevel(logging.DEBUG)
 
     # Resolve project root
-    project_root = args.project.resolve()
+    try:
+        project_root = args.project.resolve()
+    except (OSError, ValueError) as e:
+        logger.error(f"Invalid project path '{args.project}': {e}")
+        return 2
+
     if not project_root.exists():
         logger.error(f"Project root does not exist: {project_root}")
-        return 1
+        return 2
+    if not project_root.is_dir():
+        logger.error(f"Project path is not a directory: {project_root}")
+        return 2
 
-    # Run audit
-    auditor = MQL5CodeAuditor(project_root)
+    try:
+        # Run audit
+        auditor = MQL5CodeAuditor(project_root)
 
-    if args.files:
-        # Audit specific files
-        paths = []
-        for f in args.files:
-            found = list(project_root.rglob(f))
-            paths.extend(found)
-        report = auditor.audit(paths)
-    else:
-        report = auditor.audit()
+        if args.files:
+            # Audit specific files
+            paths = []
+            for f in args.files:
+                try:
+                    found = list(project_root.rglob(f))
+                    if not found:
+                        logger.warning(f"No files matching '{f}' found")
+                    paths.extend(found)
+                except (OSError, ValueError) as e:
+                    logger.warning(f"Error searching for '{f}': {e}")
+            if not paths:
+                logger.error("No files found matching the specified patterns")
+                return 2
+            report = auditor.audit(paths)
+        else:
+            report = auditor.audit()
 
-    # Print summary
-    auditor.print_summary()
+        # Print summary
+        auditor.print_summary()
 
-    # Save report if requested
-    if args.output:
-        auditor.save_report(args.output)
+        # Save report if requested
+        if args.output:
+            try:
+                auditor.save_report(args.output)
+            except (PermissionError, IOError, OSError) as e:
+                logger.error(f"Failed to save report: {e}")
+                return 2
 
-    # Return error code if critical issues found
-    if report.severity_counts.get('CRITICAL', 0) > 0:
-        return 1
+        # Return error code if critical issues found
+        if report.severity_counts.get('CRITICAL', 0) > 0:
+            return 1
 
-    return 0
+        return 0
+
+    except KeyboardInterrupt:
+        logger.info("Audit interrupted by user")
+        return 130
+    except Exception as e:
+        logger.error(f"Unexpected error during audit: {e}")
+        return 2
 
 
 if __name__ == "__main__":

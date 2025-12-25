@@ -474,15 +474,59 @@ public:
       m_maxBufferSize = bufferSize;
       m_sessionStart = TimeCurrent();
 
-      // Create log directory with proper error handling
+      // Create log directory with proper error handling and fallback
+      bool folderReady = false;
+      string originalPath = m_logPath;
+
       if(!FolderCreate(m_logPath))
       {
          int err = GetLastError();
          // Error 5020 = folder already exists, which is fine
-         if(err != 5020 && err != 0)
+         if(err == 5020 || err == 0)
+         {
+            folderReady = true;
+         }
+         else
          {
             Print("WARNING: CVTLogger::Init - Cannot create log folder: ", m_logPath, " (error: ", err, ")");
+
+            // Try fallback to simpler path
+            m_logPath = "VT_Logs";
+            if(!FolderCreate(m_logPath))
+            {
+               err = GetLastError();
+               if(err == 5020 || err == 0)
+               {
+                  folderReady = true;
+                  Print("INFO: CVTLogger::Init - Using fallback log folder: ", m_logPath);
+               }
+               else
+               {
+                  // Last resort: use terminal's Files folder root
+                  m_logPath = "";  // Root of Files folder
+                  folderReady = true;
+                  Print("WARNING: CVTLogger::Init - Using terminal Files root for logging");
+               }
+            }
+            else
+            {
+               folderReady = true;
+               Print("INFO: CVTLogger::Init - Using fallback log folder: ", m_logPath);
+            }
          }
+      }
+      else
+      {
+         folderReady = true;
+      }
+
+      if(!folderReady)
+      {
+         Print("ERROR: CVTLogger::Init - Failed to create any log folder. File logging disabled.");
+         if(m_destination == LOG_DEST_FILE)
+            m_destination = LOG_DEST_PRINT;  // Fallback to print-only
+         else if(m_destination == LOG_DEST_BOTH)
+            m_destination = LOG_DEST_PRINT;
       }
 
       // Open log files
@@ -619,8 +663,39 @@ public:
       if((m_destination == LOG_DEST_FILE || m_destination == LOG_DEST_BOTH) &&
          m_hLog != INVALID_HANDLE)
       {
-         FileWriteString(m_hLog, logLine + "\n");
-         FileFlush(m_hLog);
+         uint written = FileWriteString(m_hLog, logLine + "\n");
+         if(written == 0)
+         {
+            // File write failed - log to Print and try to recover
+            int err = GetLastError();
+            Print("WARNING: CVTLogger::Log - FileWriteString failed (error: ", err, ")");
+
+            // Try to reopen the file if it was closed unexpectedly
+            if(err == 5002 || err == 5004)  // Invalid handle or file not open
+            {
+               // Attempt to reopen
+               string dateStr = TimeToString(TimeCurrent(), TIME_DATE);
+               StringReplace(dateStr, ".", "");
+               string logFile = m_logPath + "\\" + m_logPrefix + "_" + dateStr + ".log";
+               m_hLog = FileOpen(logFile, FILE_WRITE|FILE_TXT|FILE_SHARE_READ|FILE_READ);
+               if(m_hLog != INVALID_HANDLE)
+               {
+                  FileSeek(m_hLog, 0, SEEK_END);  // Append to end
+                  FileWriteString(m_hLog, logLine + "\n");
+               }
+            }
+         }
+
+         // Flush with error check
+         if(!FileFlush(m_hLog))
+         {
+            // Flush failed - not critical, data is still buffered
+            static int flushErrorCount = 0;
+            if(flushErrorCount++ % 100 == 0)
+            {
+               Print("WARNING: CVTLogger::Log - FileFlush failed (error: ", GetLastError(), ")");
+            }
+         }
       }
 
       m_eventCount++;
@@ -815,11 +890,20 @@ public:
       // Validate inputs
       if(batchSize <= 0)
       {
+         Print("WARNING: CVTLogger::SampleBatch - invalid batchSize: ", batchSize);
          return 0;
       }
 
-      if(m_bufferCount == 0)
+      if(m_bufferCount <= 0)
       {
+         Print("WARNING: CVTLogger::SampleBatch - buffer is empty");
+         return 0;
+      }
+
+      // Ensure buffer size is valid
+      if(m_bufferSize <= 0 || ArraySize(m_replayBuffer) == 0)
+      {
+         Print("ERROR: CVTLogger::SampleBatch - replay buffer not initialized");
          return 0;
       }
 
@@ -831,26 +915,59 @@ public:
 
       if(ArrayResize(batch, actualSize) != actualSize)
       {
-         Print("WARNING: CVTLogger::SampleBatch - cannot allocate batch array");
+         Print("WARNING: CVTLogger::SampleBatch - cannot allocate batch array of size ", actualSize);
          return 0;
       }
 
-      for(int i = 0; i < actualSize; i++)
+      int sampledCount = 0;
+      int maxAttempts = actualSize * 3;  // Allow retries for better sampling
+      int attempts = 0;
+
+      while(sampledCount < actualSize && attempts < maxAttempts)
       {
-         // Use modulo with bounds check to prevent any overflow issues
-         int randIdx = MathAbs(MathRand()) % m_bufferCount;
-         if(randIdx >= 0 && randIdx < m_bufferCount)
+         attempts++;
+
+         // Generate random index with multiple safety checks
+         int randVal = MathAbs(MathRand());
+         if(randVal < 0) randVal = 0;  // Handle int overflow edge case
+
+         int randIdx = randVal % m_bufferCount;
+
+         // Triple bounds check for safety
+         if(randIdx < 0)
+            randIdx = 0;
+         if(randIdx >= m_bufferCount)
+            randIdx = m_bufferCount - 1;
+         if(randIdx >= ArraySize(m_replayBuffer))
+            randIdx = ArraySize(m_replayBuffer) - 1;
+
+         // Final validation before access (check all array bounds)
+         if(randIdx >= 0 && randIdx < m_bufferCount && randIdx < ArraySize(m_replayBuffer) &&
+            sampledCount >= 0 && sampledCount < ArraySize(batch))
          {
-            batch[i] = m_replayBuffer[randIdx];
+            batch[sampledCount] = m_replayBuffer[randIdx];
+            sampledCount++;
          }
          else
          {
-            // Fallback to first entry if something goes wrong
-            batch[i] = m_replayBuffer[0];
+            // Log but don't fail - try again
+            Print("WARNING: CVTLogger::SampleBatch - invalid index ", randIdx,
+                  " (bufferCount=", m_bufferCount, ", arraySize=", ArraySize(m_replayBuffer), ")");
          }
       }
 
-      return actualSize;
+      if(sampledCount < actualSize)
+      {
+         Print("WARNING: CVTLogger::SampleBatch - only sampled ", sampledCount, "/", actualSize, " entries");
+         // Resize batch to actual size
+         if(sampledCount > 0)
+         {
+            if(ArrayResize(batch, sampledCount) != sampledCount)
+               Print("WARNING: CVTLogger::SampleBatch - ArrayResize to ", sampledCount, " failed");
+         }
+      }
+
+      return sampledCount;
    }
 
    //+------------------------------------------------------------------+
@@ -954,6 +1071,8 @@ public:
 
       int exportedCount = 0;
       int errorCount = 0;
+      int consecutiveErrors = 0;
+      const int MAX_CONSECUTIVE_ERRORS = 10;  // Abort if too many errors in a row
 
       for(int i = 0; i < m_bufferCount; i++)
       {
@@ -964,27 +1083,60 @@ public:
             if(written > 0)
             {
                exportedCount++;
+               consecutiveErrors = 0;  // Reset on success
             }
             else
             {
                errorCount++;
+               consecutiveErrors++;
+               int err = GetLastError();
+
+               // Check for critical errors (disk full, etc.)
+               if(err == 5025 || err == 5026)  // File too big or disk full
+               {
+                  Log(LOG_ERROR, StringFormat("ExportReplayBuffer - disk full or file too large at entry %d (error: %d)", i, err));
+                  FileClose(h);
+                  return false;
+               }
+
+               // Abort if too many consecutive errors
+               if(consecutiveErrors >= MAX_CONSECUTIVE_ERRORS)
+               {
+                  Log(LOG_ERROR, StringFormat("ExportReplayBuffer - aborting after %d consecutive write errors", MAX_CONSECUTIVE_ERRORS));
+                  FileClose(h);
+                  return false;
+               }
             }
          }
          else
          {
             errorCount++;
+            // Empty JSON is not a consecutive error, just skip
+         }
+
+         // Flush periodically to avoid losing data on crash
+         if(exportedCount > 0 && exportedCount % 1000 == 0)
+         {
+            if(!FileFlush(h))
+            {
+               int err = GetLastError();
+               Log(LOG_WARNING, StringFormat("ExportReplayBuffer - FileFlush failed at entry %d (error: %d)", i, err));
+            }
          }
       }
 
+      // Final flush before close
+      FileFlush(h);
       FileClose(h);
 
-      if(errorCount > 0)
+      if(errorCount > 0 && m_bufferCount > 0)
       {
-         Log(LOG_WARNING, StringFormat("ExportReplayBuffer - %d/%d entries had errors",
-             errorCount, m_bufferCount));
+         double successRate = SafeDivide((double)exportedCount, (double)m_bufferCount, 0.0) * 100.0;
+         Log(LOG_WARNING, StringFormat("ExportReplayBuffer - %d/%d entries had errors (%.1f%% success rate)",
+             errorCount, m_bufferCount, successRate));
       }
 
-      Log(LOG_INFO, StringFormat("Exported %d experiences to %s", exportedCount, filename));
+      Log(LOG_INFO, StringFormat("Exported %d/%d experiences to %s", exportedCount, m_bufferCount, filename));
 
       return exportedCount > 0;
    }

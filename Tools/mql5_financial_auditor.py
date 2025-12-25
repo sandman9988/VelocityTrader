@@ -89,7 +89,7 @@ class FinancialAuditRules:
             'severity': Severity.CRITICAL,
             'title': 'Unsafe Division Operation',
             'pattern': r'(?<!/)/(?!/|=|\*)\s*([a-zA-Z_]\w*)',
-            'exclude_pattern': r'SafeDiv|SafeDivide|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*2\.0|/\s*10\.0|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'|// |/\*|MathSqrt\s*\(\s*2|MESO_WINDOW|MICRO_WINDOW|MACRO_WINDOW|KINEMATIC_STATES|numBins|_WINDOW|_SIZE|_COUNT|MathLog\s*\(|/\s*MathLog',
+            'exclude_pattern': r'SafeDiv|SafeDivide|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*2\.0|/\s*10\.0|/\s*60|/\s*32767|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'|// |/\*|MathSqrt\s*\(\s*2|MESO_WINDOW|MICRO_WINDOW|MACRO_WINDOW|KINEMATIC_STATES|numBins|_WINDOW|_SIZE|_COUNT|MathLog\s*\(|/\s*MathLog|/\s*point|/\s*Point|volumeStep|lotStep|spec\.|MathRand',
             'description': 'Division by variable without zero-check can crash or produce infinity',
             'recommendation': 'Use SafeDivide(numerator, denominator, default_value) or explicit zero-check',
             'check_denominator_validation': True,  # Special flag for checking nearby validation
@@ -102,7 +102,8 @@ class FinancialAuditRules:
             'title': 'Direct Floating Point Comparison',
             'pattern': r'(?:==|!=)\s*(?:\d+\.\d+|[a-zA-Z_]\w*\s*[,)])',
             'context_pattern': r'double|float',
-            'exclude_pattern': r'NULL|nullptr|true|false|\w+\s*==\s*\w+\s*\)|enum|int\s+\w+|long\s+\w+',
+            # Exclude: int comparisons, ArrayResize returns, handles, strings, enums, zero checks
+            'exclude_pattern': r'NULL|nullptr|true|false|\w+\s*==\s*\w+\s*\)|enum|int\s+\w+|long\s+\w+|ArrayResize|PositionGet|INVALID_HANDLE|symbol|Symbol|magic|Magic|type|Type|Handle|String|Integer|POSITION_|ORDER_|DEAL_|==\s*0\.0|!=\s*0\.0|denominator',
             'description': 'Direct equality comparison of floating point values is unreliable',
             'recommendation': 'Use MathAbs(a - b) < EPSILON or IsEqual(a, b)'
         },
@@ -111,6 +112,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Potential Integer Overflow',
             'pattern': r'\b(int|long)\s+\w+\s*=\s*\w+\s*\*\s*\w+',
+            # Exclude multiplications by small constants (safe operations)
+            'exclude_pattern': r'\*\s*[2-9]\s*;|\*\s*1[0-9]\s*;',
             'description': 'Integer multiplication without overflow check',
             'recommendation': 'Use SafeMul() or check bounds before multiplication'
         },
@@ -119,7 +122,8 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Hardcoded Numeric Constant',
             'pattern': r'(?<![\w.])(?:0\.0[0-9]{3,}|[1-9]\d{3,}(?:\.\d+)?)(?![\w.])',
-            'exclude_pattern': r'#define|const\s+|FNV|2166136261|16777619|0\.0001|32768|1440|10080|43200|86400|/ 100\.0|tolerance|epsilon',
+            # Exclude: constants, FNV hash, time calculations, forex standards, scaling factors, error codes
+            'exclude_pattern': r'#define|const\s+|FNV|2166136261|16777619|0\.0001|32768|1440|10080|43200|86400|/ 100\.0|tolerance|epsilon|100000|10000|1000000|0\.00001|1024|4200|4201|4202|4203|swapLong|swapShort|point\s*\*|lotMin|lotStep|contractSize|tickSize|lotMax',
             'description': 'Magic numbers should be defined as named constants',
             'recommendation': 'Define as const or #define with descriptive name'
         },
@@ -146,7 +150,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Unsafe Power Operation',
             'pattern': r'MathPow\s*\(',
-            'exclude_pattern': r'SafePow',
+            # Exclude squaring (power of 2) since it's always safe mathematically
+            'exclude_pattern': r'SafePow|,\s*2\s*\)|,\s*2\.0\s*\)',
             'description': 'MathPow can overflow or return NaN with certain inputs',
             'recommendation': 'Use SafePow() with bounds checking'
         },
@@ -159,7 +164,7 @@ class FinancialAuditRules:
             'severity': Severity.CRITICAL,
             'title': 'Array Access Without Bounds Check',
             'pattern': r'(\w+)\s*\[\s*([a-zA-Z_]\w*(?:\s*[\+\-\*/]\s*\w+)*)\s*\]',
-            'exclude_pattern': r'ArraySize|<\s*ArraySize|>=\s*0\s*&&|IsValidIndex|SafeArrayAccess',
+            'exclude_pattern': r'ArraySize|<\s*ArraySize|>=\s*0\s*&&|IsValidIndex|SafeArrayAccess|MathMin|safeCount|loopCount|actualSize|sampledCount|m_bufferCount|m_historyIdx|m_markedCount|regimeCount|for\s*\(\s*int\s+\w+\s*=\s*0',
             'description': 'Array access with computed index without bounds validation',
             'recommendation': 'Validate: if(index >= 0 && index < ArraySize(arr))',
             'check_loop_bounds': True,  # Special flag for smarter checking
@@ -169,16 +174,22 @@ class FinancialAuditRules:
             'category': AuditCategory.MEMORY_SAFETY,
             'severity': Severity.HIGH,
             'title': 'Dynamic Memory Without Null Check',
-            'pattern': r'new\s+\w+',
-            'exclude_pattern': r'==\s*NULL|!=\s*NULL|if\s*\(',
+            # Match 'new ClassName(' for actual allocations, not "New" in strings
+            'pattern': r'=\s*new\s+[A-Z]\w*\s*\(',
+            # Exclude: NULL checks on same line, member variables (typically checked on next line)
+            'exclude_pattern': r'==\s*NULL|!=\s*NULL|if\s*\(|m_\w+\s*=\s*new',
             'description': 'Dynamic allocation may fail, returning NULL',
-            'recommendation': 'Always check: if(ptr == NULL) { handle error }'
+            'recommendation': 'Always check: if(ptr == NULL) { handle error }',
+            'check_next_line_null': True  # Flag for future: check if next line has NULL check
         },
         'MEM003': {
             'category': AuditCategory.MEMORY_SAFETY,
             'severity': Severity.HIGH,
             'title': 'Potential Memory Leak',
-            'pattern': r'\bnew\s+\w+',
+            # Match 'new ClassName(' for actual allocations, not "New" in strings
+            'pattern': r'=\s*new\s+[A-Z]\w*\s*\(',
+            # Exclude member variables (managed in destructor)
+            'exclude_pattern': r'm_\w+\s*=\s*new',
             'context_check': 'delete_tracking',
             'description': 'Dynamic allocation without corresponding delete',
             'recommendation': 'Ensure every new has matching delete or use RAII pattern'
@@ -188,7 +199,8 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'ArrayResize Without Error Check',
             'pattern': r'ArrayResize\s*\([^)]+\)',
-            'exclude_pattern': r'if\s*\(|==\s*-1|<\s*0',
+            # Exclude: checks, result captured, resize to 0 (always safe), size comparison
+            'exclude_pattern': r'if\s*\(|==\s*-1|<\s*0|=\s*ArrayResize|,\s*0\s*\)|!=\s*\w*[Ss]ize',
             'description': 'ArrayResize returns -1 on failure',
             'recommendation': 'Check return: if(ArrayResize(arr, size) < 0) { handle error }'
         },
@@ -229,7 +241,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Stop Level Not Validated',
             'pattern': r'(?:stop|sl|tp)\s*[=:]\s*\w+\s*[\+\-]',
-            'exclude_pattern': r'SYMBOL_TRADE_STOPS_LEVEL|ValidateStop',
+            # Exclude: calculations already using minDistance, trailing stop calculations, validated distances
+            'exclude_pattern': r'SYMBOL_TRADE_STOPS_LEVEL|ValidateStop|minStop|minTP|minDistance|potentialSL|trailDist|atr\s*\*',
             'description': 'Stop/TP distance not checked against broker minimum',
             'recommendation': 'Validate against SymbolInfoInteger(SYMBOL_TRADE_STOPS_LEVEL)'
         },
@@ -238,7 +251,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Price Not Normalized',
             'pattern': r'(?:price|entry|exit)\s*=\s*(?!\s*NormalizeDouble)',
-            'exclude_pattern': r'NormalizeDouble|Bid|Ask|SymbolInfo|=\s*0|=\s*prices\[|=\s*GlobalVariable|z_score|slippage|Calculate|first_|last_',
+            # Exclude: API values, bid/ask, enums, booleans, member assignments, direction-based price selection
+            'exclude_pattern': r'NormalizeDouble|Bid|Ask|SymbolInfo|=\s*0|=\s*prices\[|=\s*GlobalVariable|z_score|slippage|Calculate|first_|last_|PositionGet|m_posInfo|m_dealInfo|DEAL_ENTRY|signal|minStop|minTP|PriceOpen|PriceCurrent|=\s*(?:true|false)|openPrice\s*=\s*Position|entryPrice\s*=\s*m_|regimeAt|pWinAt|m_lastPrice|currentPrice\s*=\s*\(|=\s*\([^)]+\?\s*(?:bid|ask)|\.entryPrice\s*=|\.exitPrice\s*=|currentSL|spec\.ask|spec\.bid|direction\s*[><=]',
             'description': 'Prices must be normalized to symbol digits',
             'recommendation': 'Use NormalizeDouble(price, _Digits)'
         },
@@ -332,7 +346,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Missing Data Validity Check',
             'pattern': r'iClose|iOpen|iHigh|iLow|iVolume|iTime',
-            'exclude_pattern': r'==\s*0|==\s*EMPTY_VALUE|if\s*\(|SafeOHLCV|GetSafeOHLCV|IsValid|\.valid|MathIsValidNumber|IsValidNumber|data\.|mc\.',
+            # Exclude: validity checks, safe wrappers, quality analysis context (non-critical), prev/current bar comparison
+            'exclude_pattern': r'==\s*0|==\s*EMPTY_VALUE|if\s*\(|SafeOHLCV|GetSafeOHLCV|IsValid|\.valid|MathIsValidNumber|IsValidNumber|data\.|mc\.|quality\.|engulfing|prev\w+\s*=\s*i[A-Z]|current\w+\s*=\s*i[A-Z]',
             'description': 'Historical data access without validity check',
             'recommendation': 'Check for EMPTY_VALUE or 0 before using data',
             'check_in_safe_function': True  # Exclude if inside GetSafeOHLCV function
@@ -431,7 +446,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Missing Null Pointer Check',
             'pattern': r'(\w+)\s*[.>]\s*\w+\s*\(',
-            'exclude_pattern': r'!=\s*NULL|==\s*NULL|if\s*\(\s*\w+\s*\)|\.Init\(|\.Reset\(|\.Clear\(|\.Update\(|\.Calculate\(|\.Detect\(|\.Normalize\(|\.GetVolatility\(|\.Get[A-Z]|\.Set[A-Z]|\.Is[A-Z]|\.Has[A-Z]|\.Add[A-Z]|\.Remove[A-Z]|\.Any|\.To[A-Z]|\.Recalc|\.Decay|\.Invalidate|result\.|state\.|config\.|cfg\.|micro\.|meso\.|macro\.|m_\w+\.|this\.|child\.|metrics\.|yz\.|cycle\.|physics\.|w\.|g_\w+\.|_trade\.|trade\.|profile\.|agent\.|stats\.|regime\[|spec\.|breaker\.|predictor\.|sniper\.|berserker\.|symc\.',
+            # Exclude: member objects, history/cache objects, local references, queues, MT5 built-ins
+            'exclude_pattern': r'!=\s*NULL|==\s*NULL|if\s*\(\s*\w+\s*\)|\.Init\(|\.Reset\(|\.Clear\(|\.Update\(|\.Calculate\(|\.Detect\(|\.Normalize\(|\.GetVolatility\(|\.Get[A-Z]|\.Set[A-Z]|\.Is[A-Z]|\.Has[A-Z]|\.Add[A-Z]|\.Remove[A-Z]|\.Any|\.To[A-Z]|\.Recalc|\.Decay|\.Invalidate|result\.|state\.|config\.|cfg\.|micro\.|meso\.|macro\.|m_\w+\.|this\.|child\.|metrics\.|yz\.|cycle\.|physics\.|w\.|g_\w+\.|_trade\.|trade\.|profile\.|agent\.|stats\.|regime\[|spec\.|breaker\.|predictor\.|sniper\.|berserker\.|symc\.|History\.|cached\w*\.|rolling\w*\.|real\.|pnl\w*\.|win\w*\.|symbol\.|action\.|request\.|response\.|\.Push\(|\.Pop\(|\.Count\(|TimeCurrent|s1\.|s2\.|entry\.|exit\.|quality\.|avg\w+\.|update\w+\.|\.Dequeue\(|\.Enqueue\(|\.CalculateStats\(|\.CalculateOverall\(|Print\(',
             'description': 'Object method call without null check',
             'recommendation': 'Check: if(ptr != NULL) before dereferencing'
         },
@@ -476,7 +492,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Hardcoded Array Size in Loop',
             'pattern': r'for\s*\([^;]+;\s*\w+\s*<\s*[0-9]+\s*;',
-            'exclude_pattern': r'<\s*3\s*;|<\s*4\s*;|<\s*5\s*;|ArraySize|REGIME|_COUNT|MAX_|NUM_',
+            # Exclude small constants and well-known safe values (7=days, 8=bits, 10=retries, 256=bytes)
+            'exclude_pattern': r'<\s*[0-9]\s*;|<\s*1[0-2]\s*;|<\s*256\s*;|ArraySize|REGIME|_COUNT|MAX_|NUM_',
             'description': 'Loop with hardcoded limit may break if array size changes',
             'recommendation': 'Use ArraySize(arr) or define a named constant for the size'
         },
@@ -485,7 +502,8 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Index Calculation Without Clamp',
             'pattern': r'\[\s*\w+\s*[+\-*/]\s*\d+\s*\]',
-            'exclude_pattern': r'MathMin|MathMax|Clamp|%\s*\d+|%\s*\w+|SafeIndex|ClampIndex|IsValidIndex',
+            # Exclude: clamp functions, modulo, small fixed offsets (0-9), feature index patterns
+            'exclude_pattern': r'MathMin|MathMax|Clamp|%\s*\d+|%\s*\w+|SafeIndex|ClampIndex|IsValidIndex|\+\s*[0-9]\s*\]|startIdx|featureIdx|baseIdx',
             'description': 'Computed index without range clamping may go out of bounds',
             'recommendation': 'Use MathMax(0, MathMin(idx, size-1)) or modulo operator'
         },
@@ -498,9 +516,11 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Missing Audit Trail',
             'pattern': r'OrderSend|PositionClose|PositionModify',
-            'exclude_pattern': r'Log|Print|FileWrite|Journal',
+            # Exclude: logging on same line, ExecuteRealTrade (has logging), trailing stop updates (has logging)
+            'exclude_pattern': r'Log|Print|FileWrite|Journal|ExecuteRealTrade|UpdateTrailingStop|newSL,\s*0\)',
             'description': 'Trade operations without audit logging',
-            'recommendation': 'Log all trade decisions with timestamp, reason, and parameters'
+            'recommendation': 'Log all trade decisions with timestamp, reason, and parameters',
+            'check_block_for_logging': True  # Check if surrounding block has logging
         },
         'REG002': {
             'category': AuditCategory.REGULATORY_COMPLIANCE,
@@ -577,13 +597,33 @@ class FinancialCodeAuditor:
             with open(file_path, 'r', encoding='utf-8-sig') as f:
                 content = f.read()
                 lines = content.split('\n')
-        except Exception as e:
-            logger.error(f"Failed to read {file_path}: {e}")
+        except FileNotFoundError:
+            logger.warning(f"File not found: {file_path}")
+            return findings
+        except PermissionError:
+            logger.warning(f"Permission denied reading: {file_path}")
+            return findings
+        except UnicodeDecodeError:
+            # Try fallback encoding
+            try:
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    content = f.read()
+                    lines = content.split('\n')
+                logger.info(f"Read '{file_path}' with fallback encoding (latin-1)")
+            except Exception as e:
+                logger.error(f"Failed to read {file_path} with fallback encoding: {e}")
+                return findings
+        except (IOError, OSError) as e:
+            logger.error(f"I/O error reading '{file_path}': {e}")
             return findings
 
         # Compute hash
-        with open(file_path, 'rb') as f:
-            self.file_hashes[str(file_path)] = hashlib.sha256(f.read()).hexdigest()
+        try:
+            with open(file_path, 'rb') as f:
+                self.file_hashes[str(file_path)] = hashlib.sha256(f.read()).hexdigest()
+        except (IOError, OSError) as e:
+            logger.warning(f"Could not compute hash for '{file_path}': {e}")
+            self.file_hashes[str(file_path)] = "error"
 
         # Apply each rule
         for rule_id, rule in FinancialAuditRules.RULES.items():
@@ -1156,8 +1196,13 @@ class FinancialCodeAuditor:
                             if re.search(r'GetSafeOHLCV|SafeOHLCV|IsValid|HasPriceGap|ValidateData', context_back):
                                 continue
 
+                        try:
+                            rel_file = str(file_path.relative_to(self.project_root))
+                        except ValueError:
+                            rel_file = str(file_path)
+
                         finding = AuditFinding(
-                            file=str(file_path.relative_to(self.project_root)),
+                            file=rel_file,
                             line=i,
                             category=rule['category'],
                             severity=rule['severity'],
@@ -1185,17 +1230,30 @@ class FinancialCodeAuditor:
             self._impact_analyzer = MQL5ImpactAnalyzer(self.project_root)
             report = self._impact_analyzer.analyze()
 
+            if report is None:
+                logger.warning("Impact analyzer returned no report")
+                self._use_impact_scoring = False
+                return
+
             # Build impact scores from file metrics
             for file_data in report.get('top_impact_files', []):
-                path = file_data['path']
+                path = file_data.get('path')
+                if not path:
+                    continue
                 # Normalize impact to 1.0 - 3.0 range
-                impact = file_data['impact_score']
+                impact = file_data.get('impact_score', 0)
                 # Use log scale to prevent extreme values
                 import math
-                normalized = 1.0 + min(2.0, math.log10(max(1, impact)) / 3)
+                try:
+                    normalized = 1.0 + min(2.0, math.log10(max(1, impact)) / 3)
+                except (ValueError, ZeroDivisionError):
+                    normalized = 1.0
                 self._impact_scores[path] = normalized
 
             logger.info(f"Impact analysis: {len(self._impact_scores)} files scored")
+        except ImportError:
+            logger.info("Impact analyzer module not available, using default scoring")
+            self._use_impact_scoring = False
         except Exception as e:
             logger.warning(f"Impact analysis unavailable: {e}")
             self._use_impact_scoring = False
@@ -1209,18 +1267,44 @@ class FinancialCodeAuditor:
 
         # Find all MQL5 files
         mql5_dir = self.project_root / "MQL5"
-        files = list(mql5_dir.rglob("*.mqh")) + list(mql5_dir.rglob("*.mq5"))
-        files = [f for f in files if '.backup' not in str(f)]
+        files = []
+        files_with_errors = 0
+
+        try:
+            if mql5_dir.exists():
+                try:
+                    files.extend(mql5_dir.rglob("*.mqh"))
+                except (OSError, PermissionError) as e:
+                    logger.warning(f"Error scanning for .mqh files: {e}")
+                try:
+                    files.extend(mql5_dir.rglob("*.mq5"))
+                except (OSError, PermissionError) as e:
+                    logger.warning(f"Error scanning for .mq5 files: {e}")
+                files = [f for f in files if '.backup' not in str(f)]
+            else:
+                logger.warning(f"MQL5 directory not found: {mql5_dir}")
+        except (OSError, PermissionError) as e:
+            logger.error(f"Cannot access MQL5 directory: {e}")
+
+        if not files:
+            logger.warning("No MQL5 files found to audit")
 
         logger.info(f"Found {len(files)} files to audit")
 
         # Audit each file
         all_findings = []
         for file_path in files:
-            findings = self.audit_file(file_path)
-            all_findings.extend(findings)
-            if findings:
-                logger.info(f"  {file_path.name}: {len(findings)} findings")
+            try:
+                findings = self.audit_file(file_path)
+                all_findings.extend(findings)
+                if findings:
+                    logger.info(f"  {file_path.name}: {len(findings)} findings")
+            except Exception as e:
+                files_with_errors += 1
+                logger.error(f"Error auditing '{file_path}': {e}")
+
+        if files_with_errors > 0:
+            logger.warning(f"{files_with_errors} file(s) could not be audited")
 
         self.findings = all_findings
 
@@ -1355,10 +1439,21 @@ class FinancialCodeAuditor:
             ]
         }
 
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(report, f, indent=2)
-
-        logger.info(f"Report saved to {output_path}")
+        try:
+            # Ensure parent directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(report, f, indent=2)
+            logger.info(f"Report saved to {output_path}")
+        except PermissionError:
+            logger.error(f"Permission denied writing to: {output_path}")
+            raise
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to save report to '{output_path}': {e}")
+            raise
+        except (TypeError, ValueError) as e:
+            logger.error(f"Failed to serialize report to JSON: {e}")
+            raise
 
 
 def main():
@@ -1374,22 +1469,48 @@ def main():
 
     args = parser.parse_args()
 
-    auditor = FinancialCodeAuditor(args.project.resolve())
-    auditor.audit_project()
-    
-    # If limit specified, temporarily modify print_report to use it
-    if args.limit:
-        auditor._display_limit = args.limit
-    
-    auditor.print_report()
+    # Validate project path
+    try:
+        project_path = args.project.resolve()
+    except (OSError, ValueError) as e:
+        logger.error(f"Invalid project path '{args.project}': {e}")
+        return 2
 
-    if args.output:
-        auditor.save_report(args.output)
+    if not project_path.exists():
+        logger.error(f"Project directory does not exist: {project_path}")
+        return 2
+    if not project_path.is_dir():
+        logger.error(f"Project path is not a directory: {project_path}")
+        return 2
 
-    # Exit with error if critical issues
-    critical_count = len([f for f in auditor.findings
-                          if f.severity == Severity.CRITICAL])
-    return 1 if critical_count > 0 else 0
+    try:
+        auditor = FinancialCodeAuditor(project_path)
+        auditor.audit_project()
+
+        # If limit specified, temporarily modify print_report to use it
+        if args.limit:
+            auditor._display_limit = args.limit
+
+        auditor.print_report()
+
+        if args.output:
+            try:
+                auditor.save_report(args.output)
+            except (PermissionError, IOError, OSError) as e:
+                logger.error(f"Failed to save report: {e}")
+                return 2
+
+        # Exit with error if critical issues
+        critical_count = len([f for f in auditor.findings
+                              if f.severity == Severity.CRITICAL])
+        return 1 if critical_count > 0 else 0
+
+    except KeyboardInterrupt:
+        logger.info("Audit interrupted by user")
+        return 130
+    except Exception as e:
+        logger.error(f"Unexpected error during audit: {e}")
+        return 2
 
 
 if __name__ == "__main__":

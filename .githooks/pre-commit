@@ -1,0 +1,61 @@
+#!/bin/bash
+# Pre-commit hook: Block commits with CRITICAL audit findings
+# Install: git config core.hooksPath .githooks
+#
+# This hook:
+# 1. Shows the Code Quality Score
+# 2. Blocks commits with CRITICAL issues
+# 3. Warns about HIGH issues (doesn't block)
+# 4. Suggests AI instruction updates when patterns repeat
+
+set -e
+
+echo "Running DO NO HARM audit..."
+
+# Run financial auditor with critical-only flag
+OUTPUT=$(python3 Tools/mql5_financial_auditor.py --project . --critical-only 2>&1)
+
+# Check for CRITICAL findings
+if echo "$OUTPUT" | grep -q "CRITICAL: [1-9]"; then
+    echo ""
+    echo "=========================================="
+    echo "COMMIT BLOCKED: Critical issues found"
+    echo "=========================================="
+    echo "$OUTPUT" | grep -A 100 "CRITICAL FINDINGS"
+    echo ""
+    echo "Fix these issues before committing."
+    echo ""
+    echo "TIP: Run 'python3 Tools/update_ai_instructions.py --from-audit'"
+    echo "     to update AI coding instructions and prevent future issues."
+    exit 1
+fi
+
+# Quick syntax check with super audit
+SUPER_OUTPUT=$(python3 Tools/mql5_super_audit.py --project . 2>&1)
+if echo "$SUPER_OUTPUT" | grep -q "CRITICAL:"; then
+    echo ""
+    echo "=========================================="
+    echo "COMMIT BLOCKED: Super audit critical issues"
+    echo "=========================================="
+    echo "$SUPER_OUTPUT" | grep -B 2 -A 2 "CRITICAL"
+    exit 1
+fi
+
+# Show score summary
+SCORE_OUTPUT=$(python3 Tools/code_quality_score.py 2>&1 || true)
+SCORE=$(echo "$SCORE_OUTPUT" | grep -oP "SCORE:\s+\K[\d.]+" || echo "?")
+GRADE=$(echo "$SCORE_OUTPUT" | grep -oP "GRADE:\s+\K\w+" || echo "?")
+
+echo ""
+echo "Code Quality Score: $SCORE ($GRADE)"
+
+# Check for HIGH findings (warn but don't block)
+HIGH_COUNT=$(echo "$OUTPUT" | grep -oP "HIGH:\s+\K\d+" || echo "0")
+if [ "$HIGH_COUNT" -gt 20 ]; then
+    echo ""
+    echo "WARNING: $HIGH_COUNT HIGH severity findings."
+    echo "Goal: Reduce HIGH issues to improve score toward 90+ (Grade A)"
+fi
+
+echo "Audit passed - no critical issues."
+exit 0
