@@ -389,10 +389,25 @@ class MQL5SuperAudit:
         """Find all MQL5 files in the project"""
         files = []
         mql5_dir = self.project_root / "MQL5"
-        if mql5_dir.exists():
-            files.extend(mql5_dir.rglob("*.mq5"))
-            files.extend(mql5_dir.rglob("*.mqh"))
-        return sorted(files)
+        try:
+            if mql5_dir.exists():
+                try:
+                    files.extend(mql5_dir.rglob("*.mq5"))
+                except (OSError, PermissionError) as e:
+                    print(f"Warning: Error scanning for .mq5 files: {e}")
+                try:
+                    files.extend(mql5_dir.rglob("*.mqh"))
+                except (OSError, PermissionError) as e:
+                    print(f"Warning: Error scanning for .mqh files: {e}")
+        except (OSError, PermissionError) as e:
+            print(f"Error: Cannot access MQL5 directory '{mql5_dir}': {e}")
+            return []
+
+        try:
+            return sorted(files)
+        except (TypeError, OSError) as e:
+            print(f"Warning: Error sorting file list: {e}")
+            return list(files)
 
     # Suppression comments - allows developers to mark verified-safe code
     # Usage: // NOAUDIT: reason
@@ -407,10 +422,24 @@ class MQL5SuperAudit:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
                 lines = content.splitlines()
+        except FileNotFoundError:
+            print(f"Warning: File not found: {file_path}")
+            return issues
+        except PermissionError:
+            print(f"Warning: Permission denied reading: {file_path}")
+            return issues
+        except (IOError, OSError) as e:
+            print(f"Warning: I/O error reading '{file_path}': {e}")
+            return issues
         except Exception as e:
+            print(f"Warning: Unexpected error reading '{file_path}': {e}")
             return issues
 
-        rel_path = str(file_path.relative_to(self.project_root))
+        try:
+            rel_path = str(file_path.relative_to(self.project_root))
+        except ValueError:
+            # File is not relative to project root
+            rel_path = str(file_path)
 
         for i, line in enumerate(lines, 1):
             # Skip comments
@@ -597,22 +626,43 @@ class MQL5SuperAudit:
         files = self.find_mql5_files()
         self.result.total_files = len(files)
 
+        if not files:
+            print("Warning: No MQL5 files found to audit")
+
         total_lines = 0
+        files_with_errors = 0
         for file_path in files:
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     lines = f.readlines()
                     total_lines += len(lines)
-            except Exception:
-                pass
+            except FileNotFoundError:
+                files_with_errors += 1
+                print(f"Warning: File disappeared during audit: {file_path}")
+                continue
+            except PermissionError:
+                files_with_errors += 1
+                print(f"Warning: Permission denied: {file_path}")
+                continue
+            except (IOError, OSError) as e:
+                files_with_errors += 1
+                print(f"Warning: I/O error reading '{file_path}': {e}")
+                continue
 
-            issues = self.audit_file(file_path)
-            for issue in issues:
-                self.result.add_issue(issue)
+            try:
+                issues = self.audit_file(file_path)
+                for issue in issues:
+                    self.result.add_issue(issue)
+            except Exception as e:
+                print(f"Warning: Error auditing '{file_path}': {e}")
+
+        if files_with_errors > 0:
+            print(f"Warning: {files_with_errors} file(s) could not be read")
 
         self.result.total_lines = total_lines
         self.result.metrics = {
             "files_scanned": self.result.total_files,
+            "files_with_errors": files_with_errors,
             "lines_scanned": total_lines,
             "issues_by_severity": self.result.count_by_severity(),
             "issues_by_category": self.result.count_by_category(),
@@ -763,15 +813,40 @@ DO NO HARM Principle:
 
     args = parser.parse_args()
 
-    auditor = MQL5SuperAudit(Path(args.project))
-    auditor.run_audit()
+    # Validate project path
+    project_path = Path(args.project)
+    if not project_path.exists():
+        print(f"Error: Project directory does not exist: {project_path}")
+        sys.exit(2)
+    if not project_path.is_dir():
+        print(f"Error: Project path is not a directory: {project_path}")
+        sys.exit(2)
 
-    passed = auditor.print_report(verbose=args.verbose)
+    try:
+        auditor = MQL5SuperAudit(project_path)
+        auditor.run_audit()
+        passed = auditor.print_report(verbose=args.verbose)
+    except KeyboardInterrupt:
+        print("\nAudit interrupted by user")
+        sys.exit(130)
+    except Exception as e:
+        print(f"Error: Audit failed: {e}")
+        sys.exit(2)
 
     if args.output:
-        with open(args.output, 'w') as f:
-            f.write(auditor.to_json())
-        print(f"\nJSON report saved to: {args.output}")
+        output_path = Path(args.output)
+        try:
+            # Ensure parent directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(auditor.to_json())
+            print(f"\nJSON report saved to: {args.output}")
+        except PermissionError:
+            print(f"Error: Permission denied writing to: {args.output}")
+            sys.exit(2)
+        except (IOError, OSError) as e:
+            print(f"Error: Failed to save report to '{args.output}': {e}")
+            sys.exit(2)
 
     if args.fail_on_error and not passed:
         sys.exit(1)

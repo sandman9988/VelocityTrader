@@ -577,13 +577,33 @@ class FinancialCodeAuditor:
             with open(file_path, 'r', encoding='utf-8-sig') as f:
                 content = f.read()
                 lines = content.split('\n')
-        except Exception as e:
-            logger.error(f"Failed to read {file_path}: {e}")
+        except FileNotFoundError:
+            logger.warning(f"File not found: {file_path}")
+            return findings
+        except PermissionError:
+            logger.warning(f"Permission denied reading: {file_path}")
+            return findings
+        except UnicodeDecodeError:
+            # Try fallback encoding
+            try:
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    content = f.read()
+                    lines = content.split('\n')
+                logger.info(f"Read '{file_path}' with fallback encoding (latin-1)")
+            except Exception as e:
+                logger.error(f"Failed to read {file_path} with fallback encoding: {e}")
+                return findings
+        except (IOError, OSError) as e:
+            logger.error(f"I/O error reading '{file_path}': {e}")
             return findings
 
         # Compute hash
-        with open(file_path, 'rb') as f:
-            self.file_hashes[str(file_path)] = hashlib.sha256(f.read()).hexdigest()
+        try:
+            with open(file_path, 'rb') as f:
+                self.file_hashes[str(file_path)] = hashlib.sha256(f.read()).hexdigest()
+        except (IOError, OSError) as e:
+            logger.warning(f"Could not compute hash for '{file_path}': {e}")
+            self.file_hashes[str(file_path)] = "error"
 
         # Apply each rule
         for rule_id, rule in FinancialAuditRules.RULES.items():
@@ -1156,8 +1176,13 @@ class FinancialCodeAuditor:
                             if re.search(r'GetSafeOHLCV|SafeOHLCV|IsValid|HasPriceGap|ValidateData', context_back):
                                 continue
 
+                        try:
+                            rel_file = str(file_path.relative_to(self.project_root))
+                        except ValueError:
+                            rel_file = str(file_path)
+
                         finding = AuditFinding(
-                            file=str(file_path.relative_to(self.project_root)),
+                            file=rel_file,
                             line=i,
                             category=rule['category'],
                             severity=rule['severity'],
@@ -1185,17 +1210,30 @@ class FinancialCodeAuditor:
             self._impact_analyzer = MQL5ImpactAnalyzer(self.project_root)
             report = self._impact_analyzer.analyze()
 
+            if report is None:
+                logger.warning("Impact analyzer returned no report")
+                self._use_impact_scoring = False
+                return
+
             # Build impact scores from file metrics
             for file_data in report.get('top_impact_files', []):
-                path = file_data['path']
+                path = file_data.get('path')
+                if not path:
+                    continue
                 # Normalize impact to 1.0 - 3.0 range
-                impact = file_data['impact_score']
+                impact = file_data.get('impact_score', 0)
                 # Use log scale to prevent extreme values
                 import math
-                normalized = 1.0 + min(2.0, math.log10(max(1, impact)) / 3)
+                try:
+                    normalized = 1.0 + min(2.0, math.log10(max(1, impact)) / 3)
+                except (ValueError, ZeroDivisionError):
+                    normalized = 1.0
                 self._impact_scores[path] = normalized
 
             logger.info(f"Impact analysis: {len(self._impact_scores)} files scored")
+        except ImportError:
+            logger.info("Impact analyzer module not available, using default scoring")
+            self._use_impact_scoring = False
         except Exception as e:
             logger.warning(f"Impact analysis unavailable: {e}")
             self._use_impact_scoring = False
@@ -1209,18 +1247,44 @@ class FinancialCodeAuditor:
 
         # Find all MQL5 files
         mql5_dir = self.project_root / "MQL5"
-        files = list(mql5_dir.rglob("*.mqh")) + list(mql5_dir.rglob("*.mq5"))
-        files = [f for f in files if '.backup' not in str(f)]
+        files = []
+        files_with_errors = 0
+
+        try:
+            if mql5_dir.exists():
+                try:
+                    files.extend(mql5_dir.rglob("*.mqh"))
+                except (OSError, PermissionError) as e:
+                    logger.warning(f"Error scanning for .mqh files: {e}")
+                try:
+                    files.extend(mql5_dir.rglob("*.mq5"))
+                except (OSError, PermissionError) as e:
+                    logger.warning(f"Error scanning for .mq5 files: {e}")
+                files = [f for f in files if '.backup' not in str(f)]
+            else:
+                logger.warning(f"MQL5 directory not found: {mql5_dir}")
+        except (OSError, PermissionError) as e:
+            logger.error(f"Cannot access MQL5 directory: {e}")
+
+        if not files:
+            logger.warning("No MQL5 files found to audit")
 
         logger.info(f"Found {len(files)} files to audit")
 
         # Audit each file
         all_findings = []
         for file_path in files:
-            findings = self.audit_file(file_path)
-            all_findings.extend(findings)
-            if findings:
-                logger.info(f"  {file_path.name}: {len(findings)} findings")
+            try:
+                findings = self.audit_file(file_path)
+                all_findings.extend(findings)
+                if findings:
+                    logger.info(f"  {file_path.name}: {len(findings)} findings")
+            except Exception as e:
+                files_with_errors += 1
+                logger.error(f"Error auditing '{file_path}': {e}")
+
+        if files_with_errors > 0:
+            logger.warning(f"{files_with_errors} file(s) could not be audited")
 
         self.findings = all_findings
 
@@ -1355,10 +1419,21 @@ class FinancialCodeAuditor:
             ]
         }
 
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(report, f, indent=2)
-
-        logger.info(f"Report saved to {output_path}")
+        try:
+            # Ensure parent directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(report, f, indent=2)
+            logger.info(f"Report saved to {output_path}")
+        except PermissionError:
+            logger.error(f"Permission denied writing to: {output_path}")
+            raise
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to save report to '{output_path}': {e}")
+            raise
+        except (TypeError, ValueError) as e:
+            logger.error(f"Failed to serialize report to JSON: {e}")
+            raise
 
 
 def main():
@@ -1374,22 +1449,48 @@ def main():
 
     args = parser.parse_args()
 
-    auditor = FinancialCodeAuditor(args.project.resolve())
-    auditor.audit_project()
-    
-    # If limit specified, temporarily modify print_report to use it
-    if args.limit:
-        auditor._display_limit = args.limit
-    
-    auditor.print_report()
+    # Validate project path
+    try:
+        project_path = args.project.resolve()
+    except (OSError, ValueError) as e:
+        logger.error(f"Invalid project path '{args.project}': {e}")
+        return 2
 
-    if args.output:
-        auditor.save_report(args.output)
+    if not project_path.exists():
+        logger.error(f"Project directory does not exist: {project_path}")
+        return 2
+    if not project_path.is_dir():
+        logger.error(f"Project path is not a directory: {project_path}")
+        return 2
 
-    # Exit with error if critical issues
-    critical_count = len([f for f in auditor.findings
-                          if f.severity == Severity.CRITICAL])
-    return 1 if critical_count > 0 else 0
+    try:
+        auditor = FinancialCodeAuditor(project_path)
+        auditor.audit_project()
+
+        # If limit specified, temporarily modify print_report to use it
+        if args.limit:
+            auditor._display_limit = args.limit
+
+        auditor.print_report()
+
+        if args.output:
+            try:
+                auditor.save_report(args.output)
+            except (PermissionError, IOError, OSError) as e:
+                logger.error(f"Failed to save report: {e}")
+                return 2
+
+        # Exit with error if critical issues
+        critical_count = len([f for f in auditor.findings
+                              if f.severity == Severity.CRITICAL])
+        return 1 if critical_count > 0 else 0
+
+    except KeyboardInterrupt:
+        logger.info("Audit interrupted by user")
+        return 130
+    except Exception as e:
+        logger.error(f"Unexpected error during audit: {e}")
+        return 2
 
 
 if __name__ == "__main__":
