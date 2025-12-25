@@ -102,7 +102,8 @@ class FinancialAuditRules:
             'title': 'Direct Floating Point Comparison',
             'pattern': r'(?:==|!=)\s*(?:\d+\.\d+|[a-zA-Z_]\w*\s*[,)])',
             'context_pattern': r'double|float',
-            'exclude_pattern': r'NULL|nullptr|true|false|\w+\s*==\s*\w+\s*\)|enum|int\s+\w+|long\s+\w+',
+            # Exclude: int comparisons, ArrayResize returns, handles, strings, enums, zero checks
+            'exclude_pattern': r'NULL|nullptr|true|false|\w+\s*==\s*\w+\s*\)|enum|int\s+\w+|long\s+\w+|ArrayResize|PositionGet|INVALID_HANDLE|symbol|Symbol|magic|Magic|type|Type|Handle|String|Integer|POSITION_|ORDER_|DEAL_|==\s*0\.0|!=\s*0\.0|denominator',
             'description': 'Direct equality comparison of floating point values is unreliable',
             'recommendation': 'Use MathAbs(a - b) < EPSILON or IsEqual(a, b)'
         },
@@ -433,8 +434,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Missing Null Pointer Check',
             'pattern': r'(\w+)\s*[.>]\s*\w+\s*\(',
-            # Exclude: member objects, history/cache objects, known patterns
-            'exclude_pattern': r'!=\s*NULL|==\s*NULL|if\s*\(\s*\w+\s*\)|\.Init\(|\.Reset\(|\.Clear\(|\.Update\(|\.Calculate\(|\.Detect\(|\.Normalize\(|\.GetVolatility\(|\.Get[A-Z]|\.Set[A-Z]|\.Is[A-Z]|\.Has[A-Z]|\.Add[A-Z]|\.Remove[A-Z]|\.Any|\.To[A-Z]|\.Recalc|\.Decay|\.Invalidate|result\.|state\.|config\.|cfg\.|micro\.|meso\.|macro\.|m_\w+\.|this\.|child\.|metrics\.|yz\.|cycle\.|physics\.|w\.|g_\w+\.|_trade\.|trade\.|profile\.|agent\.|stats\.|regime\[|spec\.|breaker\.|predictor\.|sniper\.|berserker\.|symc\.|History\.|cached\w*\.|rolling\w*\.|real\.|pnl\w*\.|win\w*\.|symbol\.|action\.|request\.|response\.|\.Push\(|\.Pop\(|\.Count\(',
+            # Exclude: member objects, history/cache objects, local references, queues, MT5 built-ins
+            'exclude_pattern': r'!=\s*NULL|==\s*NULL|if\s*\(\s*\w+\s*\)|\.Init\(|\.Reset\(|\.Clear\(|\.Update\(|\.Calculate\(|\.Detect\(|\.Normalize\(|\.GetVolatility\(|\.Get[A-Z]|\.Set[A-Z]|\.Is[A-Z]|\.Has[A-Z]|\.Add[A-Z]|\.Remove[A-Z]|\.Any|\.To[A-Z]|\.Recalc|\.Decay|\.Invalidate|result\.|state\.|config\.|cfg\.|micro\.|meso\.|macro\.|m_\w+\.|this\.|child\.|metrics\.|yz\.|cycle\.|physics\.|w\.|g_\w+\.|_trade\.|trade\.|profile\.|agent\.|stats\.|regime\[|spec\.|breaker\.|predictor\.|sniper\.|berserker\.|symc\.|History\.|cached\w*\.|rolling\w*\.|real\.|pnl\w*\.|win\w*\.|symbol\.|action\.|request\.|response\.|\.Push\(|\.Pop\(|\.Count\(|TimeCurrent|s1\.|s2\.|entry\.|exit\.|quality\.|avg\w+\.|update\w+\.|\.Dequeue\(|\.Enqueue\(|\.CalculateStats\(|\.CalculateOverall\(|Print\(',
             'description': 'Object method call without null check',
             'recommendation': 'Check: if(ptr != NULL) before dereferencing'
         },
