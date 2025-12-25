@@ -309,11 +309,27 @@
 				</dict>
 				<dict>
 					<key>comment</key>
-					<string>DEPRECATED: MQL4 trading modes</string>
+					<string>DEPRECATED: MQL4 trading modes and constants</string>
 					<key>match</key>
-					<string>\b(OP_BUY|OP_SELL|OP_BUYLIMIT|OP_SELLLIMIT|OP_BUYSTOP|OP_SELLSTOP|SELECT_BY_POS|SELECT_BY_TICKET|MODE_TRADES|MODE_HISTORY)\b</string>
+					<string>\b(OP_BUY|OP_SELL|OP_BUYLIMIT|OP_SELLLIMIT|OP_BUYSTOP|OP_SELLSTOP|SELECT_BY_POS|SELECT_BY_TICKET|MODE_TRADES|MODE_HISTORY|MODE_ASK|MODE_BID|MODE_SPREAD|MODE_STOPLEVEL|MODE_FREEZELEVEL|MODE_LOTSIZE|MODE_LOTSTEP|MODE_MINLOT|MODE_MAXLOT|MODE_TICKVALUE|MODE_TICKSIZE|MODE_SWAPLONG|MODE_SWAPSHORT|MODE_SWAPTYPE|MODE_DIGITS|MODE_POINT)\b</string>
 					<key>name</key>
 					<string>invalid.deprecated.mql4.constant.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>DEPRECATED: #property strict is MT4-era (MQL5 is strict by design)</string>
+					<key>match</key>
+					<string>#\s*property\s+strict\b</string>
+					<key>name</key>
+					<string>invalid.deprecated.mql4.property-strict.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>DEPRECATED: MT4 predefined vars - use SymbolInfoDouble/SymbolInfoTick/_Point/_Digits</string>
+					<key>match</key>
+					<string>(?&lt;!\.)\b(Ask|Bid)\b(?!\s*\()</string>
+					<key>name</key>
+					<string>invalid.deprecated.mql4.predefined-var.mql5</string>
 				</dict>
 			</array>
 		</dict>
@@ -345,9 +361,17 @@
 				</dict>
 				<dict>
 					<key>comment</key>
+					<string>ILLEGAL: using namespace std - C++ pattern not available</string>
+					<key>match</key>
+					<string>\busing\s+namespace\s+std\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.using-std.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
 					<string>UNSUPPORTED: C++ namespaces - not available in MQL5</string>
 					<key>match</key>
-					<string>\b(namespace|using)\s+\w+</string>
+					<string>\b(namespace)\s+\w+</string>
 					<key>name</key>
 					<string>invalid.illegal.unsupported-cpp.namespace.mql5</string>
 				</dict>
@@ -369,11 +393,35 @@
 				</dict>
 				<dict>
 					<key>comment</key>
-					<string>UNSUPPORTED: C++ std:: prefix - standard library not available</string>
+					<string>ILLEGAL: C++ std::/boost:: namespaces - standard library not available</string>
 					<key>match</key>
-					<string>\bstd::\w+</string>
+					<string>\b(std|boost)\s*::\s*[A-Za-z_][A-Za-z0-9_]*</string>
 					<key>name</key>
 					<string>invalid.illegal.unsupported-cpp.std-namespace.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>ILLEGAL: C/C++ program entrypoint main() - use OnInit/OnTick</string>
+					<key>match</key>
+					<string>\b(int|void)\s+main\s*\(</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.main.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>ILLEGAL: C stdio functions - use MQL5 File*/Print/StringFormat</string>
+					<key>match</key>
+					<string>(?&lt;!\.)\b(fopen|fclose|freopen|fprintf|printf|snprintf|sprintf|scanf|sscanf|fscanf|getline|getchar|putchar|puts|gets|fgets|fputs|fread|fwrite|fseek|ftell|rewind|feof|ferror|perror)\s*\(</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.c-stdio.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>ILLEGAL: C++ stream operators with iostream</string>
+					<key>match</key>
+					<string>\b(cout|cin|cerr|clog)\s*(&lt;&lt;|&gt;&gt;)</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.stream-op.mql5</string>
 				</dict>
 				<dict>
 					<key>comment</key>
@@ -411,7 +459,7 @@
 					<key>comment</key>
 					<string>UNSUPPORTED: C++ constexpr - use #define or const</string>
 					<key>match</key>
-					<string>\b(constexpr|consteval|constinit)\b</string>
+					<string>\b(constexpr|consteval|constinit|static_assert)\b</string>
 					<key>name</key>
 					<string>invalid.illegal.unsupported-cpp.constexpr.mql5</string>
 				</dict>
@@ -457,9 +505,9 @@
 				</dict>
 				<dict>
 					<key>comment</key>
-					<string>UNSUPPORTED: C++ standard headers - use MQL5 #include</string>
+					<string>ILLEGAL: C/C++ standard headers (STL/iostream/etc.) not available in MQL5</string>
 					<key>match</key>
-					<string>#\s*include\s*&lt;(iostream|vector|string|map|set|algorithm|memory|functional|utility|cstdlib|cstdio|cstring|cmath|cassert|climits|cfloat|cctype|ctime)\s*&gt;</string>
+					<string>#\s*include\s*[&lt;"](bits/stdc\+\+\.h|iostream|istream|ostream|sstream|fstream|iomanip|vector|array|deque|list|forward_list|queue|stack|map|unordered_map|set|unordered_set|algorithm|numeric|functional|memory|thread|mutex|shared_mutex|atomic|future|chrono|ratio|regex|filesystem|optional|variant|any|tuple|utility|type_traits|limits|exception|stdexcept|new|initializer_list|cstddef|cstdint|cinttypes|cstdio|cstdlib|cstring|cmath|cctype|cwctype|climits|cfloat|cassert|string|string\.h|stdio\.h|stdlib\.h|math\.h|time\.h|assert\.h)[&gt;"]</string>
 					<key>name</key>
 					<string>invalid.illegal.unsupported-cpp.std-header.mql5</string>
 				</dict>
