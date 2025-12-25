@@ -1489,10 +1489,10 @@ class FinancialCodeAuditor:
         for mqh_file in include_dir.glob("*.mqh"):
             try:
                 content = mqh_file.read_text(encoding='utf-8-sig')
-            except:
+            except Exception:
                 try:
                     content = mqh_file.read_text(encoding='latin-1')
-                except:
+                except Exception:
                     continue
 
             lines = content.split('\n')
