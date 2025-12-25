@@ -362,21 +362,31 @@ class MQL5Linter:
 
                 # 6. FINANCIAL SAFETY: Lossy type conversions (critical for money)
                 # Explicit casts that lose precision
+                # Each entry: (regex_pattern, message, default_severity)
                 lossy_casts = [
-                    (r'\(int\)\s*\w+', 'Cast to int loses decimal precision'),
-                    (r'\(short\)\s*\w+', 'Cast to short may overflow'),
-                    (r'\(char\)\s*\w+', 'Cast to char loses data'),
-                    (r'\(float\)\s*\w+', 'Cast to float loses double precision'),
-                    (r'\(uint\)\s*-', 'Cast negative to unsigned'),
-                    (r'\(ulong\)\s*-', 'Cast negative to unsigned long'),
+                    # Casts to int are very common (indices, loop counters, enums).
+                    # Treat them as info by default and only escalate in financial contexts.
+                    (r'\(int\)\s*\w+', 'Cast to int loses decimal precision', 'info'),
+                    (r'\(short\)\s*\w+', 'Cast to short may overflow', 'warning'),
+                    (r'\(char\)\s*\w+', 'Cast to char loses data', 'warning'),
+                    (r'\(float\)\s*\w+', 'Cast to float loses double precision', 'warning'),
+                    (r'\(uint\)\s*-', 'Cast negative to unsigned', 'warning'),
+                    (r'\(ulong\)\s*-', 'Cast negative to unsigned long', 'warning'),
                 ]
-                for pattern, msg in lossy_casts:
+                for pattern, msg, default_severity in lossy_casts:
                     if re.search(pattern, line_stripped):
+                        severity = default_severity
+                        # Escalate int casts to warning when line looks financially relevant.
+                        if pattern.startswith(r'\(int\)'):
+                            if re.search(r'(price|amount|lot|volume|balance|equity|profit|loss|pips?)',
+                                         line_stripped,
+                                         re.IGNORECASE):
+                                severity = 'warning'
                         result["warnings"].append({
                             "line": i,
                             "column": 1,
                             "message": f"FINANCIAL RISK: {msg}",
-                            "severity": "warning"
+                            "severity": severity
                         })
 
                 # 7. FINANCIAL SAFETY: Implicit integer division (loses decimals)
