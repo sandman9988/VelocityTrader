@@ -127,7 +127,7 @@ struct NormalizedSpecs
       int requiredSize = startIdx + 9;
       if(ArraySize(features) < requiredSize)
       {
-         if(ArrayResize(features, requiredSize) != requiredSize)
+         if(ArrayResize(features, requiredSize) < 0)
          {
             Print("ERROR: ArrayResize failed for features vector - cannot populate broker data");
             return;
