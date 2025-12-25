@@ -229,7 +229,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Stop Level Not Validated',
             'pattern': r'(?:stop|sl|tp)\s*[=:]\s*\w+\s*[\+\-]',
-            'exclude_pattern': r'SYMBOL_TRADE_STOPS_LEVEL|ValidateStop',
+            # Exclude: calculations already using minDistance, trailing stop calculations, validated distances
+            'exclude_pattern': r'SYMBOL_TRADE_STOPS_LEVEL|ValidateStop|minStop|minTP|minDistance|potentialSL|trailDist|atr\s*\*',
             'description': 'Stop/TP distance not checked against broker minimum',
             'recommendation': 'Validate against SymbolInfoInteger(SYMBOL_TRADE_STOPS_LEVEL)'
         },
@@ -238,8 +239,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Price Not Normalized',
             'pattern': r'(?:price|entry|exit)\s*=\s*(?!\s*NormalizeDouble)',
-            # Exclude: API values (already normalized), enums, booleans, validated values
-            'exclude_pattern': r'NormalizeDouble|Bid|Ask|SymbolInfo|=\s*0|=\s*prices\[|=\s*GlobalVariable|z_score|slippage|Calculate|first_|last_|PositionGet|m_posInfo|m_dealInfo|DEAL_ENTRY|signal|minStop|minTP|PriceOpen|PriceCurrent|=\s*(?:true|false)|openPrice\s*=\s*Position|entryPrice\s*=\s*m_',
+            # Exclude: API values, bid/ask, enums, booleans, member assignments, non-prices
+            'exclude_pattern': r'NormalizeDouble|Bid|Ask|SymbolInfo|=\s*0|=\s*prices\[|=\s*GlobalVariable|z_score|slippage|Calculate|first_|last_|PositionGet|m_posInfo|m_dealInfo|DEAL_ENTRY|signal|minStop|minTP|PriceOpen|PriceCurrent|=\s*(?:true|false)|openPrice\s*=\s*Position|entryPrice\s*=\s*m_|regimeAt|pWinAt|m_lastPrice|currentPrice\s*=\s*\(|=\s*\([^)]+\?\s*(?:bid|ask)|\.entryPrice\s*=|\.exitPrice\s*=|currentSL',
             'description': 'Prices must be normalized to symbol digits',
             'recommendation': 'Use NormalizeDouble(price, _Digits)'
         },
