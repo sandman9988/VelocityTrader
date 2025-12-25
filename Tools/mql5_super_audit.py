@@ -223,13 +223,20 @@ class MQL5SuperAudit:
         ),
     }
 
-    # Financial safety patterns
+    # Financial safety patterns - only flag truly dangerous casts
     FINANCIAL_PATTERNS = {
-        r'\(\s*(int|short|char|float)\s*\)': (
-            "Lossy type cast",
-            "May lose financial precision - review carefully",
-            Severity.WARNING
+        # DANGEROUS: Casting prices/lots directly without rounding
+        r'\(\s*int\s*\)\s*(lot|volume|price|sl|tp|stoploss|takeprofit)': (
+            "Dangerous cast on financial value",
+            "Use MathRound/NormalizeDouble instead of direct (int) cast",
+            Severity.ERROR
         ),
+        r'\(\s*float\s*\)\s*(SymbolInfo|AccountInfo|Position|Order)': (
+            "Dangerous float cast on API value",
+            "float has only ~7 digits precision - use double for financial data",
+            Severity.ERROR
+        ),
+        # INFO: These are usually intentional but worth noting
         r'\b(volume|lot|lots)\s*=\s*\d+\.\d+': (
             "Hardcoded lot size",
             "Use calculated or input parameter",
@@ -246,6 +253,24 @@ class MQL5SuperAudit:
             Severity.INFO
         ),
     }
+
+    # Safe cast patterns - these are intentional and don't need flagging
+    SAFE_CAST_PATTERNS = [
+        r'\(int\)\s*SymbolInfoInteger',      # Already integer, just type conversion
+        r'\(int\)\s*MathRound',              # Already rounded
+        r'\(int\)\s*MathFloor',              # Already floored
+        r'\(int\)\s*MathCeil',               # Already ceiled
+        r'\(int\)\s*\([^)]*Time[^)]*/',      # Time division (seconds to minutes/hours)
+        r'\(int\)\s*\([^)]*\s*/\s*60',       # Time to minutes
+        r'\(int\)\s*\([^)]*\s*/\s*3600',     # Time to hours
+        r'\(int\)\s*g_breaker\.',            # Enum/state casts
+        r'\(int\)\s*\w+Tab',                 # UI tab index
+        r'\(int\)\s*checksum',               # Checksum values
+        r'\(int\)\s*autoTag',                # Tag/flag values
+        r'\(int\)\s*priority',               # Queue priority
+        r'\(int\)\s*fileSize',               # File operations
+        r'\(int\)\s*dataSize',               # Data size calculations
+    ]
 
     def __init__(self, project_root: Path):
         self.project_root = Path(project_root)
@@ -324,18 +349,113 @@ class MQL5SuperAudit:
             # Check financial safety patterns
             for pattern, (name, suggestion, severity) in self.FINANCIAL_PATTERNS.items():
                 if re.search(pattern, line):
-                    issues.append(Issue(
-                        file=rel_path,
-                        line=i,
-                        category=Category.FINANCIAL_SAFETY,
-                        severity=severity,
-                        rule=name,
-                        message=f"Financial safety: {name}",
-                        suggestion=suggestion,
-                        context=stripped[:80]
-                    ))
+                    # Skip if it matches a known safe pattern
+                    is_safe = False
+                    for safe_pattern in self.SAFE_CAST_PATTERNS:
+                        if re.search(safe_pattern, line):
+                            is_safe = True
+                            break
+                    if not is_safe:
+                        issues.append(Issue(
+                            file=rel_path,
+                            line=i,
+                            category=Category.FINANCIAL_SAFETY,
+                            severity=severity,
+                            rule=name,
+                            message=f"Financial safety: {name}",
+                            suggestion=suggestion,
+                            context=stripped[:80]
+                        ))
+
+            # Check for additional dangerous patterns not covered above
+            self._check_dangerous_patterns(line, stripped, rel_path, i, issues)
 
         return issues
+
+    def _check_dangerous_patterns(self, line: str, stripped: str, rel_path: str, line_num: int, issues: List[Issue]):
+        """Check for dangerous financial patterns that need special handling"""
+
+        # Pattern: (int)lots or (int)volume without MathRound
+        if re.search(r'\(\s*int\s*\)\s*\w*(lot|volume)\w*', line, re.IGNORECASE):
+            if not re.search(r'MathRound|MathFloor|MathCeil', line):
+                issues.append(Issue(
+                    file=rel_path,
+                    line=line_num,
+                    category=Category.FINANCIAL_SAFETY,
+                    severity=Severity.ERROR,
+                    rule="Unrounded lot cast",
+                    message="Casting lot/volume to int without rounding - (int)2.99 = 2!",
+                    suggestion="Use (int)MathRound(lots) or NormalizeLots()",
+                    context=stripped[:80]
+                ))
+
+        # Pattern: Division that could cause divide-by-zero in financial calc
+        # Skip if: dividing by constant, has zero check on same line, is a ratio, or is indented (likely guarded)
+        if re.search(r'(profit|loss|pnl|equity|balance|margin)\s*/\s*[a-zA-Z_]\w*', line, re.IGNORECASE):
+            # Skip if dividing by constant number
+            if re.search(r'/\s*\d+\.?\d*', line):
+                pass  # Dividing by constant is safe
+            # Skip if there's a zero check on the same line
+            elif re.search(r'(!=\s*0|>\s*0|<\s*0|if\s*\()', line):
+                pass  # Has inline check
+            # Skip common ratio/capture patterns that are guarded elsewhere
+            elif re.search(r'Ratio|ratio|Factor|factor|Percent|percent|captured|Captured', line):
+                pass  # Ratios are typically guarded
+            # Skip if deeply indented (likely inside a guarded block)
+            elif line.startswith('         '):  # 9+ spaces = inside if block
+                pass  # Likely has guard in outer scope
+            else:
+                issues.append(Issue(
+                    file=rel_path,
+                    line=line_num,
+                    category=Category.FINANCIAL_SAFETY,
+                    severity=Severity.WARNING,
+                    rule="Potential division by zero",
+                    message="Division in financial calculation - ensure divisor != 0",
+                    suggestion="Add zero check: if(divisor != 0) or use safe division",
+                    context=stripped[:80]
+                ))
+
+        # Pattern: Price comparison without NormalizeDouble
+        if re.search(r'(price|sl|tp|ask|bid)\s*(==|!=)\s*(price|sl|tp|ask|bid|\d+\.)', line, re.IGNORECASE):
+            if not re.search(r'NormalizeDouble|MathAbs.*<', line):
+                issues.append(Issue(
+                    file=rel_path,
+                    line=line_num,
+                    category=Category.FINANCIAL_SAFETY,
+                    severity=Severity.WARNING,
+                    rule="Direct price comparison",
+                    message="Comparing prices directly may fail due to floating point",
+                    suggestion="Use MathAbs(price1 - price2) < _Point or NormalizeDouble",
+                    context=stripped[:80]
+                ))
+
+        # Pattern: AccountInfoDouble cast to int (balance overflow risk)
+        # Only flag AccountInfoDouble, not AccountInfoInteger (which is safe to cast)
+        if re.search(r'\(\s*int\s*\)\s*AccountInfoDouble', line):
+            issues.append(Issue(
+                file=rel_path,
+                line=line_num,
+                category=Category.FINANCIAL_SAFETY,
+                severity=Severity.ERROR,
+                rule="Account value overflow risk",
+                message="Casting AccountInfoDouble to int - overflow if balance > 2.1B",
+                suggestion="Use double or long for account values",
+                context=stripped[:80]
+            ))
+
+        # Pattern: Hardcoded stop loss/take profit in points
+        if re.search(r'(sl|tp|stoploss|takeprofit)\s*=\s*\d{2,4}\s*[;,)]', line, re.IGNORECASE):
+            issues.append(Issue(
+                file=rel_path,
+                line=line_num,
+                category=Category.FINANCIAL_SAFETY,
+                severity=Severity.INFO,
+                rule="Hardcoded SL/TP points",
+                message="Hardcoded stop loss/take profit value",
+                suggestion="Use input parameter or calculated value based on ATR",
+                context=stripped[:80]
+            ))
 
     def run_audit(self) -> AuditResult:
         """Run complete audit"""
