@@ -199,7 +199,8 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'ArrayResize Without Error Check',
             'pattern': r'ArrayResize\s*\([^)]+\)',
-            'exclude_pattern': r'if\s*\(|==\s*-1|<\s*0',
+            # Exclude: checks, result captured, resize to 0 (always safe), size comparison
+            'exclude_pattern': r'if\s*\(|==\s*-1|<\s*0|=\s*ArrayResize|,\s*0\s*\)|!=\s*\w*[Ss]ize',
             'description': 'ArrayResize returns -1 on failure',
             'recommendation': 'Check return: if(ArrayResize(arr, size) < 0) { handle error }'
         },
