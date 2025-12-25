@@ -1439,7 +1439,6 @@ class FinancialCodeAuditor:
                     continue
 
             # Find all #include statements
-            import re
             includes = re.findall(r'#include\s*[<"]([^>"]+)[>"]', content)
 
             for inc in includes:
