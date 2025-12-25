@@ -1,0 +1,180 @@
+name: MQL5 Compile
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths:
+      - 'MQL5/**/*.mq5'
+      - 'MQL5/**/*.mqh'
+      - '.github/workflows/mql5-compile.yml'
+  pull_request:
+    branches: [ main, master, develop ]
+    paths:
+      - 'MQL5/**/*.mq5'
+      - 'MQL5/**/*.mqh'
+  workflow_dispatch:
+
+jobs:
+  compile:
+    name: Compile MQL5 Code
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download MetaTrader 5
+        shell: powershell
+        run: |
+          Write-Host "Downloading MetaTrader 5 portable..."
+          $mt5Url = "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe"
+          $setupPath = "$env:TEMP\mt5setup.exe"
+
+          # Download MT5 installer
+          Invoke-WebRequest -Uri $mt5Url -OutFile $setupPath -UseBasicParsing
+
+          Write-Host "Installing MetaTrader 5 silently..."
+          # Silent install to specific directory
+          $installDir = "C:\MT5"
+          Start-Process -FilePath $setupPath -ArgumentList "/auto" -Wait -NoNewWindow
+
+          # Find where MT5 was installed (usually in Program Files or AppData)
+          $possiblePaths = @(
+            "C:\Program Files\MetaTrader 5",
+            "$env:APPDATA\MetaQuotes\Terminal",
+            "$env:LOCALAPPDATA\Programs\MetaTrader 5"
+          )
+
+          foreach ($path in $possiblePaths) {
+            if (Test-Path "$path\metaeditor64.exe") {
+              Write-Host "Found MetaEditor at: $path"
+              echo "MT5_PATH=$path" >> $env:GITHUB_ENV
+              break
+            }
+          }
+
+          # Also check for any metaeditor64.exe
+          $found = Get-ChildItem -Path "C:\" -Recurse -Filter "metaeditor64.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($found) {
+            $mt5Dir = Split-Path $found.FullName -Parent
+            Write-Host "Found MetaEditor at: $mt5Dir"
+            echo "MT5_PATH=$mt5Dir" >> $env:GITHUB_ENV
+          }
+
+      - name: Setup MQL5 Project Structure
+        shell: powershell
+        run: |
+          $mt5Path = $env:MT5_PATH
+          if (-not $mt5Path) {
+            Write-Host "MT5_PATH not set, searching..."
+            $found = Get-ChildItem -Path "C:\" -Recurse -Filter "metaeditor64.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) {
+              $mt5Path = Split-Path $found.FullName -Parent
+            } else {
+              Write-Error "MetaEditor not found!"
+              exit 1
+            }
+          }
+
+          Write-Host "MT5 Path: $mt5Path"
+
+          # Copy our MQL5 folder to MT5's MQL5 directory
+          $targetMql5 = "$mt5Path\MQL5"
+
+          # Copy Experts
+          if (Test-Path "MQL5\Experts") {
+            Copy-Item -Path "MQL5\Experts\*" -Destination "$targetMql5\Experts\" -Recurse -Force
+            Write-Host "Copied Experts"
+          }
+
+          # Copy Include
+          if (Test-Path "MQL5\Include") {
+            Copy-Item -Path "MQL5\Include\*" -Destination "$targetMql5\Include\" -Recurse -Force
+            Write-Host "Copied Include files"
+          }
+
+      - name: Compile MQL5 Files
+        shell: powershell
+        run: |
+          $mt5Path = $env:MT5_PATH
+          if (-not $mt5Path) {
+            $found = Get-ChildItem -Path "C:\" -Recurse -Filter "metaeditor64.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $mt5Path = Split-Path $found.FullName -Parent }
+          }
+
+          $metaeditor = "$mt5Path\metaeditor64.exe"
+          $mql5Dir = "$mt5Path\MQL5"
+          $logFile = "$env:GITHUB_WORKSPACE\compile.log"
+
+          Write-Host "MetaEditor: $metaeditor"
+          Write-Host "MQL5 Dir: $mql5Dir"
+
+          # Find all .mq5 files to compile
+          $mq5Files = Get-ChildItem -Path "$mql5Dir\Experts" -Filter "*.mq5" -Recurse
+
+          $hasErrors = $false
+
+          foreach ($file in $mq5Files) {
+            Write-Host ""
+            Write-Host "========================================"
+            Write-Host "Compiling: $($file.Name)"
+            Write-Host "========================================"
+
+            # Compile the file
+            $args = @(
+              "/compile:$($file.FullName)",
+              "/log:$logFile",
+              "/include:$mql5Dir\Include"
+            )
+
+            $process = Start-Process -FilePath $metaeditor -ArgumentList $args -Wait -PassThru -NoNewWindow
+
+            # Check log for errors
+            if (Test-Path $logFile) {
+              $logContent = Get-Content $logFile -Raw
+              Write-Host $logContent
+
+              if ($logContent -match "error|Error|ERROR") {
+                Write-Host "❌ Compilation FAILED for $($file.Name)"
+                $hasErrors = $true
+              } else {
+                Write-Host "✅ Compilation SUCCESS for $($file.Name)"
+              }
+
+              # Check if .ex5 was created
+              $ex5File = $file.FullName -replace "\.mq5$", ".ex5"
+              if (Test-Path $ex5File) {
+                $size = (Get-Item $ex5File).Length
+                Write-Host "  Generated: $ex5File ($size bytes)"
+              }
+            }
+          }
+
+          if ($hasErrors) {
+            Write-Error "One or more files failed to compile"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "All files compiled successfully!"
+          Write-Host "========================================"
+
+      - name: Upload Compiled Files
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: compiled-ex5
+          path: |
+            C:\**\MQL5\Experts\*.ex5
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload Compile Log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compile-log
+          path: compile.log
+          retention-days: 7
+          if-no-files-found: ignore
