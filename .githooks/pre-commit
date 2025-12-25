@@ -3,9 +3,10 @@
 # Install: git config core.hooksPath .githooks
 #
 # This hook:
-# 1. Blocks commits with CRITICAL issues
-# 2. Warns about HIGH issues (doesn't block)
-# 3. Suggests AI instruction updates when patterns repeat
+# 1. Shows the Code Quality Score
+# 2. Blocks commits with CRITICAL issues
+# 3. Warns about HIGH issues (doesn't block)
+# 4. Suggests AI instruction updates when patterns repeat
 
 set -e
 
@@ -40,12 +41,20 @@ if echo "$SUPER_OUTPUT" | grep -q "CRITICAL:"; then
     exit 1
 fi
 
+# Show score summary
+SCORE_OUTPUT=$(python3 Tools/code_quality_score.py 2>&1 || true)
+SCORE=$(echo "$SCORE_OUTPUT" | grep -oP "SCORE:\s+\K[\d.]+" || echo "?")
+GRADE=$(echo "$SCORE_OUTPUT" | grep -oP "GRADE:\s+\K\w+" || echo "?")
+
+echo ""
+echo "Code Quality Score: $SCORE ($GRADE)"
+
 # Check for HIGH findings (warn but don't block)
 HIGH_COUNT=$(echo "$OUTPUT" | grep -oP "HIGH:\s+\K\d+" || echo "0")
 if [ "$HIGH_COUNT" -gt 20 ]; then
     echo ""
     echo "WARNING: $HIGH_COUNT HIGH severity findings."
-    echo "Consider running: python3 Tools/update_ai_instructions.py --from-audit"
+    echo "Goal: Reduce HIGH issues to improve score toward 90+ (Grade A)"
 fi
 
 echo "Audit passed - no critical issues."

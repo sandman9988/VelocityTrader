@@ -2,7 +2,60 @@
 
 **Read this file at the start of every session. These rules are mandatory.**
 
-This document defines coding standards derived from financial code audits. Following these rules prevents CRITICAL and HIGH severity issues that could cause financial loss or system failure.
+---
+
+## 🎯 YOUR PRIMARY GOAL: Improve the Code Quality Score
+
+```
+Current Score: Check with: python3 Tools/code_quality_score.py
+Target Score:  90+ (Grade A)
+```
+
+### Score Grading
+| Grade | Score | Meaning |
+|-------|-------|---------|
+| A+ | 95-100 | Production ready, minimal risk |
+| A | 90-94 | Excellent, safe for deployment |
+| B | 80-89 | Good, minor improvements needed |
+| C | 70-79 | Acceptable, address HIGH issues |
+| D | 60-69 | Concerning, significant work needed |
+| F | <60 | **UNSAFE - Do not deploy** |
+
+### How to Improve the Score
+
+1. **Fix HIGH severity issues first** (-0.3 points each)
+   - Focus on: Numerical Safety, Execution Safety, Memory Safety
+   - Use patterns from this document
+
+2. **Reduce MEDIUM issues** (-0.05 points each)
+   - Apply defensive programming patterns
+   - Add proper error handling
+
+3. **Never introduce CRITICAL issues** (-15 points each, caps score at 60)
+   - Always use SafeDivide, bounds checks, handle validation
+
+### After Writing Code
+
+```bash
+# Check your impact on the score
+python3 Tools/code_quality_score.py
+
+# See what needs fixing
+python3 Tools/mql5_financial_auditor.py --project . --critical-only
+```
+
+---
+
+## Do No Harm Principle
+
+This codebase manages **real financial trades**. Every bug can cause **real money loss**.
+
+- **CRITICAL** issues: Can cause crashes, infinite loops, or wrong trades
+- **HIGH** issues: Can cause incorrect calculations or missed safety checks
+- **MEDIUM** issues: Can cause unexpected behavior under edge cases
+- **LOW** issues: Style/best practice violations
+
+**Your code should never make things worse. Always improve or maintain the score.**
 
 ---
 
