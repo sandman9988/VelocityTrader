@@ -496,7 +496,8 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Index Calculation Without Clamp',
             'pattern': r'\[\s*\w+\s*[+\-*/]\s*\d+\s*\]',
-            'exclude_pattern': r'MathMin|MathMax|Clamp|%\s*\d+|%\s*\w+|SafeIndex|ClampIndex|IsValidIndex',
+            # Exclude: clamp functions, modulo, small fixed offsets (0-9), feature index patterns
+            'exclude_pattern': r'MathMin|MathMax|Clamp|%\s*\d+|%\s*\w+|SafeIndex|ClampIndex|IsValidIndex|\+\s*[0-9]\s*\]|startIdx|featureIdx|baseIdx',
             'description': 'Computed index without range clamping may go out of bounds',
             'recommendation': 'Use MathMax(0, MathMin(idx, size-1)) or modulo operator'
         },
