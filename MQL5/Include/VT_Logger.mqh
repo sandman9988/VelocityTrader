@@ -1172,7 +1172,8 @@ public:
       if(m_markedCount >= ArraySize(m_markedCandles))
       {
          int newSize = m_markedCount + 100;
-         if(ArrayResize(m_markedCandles, newSize) != newSize)
+         int resized  = ArrayResize(m_markedCandles, newSize);
+         if(resized < 0)
          {
             Print("ERROR: CVTLogger::MarkCandle - failed to resize array");
             return false;
