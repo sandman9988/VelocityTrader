@@ -277,16 +277,19 @@ class MQL5SuperAudit:
             Severity.WARNING
         ),
         # WARMUP: Not checking if enough bars available before calculation
+        # DO NO HARM: Trading without warmup = trading on invalid indicators!
         r'(iMA|iRSI|iATR|iMACD|iADX|iBands|iStochastic)\s*\([^,]+,\s*[^,]+,\s*(\d{2,3})': (
             "Indicator with large period",
-            "Ensure sufficient warmup bars (Bars > period) before first signal",
-            Severity.INFO
+            "DO NO HARM: Ensure Bars > period before first signal - invalid indicator data!",
+            Severity.WARNING
         ),
-        # BUFFER: CopyBuffer starting from 0 without ArraySetAsSeries
-        r'CopyBuffer\s*\([^,]+,\s*[^,]+,\s*0\s*,': (
-            "CopyBuffer from index 0",
-            "Ensure ArraySetAsSeries(buffer, true) for newest-first indexing",
-            Severity.INFO
+        # BUFFER: CopyBuffer starting from 0 with count > 1 without ArraySetAsSeries
+        # DO NO HARM: Wrong data direction = signals on wrong bar!
+        # Note: CopyBuffer(..., 0, 1, ...) is safe - single element has no direction issue
+        r'CopyBuffer\s*\([^,]+,\s*[^,]+,\s*0\s*,\s*([2-9]|\d{2,})': (
+            "CopyBuffer from index 0 with count > 1",
+            "DO NO HARM: ArraySetAsSeries(buffer,true) needed - [0] may be oldest, not newest!",
+            Severity.WARNING
         ),
         # BUFFER: Indicator buffer not initialized
         r'SetIndexBuffer\s*\([^)]+\)\s*;(?!\s*(ArraySetAsSeries|ArrayInitialize|PlotIndexSetDouble))': (
@@ -350,11 +353,14 @@ class MQL5SuperAudit:
             "rates[0] is OLDEST bar by default! Use ArraySetAsSeries for newest-first",
             Severity.WARNING
         ),
-        # NEGATIVE INDEX: Buffer underrun risk
-        r'\[\s*\w+\s*-\s*\d+\s*\]': (
-            "Array access with subtraction [i-n]",
-            "Verify i >= n to prevent negative index / buffer underrun",
-            Severity.INFO
+        # NEGATIVE INDEX: Buffer underrun risk (only flag high-risk patterns)
+        # Skip [i-1] which is usually safe in loops starting at 1
+        # Flag [i-2], [i-3], etc. which have higher underrun risk
+        # DO NO HARM: Negative index = reading garbage memory = bad trades!
+        r'\[\s*\w+\s*-\s*([2-9]|\d{2,})\s*\]': (
+            "Array access with large subtraction [i-n] where n>=2",
+            "DO NO HARM: Verify i >= n to prevent buffer underrun - garbage data!",
+            Severity.WARNING
         ),
     }
 

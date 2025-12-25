@@ -655,6 +655,15 @@ public:
       if(m_hATR == INVALID_HANDLE || m_hRSI == INVALID_HANDLE)
          return false;
 
+      // DO NO HARM: Set buffers as series so [0] = newest bar (not oldest!)
+      // Without this, CopyBuffer fills [0]=oldest, [n-1]=newest - dangerous!
+      ArraySetAsSeries(m_atr, true);
+      ArraySetAsSeries(m_rsi, true);
+      ArraySetAsSeries(m_adx, true);
+      ArraySetAsSeries(m_maFast, true);
+      ArraySetAsSeries(m_maMedium, true);
+      ArraySetAsSeries(m_maSlow, true);
+
       return true;
    }
 
