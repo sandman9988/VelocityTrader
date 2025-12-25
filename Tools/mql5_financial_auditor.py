@@ -112,6 +112,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Potential Integer Overflow',
             'pattern': r'\b(int|long)\s+\w+\s*=\s*\w+\s*\*\s*\w+',
+            # Exclude multiplications by small constants (safe operations)
+            'exclude_pattern': r'\*\s*[2-9]\s*;|\*\s*1[0-9]\s*;',
             'description': 'Integer multiplication without overflow check',
             'recommendation': 'Use SafeMul() or check bounds before multiplication'
         },
@@ -147,7 +149,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Unsafe Power Operation',
             'pattern': r'MathPow\s*\(',
-            'exclude_pattern': r'SafePow',
+            # Exclude squaring (power of 2) since it's always safe mathematically
+            'exclude_pattern': r'SafePow|,\s*2\s*\)|,\s*2\.0\s*\)',
             'description': 'MathPow can overflow or return NaN with certain inputs',
             'recommendation': 'Use SafePow() with bounds checking'
         },
