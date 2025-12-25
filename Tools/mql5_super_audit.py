@@ -604,7 +604,7 @@ class MQL5SuperAudit:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     lines = f.readlines()
                     total_lines += len(lines)
-            except:
+            except Exception:
                 pass
 
             issues = self.audit_file(file_path)
