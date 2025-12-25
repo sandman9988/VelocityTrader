@@ -389,6 +389,21 @@ private:
    double               m_returns[];
    int                  m_returnsCount;
 
+   //+------------------------------------------------------------------+
+   //| Helper: Map logical ring index to physical array index            |
+   //| logicalIdx: 0 = oldest, m_bufferCount-1 = newest                  |
+   //+------------------------------------------------------------------+
+   int RingIndex(int logicalIdx)
+   {
+      if(m_bufferSize <= 0 || m_bufferCount <= 0)
+         return 0;
+      if(logicalIdx < 0 || logicalIdx >= m_bufferCount)
+         return 0;
+      // Start is oldest entry in the ring
+      int start = (m_bufferHead - m_bufferCount + m_bufferSize) % m_bufferSize;
+      return (start + logicalIdx) % m_bufferSize;
+   }
+
    // Session tracking
    datetime             m_sessionStart;
    long                 m_tickCount;
@@ -576,7 +591,15 @@ public:
       if(m_destination == LOG_DEST_RL_BUFFER || m_maxBufferSize > 0)
       {
          int resized = ArrayResize(m_replayBuffer, m_maxBufferSize);
-         if(resized != m_maxBufferSize)
+         if(resized <= 0)
+         {
+            // ArrayResize failed completely - disable buffer to prevent modulo crashes
+            Print("ERROR: CVTLogger::Init - Replay buffer allocation failed");
+            m_bufferSize = 0;
+            m_bufferHead = 0;
+            m_bufferCount = 0;
+         }
+         else if(resized != m_maxBufferSize)
          {
             Print("WARNING: CVTLogger::Init - Could not allocate full replay buffer. Requested: ",
                   m_maxBufferSize, ", Allocated: ", resized);
@@ -631,6 +654,13 @@ public:
       {
          FileClose(m_hRL);
          m_hRL = INVALID_HANDLE;
+      }
+
+      // Close marked candles file (was missing - resource leak)
+      if(m_hMarked != INVALID_HANDLE)
+      {
+         FileClose(m_hMarked);
+         m_hMarked = INVALID_HANDLE;
       }
 
       m_initialized = false;
@@ -761,9 +791,7 @@ public:
    //+------------------------------------------------------------------+
    void LogOrderResult(CTrade &trade, string symbol, string actionDesc)
    {
-      MqlTradeResult result = trade.ResultRetcode() == 0 ?
-         MqlTradeResult() : trade.ResultRetcode() > 0 ? MqlTradeResult() : MqlTradeResult();
-
+      // Use CTrade methods directly for result info
       uint retcode = trade.ResultRetcode();
 
       if(retcode == TRADE_RETCODE_DONE || retcode == TRADE_RETCODE_PLACED)
@@ -877,14 +905,21 @@ public:
          FileWriteString(m_hRL, exp.ToJSON() + "\n");
       }
 
-      // Add to replay buffer
-      if(m_bufferSize > 0)
+      // Add to replay buffer (with guards against modulo by zero)
+      if(m_bufferSize > 0 && ArraySize(m_replayBuffer) > 0)
       {
+         // Bounds check before write
+         if(m_bufferHead < 0 || m_bufferHead >= m_bufferSize)
+            m_bufferHead = 0;
+
          int idx = m_bufferHead;
-         m_replayBuffer[idx] = exp;
-         m_bufferHead = (m_bufferHead + 1) % m_bufferSize;
-         if(m_bufferCount < m_bufferSize)
-            m_bufferCount++;
+         if(idx >= 0 && idx < ArraySize(m_replayBuffer))
+         {
+            m_replayBuffer[idx] = exp;
+            m_bufferHead = (m_bufferHead + 1) % m_bufferSize;
+            if(m_bufferCount < m_bufferSize)
+               m_bufferCount++;
+         }
       }
    }
 
@@ -933,31 +968,27 @@ public:
       {
          attempts++;
 
-         // Generate random index with multiple safety checks
+         // Generate random logical index (0 to m_bufferCount-1)
          int randVal = MathAbs(MathRand());
          if(randVal < 0) randVal = 0;  // Handle int overflow edge case
 
-         int randIdx = randVal % m_bufferCount;
+         int logicalIdx = randVal % m_bufferCount;
 
-         // Triple bounds check for safety
-         if(randIdx < 0)
-            randIdx = 0;
-         if(randIdx >= m_bufferCount)
-            randIdx = m_bufferCount - 1;
-         if(randIdx >= ArraySize(m_replayBuffer))
-            randIdx = ArraySize(m_replayBuffer) - 1;
+         // Map logical index to physical ring position
+         int physicalIdx = RingIndex(logicalIdx);
 
-         // Final validation before access (check all array bounds)
-         if(randIdx >= 0 && randIdx < m_bufferCount && randIdx < ArraySize(m_replayBuffer) &&
+         // Validate physical index bounds before access
+         if(physicalIdx >= 0 && physicalIdx < ArraySize(m_replayBuffer) &&
             sampledCount >= 0 && sampledCount < ArraySize(batch))
          {
-            batch[sampledCount] = m_replayBuffer[randIdx];
+            batch[sampledCount] = m_replayBuffer[physicalIdx];
             sampledCount++;
          }
          else
          {
             // Log but don't fail - try again
-            Print("WARNING: CVTLogger::SampleBatch - invalid index ", randIdx,
+            Print("WARNING: CVTLogger::SampleBatch - invalid physical index ", physicalIdx,
+                  " from logical ", logicalIdx,
                   " (bufferCount=", m_bufferCount, ", arraySize=", ArraySize(m_replayBuffer), ")");
          }
       }
@@ -1082,7 +1113,14 @@ public:
 
       for(int i = 0; i < m_bufferCount; i++)
       {
-         string json = m_replayBuffer[i].ToJSON();
+         // Use RingIndex for correct ring buffer traversal
+         int physicalIdx = RingIndex(i);
+         if(physicalIdx < 0 || physicalIdx >= ArraySize(m_replayBuffer))
+         {
+            errorCount++;
+            continue;
+         }
+         string json = m_replayBuffer[physicalIdx].ToJSON();
          if(StringLen(json) > 0)
          {
             uint written = FileWriteString(h, json + "\n");
