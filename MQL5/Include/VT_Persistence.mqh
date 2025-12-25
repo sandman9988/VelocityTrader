@@ -12,11 +12,9 @@
 #include "VT_Definitions.mqh"
 #include "VT_Globals.mqh"
 
-// Forward declaration of input parameters (defined in main EA)
-extern bool      InpUsePersistence;
-extern string    InpFilePrefix;
-extern int       InpMagicNumber;
-extern double    InpLearningRateInit;
+// Note: Input parameters (InpUsePersistence, etc.) are defined
+// in the main EA file and are automatically globally accessible.
+// DO NOT redeclare them with 'extern' as this causes type conflicts.
 
 // Persistence version defined in VT_Definitions.mqh (PERSISTENCE_VERSION = 720)
 

@@ -11,12 +11,9 @@
 
 #include "VT_Definitions.mqh"  // Required for SafeDivide()
 
-// Forward declaration of input parameters (defined in main EA)
-extern double InpOmegaBaseline;
-extern double InpOmegaMaxScale;
-extern double InpMinWinRate;
-extern double InpMaxPValue;
-extern int    InpMinTradesForEdge;
+// Note: Input parameters (InpOmegaBaseline, etc.) are defined
+// in the main EA file and are automatically globally accessible.
+// DO NOT redeclare them with 'extern' as this causes type conflicts.
 
 //+------------------------------------------------------------------+
 //| STRUCTURE: Probability Predictor                                  |
