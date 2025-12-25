@@ -62,47 +62,57 @@ struct RingBuffer
 
    void Push(T value)
    {
+      // Guard: capacity==0 would cause modulo division by zero
+      if(capacity <= 0) return;
+      if(head < 0 || head >= capacity) head = 0;  // Defensive bounds check
+
       data[head] = value;
       head = (head + 1) % capacity;
       if(count < capacity) count++;
    }
 
    // Get item at position (0 = most recent, count-1 = oldest)
+   // Returns T() (0 for numeric types) if buffer is empty or invalid
    T Get(int idx)
    {
-      if(idx < 0 || idx >= count) return data[0];  // Safe default
+      // Guard: return safe default for empty/invalid buffer
+      if(capacity <= 0 || count <= 0) return (T)0;
+      if(idx < 0 || idx >= count) return (T)0;
+
       int actualIdx = (head - 1 - idx + capacity) % capacity;
+      // Defensive bounds check before array access
+      if(actualIdx < 0 || actualIdx >= capacity) return (T)0;
       return data[actualIdx];
    }
 
    // Get oldest item
    T GetOldest()
    {
-      if(count == 0) return data[0];
+      if(capacity <= 0 || count <= 0) return (T)0;
       return Get(count - 1);
    }
 
    // Get newest item
    T GetNewest()
    {
-      if(count == 0) return data[0];
+      if(capacity <= 0 || count <= 0) return (T)0;
       return Get(0);
    }
 
-   // Calculate average (for numeric types)
+   // Calculate average (for numeric types only)
    double GetAverage()
    {
-      if(count == 0) return 0;
+      if(capacity <= 0 || count <= 0) return 0.0;
       double sum = 0;
       for(int i = 0; i < count; i++)
          sum += (double)Get(i);
       return SafeDivide(sum, (double)count, 0.0);
    }
 
-   // Calculate standard deviation
+   // Calculate standard deviation (for numeric types only)
    double GetStdDev()
    {
-      if(count < 2) return 0;
+      if(capacity <= 0 || count < 2) return 0.0;
       double avg = GetAverage();
       double sumSq = 0;
       for(int i = 0; i < count; i++)
@@ -113,20 +123,20 @@ struct RingBuffer
       return MathSqrt(SafeDivide(sumSq, (double)(count - 1), 0.0));
    }
 
-   // Get min value
+   // Get min value (for numeric types only)
    double GetMin()
    {
-      if(count == 0) return 0;
+      if(capacity <= 0 || count <= 0) return 0.0;
       double minVal = (double)Get(0);
       for(int i = 1; i < count; i++)
          minVal = MathMin(minVal, (double)Get(i));
       return minVal;
    }
 
-   // Get max value
+   // Get max value (for numeric types only)
    double GetMax()
    {
-      if(count == 0) return 0;
+      if(capacity <= 0 || count <= 0) return 0.0;
       double maxVal = (double)Get(0);
       for(int i = 1; i < count; i++)
          maxVal = MathMax(maxVal, (double)Get(i));
@@ -315,14 +325,12 @@ struct UpdateQueueItem
 struct AsyncUpdateQueue
 {
    UpdateQueueItem items[UPDATE_QUEUE_SIZE];
-   int             head;
-   int             tail;
    int             count;
+   // Note: We use scan-based slot finding instead of head/tail
+   // because Dequeue clears arbitrary slots based on priority, not FIFO order
 
    void Init()
    {
-      head = 0;
-      tail = 0;
       count = 0;
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
          items[i].active = false;
@@ -340,12 +348,25 @@ struct AsyncUpdateQueue
             return true;  // Already queued
       }
 
-      items[tail].symbolIdx = symbolIdx;
-      items[tail].priority = priority;
-      items[tail].queuedTime = TimeCurrent();
-      items[tail].active = true;
+      // Find next inactive slot (not just tail, which could overwrite active items)
+      // This is the correct approach since Dequeue clears arbitrary slots, not head
+      int slot = -1;
+      for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
+      {
+         if(!items[i].active)
+         {
+            slot = i;
+            break;
+         }
+      }
 
-      tail = (tail + 1) % UPDATE_QUEUE_SIZE;
+      if(slot < 0)
+         return false;  // No free slot (shouldn't happen if count < SIZE, but defensive)
+
+      items[slot].symbolIdx = symbolIdx;
+      items[slot].priority = priority;
+      items[slot].queuedTime = TimeCurrent();
+      items[slot].active = true;
       count++;
       return true;
    }
