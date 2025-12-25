@@ -40,8 +40,9 @@ struct FileWriteContext
 bool SafeFileWriteInteger(FileWriteContext &ctx, int value)
 {
    if(ctx.handle == INVALID_HANDLE) { ctx.errors++; return false; }
-   uint written = FileWriteInteger(ctx.handle, value);
-   if(written != sizeof(int)) { ctx.errors++; return false; }
+   // Use INT_VALUE explicitly for deterministic 4-byte format
+   uint written = FileWriteInteger(ctx.handle, value, INT_VALUE);
+   if(written != 4) { ctx.errors++; return false; }
    ctx.bytesWritten += written;
    return true;
 }
@@ -262,7 +263,7 @@ void SaveState()
 
    // Seek to checksum position (end - 4 bytes)
    FileSeek(handle, -4, SEEK_END);
-   FileWriteInteger(handle, (int)checksum);
+   FileWriteInteger(handle, (int)checksum, INT_VALUE);
    FileFlush(handle);
    FileClose(handle);
 
@@ -275,13 +276,13 @@ void SaveState()
       return;
    }
 
-   // Quick validation - check magic and version
-   int magic = FileReadInteger(handle);
-   int version = FileReadInteger(handle);
+   // Quick validation - check magic and version (use INT_VALUE for deterministic 4-byte format)
+   int magic = FileReadInteger(handle, INT_VALUE);
+   int version = FileReadInteger(handle, INT_VALUE);
 
    // Seek to end and read stored checksum
    FileSeek(handle, -4, SEEK_END);
-   uint storedChecksum = (uint)FileReadInteger(handle);
+   uint storedChecksum = (uint)FileReadInteger(handle, INT_VALUE);
    FileClose(handle);
 
    // Recalculate and verify checksum
@@ -296,30 +297,32 @@ void SaveState()
       return;
    }
 
-   // Step 3: Atomic swap - backup old, rename temp to main
+   // Step 3: Atomic-like swap using FileCopy + FileDelete (cross-build compatible)
+   // Note: FileMove with FILE_REWRITE may not compile on all MT5 builds
    if(FileIsExist(mainFilename))
    {
       // Delete old backup if exists
       if(FileIsExist(backupFilename))
          FileDelete(backupFilename);
 
-      // Move current to backup
-      if(!FileMove(mainFilename, 0, backupFilename, FILE_REWRITE))
+      // Copy current to backup (more reliable than FileMove)
+      if(!FileCopy(mainFilename, 0, backupFilename, FILE_REWRITE))
       {
          Print("WARNING: Could not create backup");
       }
+      // Delete the original main file
+      FileDelete(mainFilename);
    }
 
-   // Rename temp to main (atomic on most filesystems)
-   if(!FileMove(tempFilename, 0, mainFilename, FILE_REWRITE))
+   // Copy temp to main
+   if(!FileCopy(tempFilename, 0, mainFilename, FILE_REWRITE))
    {
       Print("ERROR: Could not finalize save");
       return;
    }
 
-   // Clean up temp file if it still exists
-   if(FileIsExist(tempFilename))
-      FileDelete(tempFilename);
+   // Clean up temp file
+   FileDelete(tempFilename);
 }
 
 //+------------------------------------------------------------------+
@@ -337,6 +340,13 @@ void SaveAgentSafe(FileWriteContext &ctx, TradingAgent &agent)
    SafeFileWriteDouble(ctx, agent.capitalAlloc);
    SafeFileWriteInteger(ctx, agent.swapCount);
    SafeFileWriteInteger(ctx, agent.consLosses);
+
+   // v720+: Persist rolling window for circuit breaker (prevents post-restart safety bypass)
+   SafeFileWriteInteger(ctx, agent.rollingIdx);
+   for(int i = 0; i < ROLLING_WINDOW; i++)
+   {
+      SafeFileWriteDouble(ctx, agent.rollingPnL[i]);
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -439,8 +449,8 @@ bool TryLoadFile(string filename)
       return false;
    }
 
-   // Read and validate header
-   int magic = FileReadInteger(handle);
+   // Read and validate header (use INT_VALUE for deterministic 4-byte format)
+   int magic = FileReadInteger(handle, INT_VALUE);
    if(magic != PERSISTENCE_MAGIC)
    {
       FileClose(handle);
@@ -448,7 +458,7 @@ bool TryLoadFile(string filename)
       return false;
    }
 
-   int version = FileReadInteger(handle);
+   int version = FileReadInteger(handle, INT_VALUE);
 
    // Handle version migration
    if(version == 710)
@@ -478,7 +488,7 @@ bool TryLoadFile(string filename)
       FileClose(handle);
       return false;
    }
-   uint storedChecksum = (uint)FileReadInteger(handle);
+   uint storedChecksum = (uint)FileReadInteger(handle, INT_VALUE);
    FileClose(handle);
 
    uint calculatedChecksum = CalculateFileChecksum(filename, 4);
@@ -503,9 +513,9 @@ bool TryLoadFile(string filename)
       return false;
    }
 
-   // Skip header (already validated)
-   FileReadInteger(handle);  // magic
-   FileReadInteger(handle);  // version
+   // Skip header (already validated) - use INT_VALUE for deterministic format
+   FileReadInteger(handle, INT_VALUE);  // magic
+   FileReadInteger(handle, INT_VALUE);  // version
 
    datetime saveTime = (datetime)FileReadLong(handle);
    if(saveTime <= 0 || saveTime > TimeCurrent() + 86400)  // Sanity check: not in future by more than 1 day
@@ -536,22 +546,22 @@ bool TryLoadFile(string filename)
    }
    for(int i = 0; i < 3; i++)
    {
-      int val = FileReadInteger(handle);
+      int val = FileReadInteger(handle, INT_VALUE);
       g_predictor.regimeCounts[i] = MathMax(0, val);  // Non-negative
    }
    for(int i = 0; i < 5; i++)
    {
-      int val = FileReadInteger(handle);
+      int val = FileReadInteger(handle, INT_VALUE);
       g_predictor.chiCounts[i] = MathMax(0, val);
    }
    for(int i = 0; i < 5; i++)
    {
-      int val = FileReadInteger(handle);
+      int val = FileReadInteger(handle, INT_VALUE);
       g_predictor.accelCounts[i] = MathMax(0, val);
    }
 
    // Load circuit breaker state with validation
-   int stateVal = FileReadInteger(handle);
+   int stateVal = FileReadInteger(handle, INT_VALUE);
    if(stateVal < 0 || stateVal > 2)  // Validate enum range
    {
       Print("WARNING: TryLoadFile - invalid trading state: ", stateVal, ", defaulting to NORMAL");
@@ -575,21 +585,40 @@ bool LoadStateV710(string filename)
    int handle = FileOpen(filename, FILE_READ | FILE_BIN);
    if(handle == INVALID_HANDLE) return false;
 
-   // Skip header (already validated)
-   FileReadInteger(handle);  // magic
-   FileReadInteger(handle);  // version
+   // Skip header (already validated) - use INT_VALUE for deterministic format
+   FileReadInteger(handle, INT_VALUE);  // magic
+   FileReadInteger(handle, INT_VALUE);  // version
 
-   // Load agents (old format without learning rate)
+   // Load agents (old format without learning rate or rolling window)
    LoadAgentV710(handle, g_sniper);
    LoadAgentV710(handle, g_berserker);
 
    // Load predictor (old format without counts)
-   for(int i = 0; i < 3; i++) g_predictor.regimeWR[i] = FileReadDouble(handle);
-   for(int i = 0; i < 5; i++) g_predictor.chiZoneWR[i] = FileReadDouble(handle);
-   for(int i = 0; i < 5; i++) g_predictor.accelZoneWR[i] = FileReadDouble(handle);
+   // First initialize to clear any stale data, then overwrite WR arrays
+   g_predictor.Init();
+   for(int i = 0; i < 3; i++)
+   {
+      double val = FileReadDouble(handle);
+      g_predictor.regimeWR[i] = MathMax(0.0, MathMin(1.0, val));
+   }
+   for(int i = 0; i < 5; i++)
+   {
+      double val = FileReadDouble(handle);
+      g_predictor.chiZoneWR[i] = MathMax(0.0, MathMin(1.0, val));
+   }
+   for(int i = 0; i < 5; i++)
+   {
+      double val = FileReadDouble(handle);
+      g_predictor.accelZoneWR[i] = MathMax(0.0, MathMin(1.0, val));
+   }
+   // Counts remain at 0 from Init() - will accumulate from new trades
+
+   // Initialize circuit breaker to safe default state after v710 migration
+   g_breaker.state = STATE_HALTED;  // Conservative: require human approval
+   g_breaker.peakEquity = AccountInfoDouble(ACCOUNT_EQUITY);
 
    FileClose(handle);
-   Print("Migrated from v710 format successfully");
+   Print("Migrated from v710 format successfully (breaker set to HALTED for safety)");
    return true;
 }
 
@@ -602,7 +631,12 @@ void LoadAgentV710(int handle, TradingAgent &agent)
    LoadProfileV710(handle, agent.shadow);
 
    agent.capitalAlloc = FileReadDouble(handle);
-   agent.swapCount = FileReadInteger(handle);
+   agent.swapCount = FileReadInteger(handle, INT_VALUE);
+
+   // v710 did not have consLosses or rolling window - initialize to safe defaults
+   agent.consLosses = 0;
+   agent.rollingIdx = 0;
+   ArrayInitialize(agent.rollingPnL, 0.0);
 
    agent.real.RecalcTotals();
    agent.shadow.RecalcTotals();
@@ -618,8 +652,8 @@ void LoadProfileV710(int handle, AgentProfile &profile)
       profile.regime[i].qBuy = FileReadDouble(handle);
       profile.regime[i].qSell = FileReadDouble(handle);
       profile.regime[i].qHold = FileReadDouble(handle);
-      profile.regime[i].trades = FileReadInteger(handle);
-      profile.regime[i].wins = FileReadInteger(handle);
+      profile.regime[i].trades = FileReadInteger(handle, INT_VALUE);
+      profile.regime[i].wins = FileReadInteger(handle, INT_VALUE);
       profile.regime[i].pnl = FileReadDouble(handle);
       profile.regime[i].upside = FileReadDouble(handle);
       profile.regime[i].downside = FileReadDouble(handle);
@@ -638,8 +672,23 @@ void LoadAgent(int handle, TradingAgent &agent)
    LoadProfile(handle, agent.shadow);
 
    agent.capitalAlloc = FileReadDouble(handle);
-   agent.swapCount = FileReadInteger(handle);
-   agent.consLosses = FileReadInteger(handle);
+   agent.swapCount = FileReadInteger(handle, INT_VALUE);
+   agent.consLosses = FileReadInteger(handle, INT_VALUE);
+
+   // v720+: Restore rolling window for circuit breaker
+   agent.rollingIdx = FileReadInteger(handle, INT_VALUE);
+   // Validate and clamp rollingIdx
+   if(agent.rollingIdx < 0 || agent.rollingIdx >= ROLLING_WINDOW)
+      agent.rollingIdx = 0;
+
+   for(int i = 0; i < ROLLING_WINDOW; i++)
+   {
+      double val = FileReadDouble(handle);
+      // Clamp invalid numbers to 0
+      if(!MathIsValidNumber(val))
+         val = 0.0;
+      agent.rollingPnL[i] = val;
+   }
 
    agent.real.RecalcTotals();
    agent.shadow.RecalcTotals();
@@ -670,11 +719,12 @@ void LoadProfile(int handle, AgentProfile &profile)
       }
 
       // Load all values from file first (before any array access)
+      // Use INT_VALUE for deterministic 4-byte integer format
       double qBuy = FileReadDouble(handle);
       double qSell = FileReadDouble(handle);
       double qHold = FileReadDouble(handle);
-      int trades = FileReadInteger(handle);
-      int wins = FileReadInteger(handle);
+      int trades = FileReadInteger(handle, INT_VALUE);
+      int wins = FileReadInteger(handle, INT_VALUE);
       double pnl = FileReadDouble(handle);
       double upside = FileReadDouble(handle);
       double downside = FileReadDouble(handle);

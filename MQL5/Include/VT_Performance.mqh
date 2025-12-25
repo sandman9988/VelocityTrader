@@ -20,7 +20,7 @@
 #define CACHE_TTL_SHORT       5      // 5 seconds for hot cache
 #define CACHE_TTL_MEDIUM      30     // 30 seconds for warm cache
 #define CACHE_TTL_LONG        300    // 5 minutes for cold cache
-#define UPDATE_QUEUE_SIZE     64     // Max pending symbol updates (expanded for bursty feeds)
+#define UPDATE_QUEUE_SIZE     64     // Max pending symbol updates (sized for backpressure handling)
 #define TIMER_INTERVAL_MS     250    // OnTimer interval (milliseconds)
 
 //+------------------------------------------------------------------+
@@ -60,49 +60,67 @@ struct RingBuffer
       count = 0;
    }
 
+   void Reset()
+   {
+      head = 0;
+      count = 0;
+      capacity = 0;
+      ArrayResize(data, 0);
+   }
+
    void Push(T value)
    {
+      // Guard: capacity==0 would cause modulo division by zero
+      if(capacity <= 0) return;
+      if(head < 0 || head >= capacity) head = 0;  // Defensive bounds check
+
       data[head] = value;
       head = (head + 1) % capacity;
       if(count < capacity) count++;
    }
 
    // Get item at position (0 = most recent, count-1 = oldest)
+   // Returns T() (0 for numeric types) if buffer is empty or invalid
    T Get(int idx)
    {
-      if(idx < 0 || idx >= count) return data[0];  // Safe default
+      // Guard: return safe default for empty/invalid buffer
+      if(capacity <= 0 || count <= 0) return (T)0;
+      if(idx < 0 || idx >= count) return (T)0;
+
       int actualIdx = (head - 1 - idx + capacity) % capacity;
+      // Defensive bounds check before array access
+      if(actualIdx < 0 || actualIdx >= capacity) return (T)0;
       return data[actualIdx];
    }
 
    // Get oldest item
    T GetOldest()
    {
-      if(count == 0) return data[0];
+      if(capacity <= 0 || count <= 0) return (T)0;
       return Get(count - 1);
    }
 
    // Get newest item
    T GetNewest()
    {
-      if(count == 0) return data[0];
+      if(capacity <= 0 || count <= 0) return (T)0;
       return Get(0);
    }
 
-   // Calculate average (for numeric types)
+   // Calculate average (for numeric types only)
    double GetAverage()
    {
-      if(count == 0) return 0;
+      if(capacity <= 0 || count <= 0) return 0.0;
       double sum = 0;
       for(int i = 0; i < count; i++)
          sum += (double)Get(i);
       return SafeDivide(sum, (double)count, 0.0);
    }
 
-   // Calculate standard deviation
+   // Calculate standard deviation (for numeric types only)
    double GetStdDev()
    {
-      if(count < 2) return 0;
+      if(capacity <= 0 || count < 2) return 0.0;
       double avg = GetAverage();
       double sumSq = 0;
       for(int i = 0; i < count; i++)
@@ -113,20 +131,20 @@ struct RingBuffer
       return MathSqrt(SafeDivide(sumSq, (double)(count - 1), 0.0));
    }
 
-   // Get min value
+   // Get min value (for numeric types only)
    double GetMin()
    {
-      if(count == 0) return 0;
+      if(capacity <= 0 || count <= 0) return 0.0;
       double minVal = (double)Get(0);
       for(int i = 1; i < count; i++)
          minVal = MathMin(minVal, (double)Get(i));
       return minVal;
    }
 
-   // Get max value
+   // Get max value (for numeric types only)
    double GetMax()
    {
-      if(count == 0) return 0;
+      if(capacity <= 0 || count <= 0) return 0.0;
       double maxVal = (double)Get(0);
       for(int i = 1; i < count; i++)
          maxVal = MathMax(maxVal, (double)Get(i));
@@ -315,16 +333,20 @@ struct UpdateQueueItem
 struct AsyncUpdateQueue
 {
    UpdateQueueItem items[UPDATE_QUEUE_SIZE];
-   int             head;
-   int             tail;
    int             count;
-   int             dropped;
+   int             dropCount;          // Track dropped enqueues for telemetry
+   int             dropCountSession;   // Session total drops
+   datetime        lastDropLog;        // Throttle drop logging
+   int             peakDepth;          // High water mark for tuning
+   int             dropped;            // Legacy compatibility field
 
    void Init()
    {
-      head = 0;
-      tail = 0;
       count = 0;
+      dropCount = 0;
+      dropCountSession = 0;
+      lastDropLog = 0;
+      peakDepth = 0;
       dropped = 0;
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
          items[i].active = false;
@@ -334,24 +356,59 @@ struct AsyncUpdateQueue
    {
       if(count >= UPDATE_QUEUE_SIZE)
       {
+         // Queue full - track and log periodically
+         dropCount++;
+         dropCountSession++;
          dropped++;
-         return false;  // Queue full
+
+         // Log every 60 seconds max to avoid spam
+         datetime now = TimeCurrent();
+         if(now - lastDropLog >= 60)
+         {
+            Print("WARNING: Update queue full - dropped ", dropCount,
+                  " updates in last period (session total: ", dropCountSession, ")");
+            dropCount = 0;
+            lastDropLog = now;
+         }
+         return false;
       }
 
-      // Check if already in queue
+      // Check if already in queue - upgrade priority if needed
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
       {
          if(items[i].active && items[i].symbolIdx == symbolIdx)
-            return true;  // Already queued
+         {
+            // Upgrade priority if new request is higher
+            if(priority < items[i].priority)
+               items[i].priority = priority;
+            return true;  // Already queued (possibly upgraded)
+         }
       }
 
-      items[tail].symbolIdx = symbolIdx;
-      items[tail].priority = priority;
-      items[tail].queuedTime = TimeCurrent();
-      items[tail].active = true;
+      // Find next inactive slot
+      int slot = -1;
+      for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
+      {
+         if(!items[i].active)
+         {
+            slot = i;
+            break;
+         }
+      }
 
-      tail = (tail + 1) % UPDATE_QUEUE_SIZE;
+      if(slot < 0)
+         return false;  // No free slot (shouldn't happen if count < SIZE, but defensive)
+
+      items[slot].symbolIdx = symbolIdx;
+      items[slot].priority = priority;
+      items[slot].queuedTime = TimeCurrent();
+      items[slot].active = true;
       count++;
+
+      // Track peak depth
+      if(count > peakDepth)
+         peakDepth = count;
+
       return true;
    }
 
@@ -360,16 +417,23 @@ struct AsyncUpdateQueue
       if(count == 0)
          return false;
 
-      // Find highest priority (lowest number) item
+      // Find highest priority (lowest number) item, with age-based tie-breaking
       int bestIdx = -1;
       int bestPriority = 999;
+      datetime oldestTime = TimeCurrent() + 86400; // Far future
 
       for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
       {
-         if(items[i].active && items[i].priority < bestPriority)
+         if(items[i].active)
          {
-            bestPriority = items[i].priority;
-            bestIdx = i;
+            // Prefer higher priority, then older items for fairness
+            if(items[i].priority < bestPriority ||
+               (items[i].priority == bestPriority && items[i].queuedTime < oldestTime))
+            {
+               bestPriority = items[i].priority;
+               oldestTime = items[i].queuedTime;
+               bestIdx = i;
+            }
          }
       }
 
@@ -386,6 +450,21 @@ struct AsyncUpdateQueue
    int Dropped() { return dropped; }
    bool IsEmpty() { return count == 0; }
    bool IsFull() { return count >= UPDATE_QUEUE_SIZE; }
+   int GetDropCount() { return dropCountSession; }
+   int GetPeakDepth() { return peakDepth; }
+
+   // Get oldest item age in seconds (for staleness monitoring)
+   int GetOldestAge()
+   {
+      if(count == 0) return 0;
+      datetime oldest = TimeCurrent();
+      for(int i = 0; i < UPDATE_QUEUE_SIZE; i++)
+      {
+         if(items[i].active && items[i].queuedTime < oldest)
+            oldest = items[i].queuedTime;
+      }
+      return (int)(TimeCurrent() - oldest);
+   }
 
    void Clear()
    {

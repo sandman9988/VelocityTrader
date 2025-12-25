@@ -74,6 +74,10 @@ This codebase manages **real financial trades**. Every bug can cause **real mone
 | External data | Use directly | `MathIsValidNumber()` first |
 | **ATR for SL** | `sl = entry - atr * x` | Validate `atr > 0` first |
 | **Trade fail** | Silent failure | Log retcode + context |
+| **Queue full** | `queue.Enqueue(x);` | Check return, fallback to direct |
+| **Portfolio risk** | Per-trade limits only | Check aggregate exposure |
+| **Symbol init** | Load all, filter later | Filter BEFORE allocating resources |
+| **Input params** | Partial validation | Validate ALL in OnInit() |
 
 ---
 
@@ -620,65 +624,58 @@ double dev = reg.currentDeviation;
 double dev = quality.regression.currentDeviation;  // Access directly
 ```
 
-### LANG003: Operator Precedence - MEDIUM
-`&&` has higher precedence than `||`. Always use parentheses to clarify intent.
+### LANG003: Potential Enum Value Conflict - MEDIUM
+Common enum values may conflict with other enums or built-ins.
 
 ```mql5
-// NEVER (ambiguous):
-if(a && b || c)  // Evaluated as: (a && b) || c
-
-// ALWAYS (explicit):
-if((a && b) || c)     // If you want OR to apply to the AND result
-if(a && (b || c))     // If you want AND to apply to the OR result
-```
-
-### LANG004: Include Dependencies - HIGH
-Always include required header files for types you use.
-
-```mql5
-// Type -> Required Include
-// WelfordStats      -> VT_Structures.mqh
-// ENUM_TRADE_TAG    -> VT_Logger.mqh
-// TAG_BERSERKER     -> VT_Logger.mqh
-// SafeOHLCV         -> VT_Definitions.mqh
-// KinematicState    -> VT_KinematicRegimes.mqh
-
-// ALWAYS add includes at the top of your file:
-#include "VT_Definitions.mqh"
-#include "VT_Structures.mqh"    // If using WelfordStats
-#include "VT_Logger.mqh"        // If using ENUM_TRADE_TAG or TAG_*
-```
-
-### LANG005: FileFlush Returns Void - HIGH
-`FileFlush()` returns `void` in MQL5, not `bool`. Cannot use with `!` or in conditions.
-
-```mql5
-// NEVER:
-if(!FileFlush(handle)) { }  // Compile error!
-
-// ALWAYS:
-ResetLastError();
-FileFlush(handle);
-if(GetLastError() != 0)
+// RISKY (may conflict):
+enum MyAssetClass
 {
-    // Handle error
-}
+    ASSET_CRYPTO = 0,    // May conflict with other enums
+    ASSET_INDEX = 1
+};
+
+enum MyMarginMode
+{
+    MARGIN_MODE_HEDGE = 0  // May conflict with built-in
+};
+
+// CORRECT (use unique prefixes):
+enum MyAssetClass
+{
+    ACLASS_CRYPTO = 0,
+    ACLASS_INDEX = 1
+};
+
+enum MyMarginMode
+{
+    VT_MARGIN_HEDGING = 0
+};
 ```
 
-### LANG006: Built-in Type Redefinition - HIGH
-Do not redefine MQL5 built-in enums.
+### LANG004: Macro May Conflict with Built-in or Other Definition - MEDIUM
+Common macro names should be guarded or use unique prefixes.
 
 ```mql5
-// NEVER:
-enum ENUM_ACCOUNT_MARGIN_MODE { ... }  // Built-in type!
-enum ENUM_ORDER_TYPE { ... }           // Built-in type!
+// RISKY (may be defined elsewhere):
+#define EPSILON 0.0001
+#define M_PI 3.14159
+#define PERSISTENCE_VERSION 1
 
-// ALWAYS (use unique prefix):
-enum ENUM_VT_MARGIN_MODE { VT_MARGIN_HEDGING = 0, ... }
-enum ENUM_VT_ORDER_TYPE { VT_ORDER_BUY = 0, ... }
+// CORRECT (guard with #ifndef):
+#ifndef VT_EPSILON
+#define VT_EPSILON 0.0001
+#endif
+
+#ifndef VT_PI
+#define VT_PI 3.14159
+#endif
+
+// Or use unique prefix:
+#define VT_PERSISTENCE_VERSION 1
 ```
 
-### LANG007: Void Function Returns - HIGH
+### LANG005: Void Function Returns Value - HIGH
 Void functions cannot return a value.
 
 ```mql5
@@ -695,21 +692,124 @@ void AnalyzeEntry(EntryQuality &quality)
 }
 ```
 
-### LANG008: Include Guards - MEDIUM
-All header files must have proper include guards.
+### LANG006: Mismatched #ifndef/#endif Pair - HIGH
+Include guards must have matching #ifndef and #endif directives.
 
 ```mql5
-// At the TOP of every .mqh file:
+// NEVER:
 #ifndef VT_MYHEADER_MQH
 #define VT_MYHEADER_MQH
+// ... code ...
+// Missing #endif!
 
-// ... your code ...
-
-// At the BOTTOM:
-#endif // VT_MYHEADER_MQH
+// ALWAYS:
+#ifndef VT_MYHEADER_MQH
+#define VT_MYHEADER_MQH
+// ... code ...
+#endif  // VT_MYHEADER_MQH
 ```
 
-### LANG009: No Extern for Input Parameters in Includes - HIGH
+### LANG007: Missing Include Guard Definition - MEDIUM
+Header files should have include guards with #define.
+
+```mql5
+// RISKY:
+#ifndef VT_MYHEADER_MQH
+// Missing #define!
+// ... code ...
+#endif
+
+// CORRECT:
+#ifndef VT_MYHEADER_MQH
+#define VT_MYHEADER_MQH
+// ... code ...
+#endif  // VT_MYHEADER_MQH
+```
+
+### LANG008: Operator Precedence - Mixed && and || Without Parentheses - MEDIUM
+When combining `&&` and `||` in a single condition, always use parentheses to make the intended logic explicit.
+
+```mql5
+// RISKY: Mixed && and || without parentheses
+if(a > 0 && b > 0 || c > 0)
+{
+    // The actual evaluation order may not match your intent
+    // Evaluated as: (a > 0 && b > 0) || c > 0
+}
+
+// CORRECT: Explicitly parenthesize logical groups
+if((a > 0 && b > 0) || c > 0)
+{
+    // Logic is clear and unambiguous
+}
+```
+
+**Note**: The exclude pattern for LANG008 attempts to detect properly parenthesized OR operators but may not handle all nested cases. Complex nested expressions should be manually reviewed for clarity.
+
+### LANG009: Type Used Without Required Include - HIGH
+Always include required header files for types you use.
+
+```mql5
+// Type -> Required Include
+// WelfordStats      -> VT_Structures.mqh
+// ENUM_TRADE_TAG    -> VT_Logger.mqh
+// TAG_BERSERKER     -> VT_Logger.mqh
+// SafeOHLCV         -> VT_Definitions.mqh
+// KinematicState    -> VT_KinematicRegimes.mqh
+
+// ALWAYS add includes at the top of your file:
+#include "VT_Definitions.mqh"
+#include "VT_Structures.mqh"    // If using WelfordStats
+#include "VT_Logger.mqh"        // If using ENUM_TRADE_TAG or TAG_*
+```
+
+### LANG010: FileFlush Returns Void - Cannot Use in Boolean Context - HIGH
+`FileFlush()` returns `void` in MQL5, not `bool`. Cannot use with `!` or in conditions.
+
+```mql5
+// NEVER:
+if(!FileFlush(handle)) { }  // Compile error!
+if(FileFlush(handle)) { }   // Compile error!
+
+// ALWAYS:
+ResetLastError();
+FileFlush(handle);
+if(GetLastError() != 0)
+{
+    // Handle error
+}
+```
+
+### LANG011: Built-in Type Redefinition - HIGH
+Do not redefine MQL5 built-in enums.
+
+```mql5
+// NEVER:
+enum ENUM_ACCOUNT_MARGIN_MODE { ... }  // Built-in type!
+enum ENUM_ORDER_TYPE { ... }           // Built-in type!
+
+// ALWAYS (use unique prefix):
+enum ENUM_VT_MARGIN_MODE { VT_MARGIN_HEDGING = 0, ... }
+enum ENUM_VT_ORDER_TYPE { VT_ORDER_BUY = 0, ... }
+```
+
+### LANG012: Bare Identifier May Need Struct Prefix - MEDIUM
+Bare `open`, `close`, `high`, `low` identifiers may need struct member access notation.
+
+```mql5
+// RISKY (may be ambiguous):
+double value = open + close;  // Which open? Which close?
+
+// CORRECT: Use explicit struct member access
+double value = candle.open + candle.close;
+double value = bar.open + bar.close;
+double value = rates[i].open + rates[i].close;
+
+// Also CORRECT: Use built-in functions
+double value = iOpen(_Symbol, _Period, 0) + iClose(_Symbol, _Period, 0);
+```
+
+### LANG013: No Extern for Input Parameters in Includes - HIGH
 Include files should NOT use `extern` for input parameters.
 
 ```mql5
@@ -725,7 +825,7 @@ void SomeFunction()
 }
 ```
 
-### LANG010: No Standalone Function Declarations in Includes - MEDIUM
+### LANG014: No Standalone Function Declarations in Includes - MEDIUM
 Standalone function forward declarations cause `#import` errors.
 
 ```mql5
@@ -738,6 +838,228 @@ class CPositionManager
 {
 public:
     int CountPositions();          // OK - inside class
+};
+```
+
+---
+
+## 10. ARCHITECTURAL PATTERNS (System-level Safety)
+
+These patterns prevent systemic issues that can affect stability and profitability.
+
+### ARCH001: Comprehensive Input Validation - CRITICAL
+Validate ALL input parameters in OnInit(), not just a subset.
+
+```mql5
+// NEVER: Partial validation
+bool ValidateInputParameters()
+{
+   if(InpRiskPercent <= 0) return false;
+   // Missing: learning rates, allocation, cooldowns, etc.
+   return true;
+}
+
+// ALWAYS: Comprehensive validation with categories
+bool ValidateInputParameters()
+{
+   bool valid = true;
+   int warnings = 0;
+
+   // ═══ CORE RISK ═══
+   if(InpRiskPercent <= 0 || InpRiskPercent > 10.0)
+   { Print("ERROR: InpRiskPercent out of range"); valid = false; }
+
+   // ═══ LEARNING PARAMETERS ═══
+   if(InpLearningRateMin > InpLearningRateInit)
+   { Print("ERROR: LearningRateMin > Init"); valid = false; }
+
+   if(InpLearningDecay <= 0 || InpLearningDecay > 1.0)
+   { Print("ERROR: LearningDecay out of range"); valid = false; }
+
+   // ═══ ALLOCATION ═══
+   if(InpMaxAllocation < InpMinAllocation)
+   { Print("ERROR: MaxAllocation < MinAllocation"); valid = false; }
+
+   // ═══ SANITY CHECKS ═══
+   if(!InpTradeForex && !InpTradeMetals && !InpTradeCrypto)
+   { Print("ERROR: No asset types enabled"); valid = false; }
+
+   double maxRisk = InpMaxPositions * InpRiskPercent;
+   if(maxRisk > 10.0)
+   { Print("WARNING: Max concurrent risk = ", maxRisk, "%"); warnings++; }
+
+   return valid;
+}
+```
+
+### ARCH002: Queue Backpressure Handling - HIGH
+Never ignore queue return values; implement fallback for full queues.
+
+```mql5
+// NEVER: Ignore return value
+updateQueue.Enqueue(symbolIdx, priority);
+// Symbol update silently dropped if queue full!
+
+// ALWAYS: Check return, implement fallback
+if(!updateQueue.Enqueue(symbolIdx, priority))
+{
+   // Queue full - fall back to direct update
+   UpdateSymbol(symbolIdx);
+}
+
+// Queue should also track drops for monitoring:
+struct AsyncUpdateQueue
+{
+   int dropCount;
+   int dropCountSession;
+   datetime lastDropLog;
+
+   bool Enqueue(int idx, int priority)
+   {
+      if(count >= QUEUE_SIZE)
+      {
+         dropCount++;
+         dropCountSession++;
+         // Throttled logging
+         if(TimeCurrent() - lastDropLog >= 60)
+         {
+            Print("WARNING: Queue dropped ", dropCount, " updates");
+            dropCount = 0;
+            lastDropLog = TimeCurrent();
+         }
+         return false;
+      }
+      // ... enqueue logic
+   }
+};
+```
+
+### ARCH003: Early Symbol Filtering - HIGH
+Filter symbols by asset type BEFORE allocating resources (indicators, buffers).
+
+```mql5
+// NEVER: Allocate then filter
+for(int i = 0; i < SymbolsTotal(true); i++)
+{
+   string sym = SymbolName(i, true);
+   g_symbols[idx].atrHandle = iATR(sym, tf, 14);  // Allocated!
+   g_symbols[idx].physics.Init(sym);               // Memory allocated!
+   g_symbols[idx].typeAllowed = IsTypeAllowed(ClassifyAsset(sym));
+   // Resources wasted if type not allowed
+}
+
+// ALWAYS: Filter first, then allocate
+for(int i = 0; i < SymbolsTotal(true); i++)
+{
+   string sym = SymbolName(i, true);
+
+   // Early filter: no bid = not tradeable
+   if(SymbolInfoDouble(sym, SYMBOL_BID) <= 0) continue;
+
+   // Early filter: asset type not enabled
+   ENUM_ASSET_TYPE type = ClassifyAsset(sym);
+   if(!IsTypeAllowed(type)) continue;
+
+   // NOW allocate resources
+   g_symbols[idx].atrHandle = iATR(sym, tf, 14);
+   g_symbols[idx].physics.Init(sym);
+}
+
+// Log stats for tuning
+Print("Symbols: ", total, " available, ", initialized, " initialized");
+Print("Skipped: ", skippedNoBid, " no bid, ", skippedType, " filtered");
+```
+
+### ARCH004: Portfolio-Level Exposure Limits - CRITICAL
+Check aggregate portfolio risk, not just per-trade limits.
+
+```mql5
+// NEVER: Only per-trade limits
+void ExecuteTrade(int symIdx, double lots)
+{
+   if(lots > InpMaxLot) lots = InpMaxLot;  // Per-trade only
+   trade.Buy(lots, ...);
+   // Portfolio could be 5 positions × 2% risk = 10% exposure!
+}
+
+// ALWAYS: Check portfolio-level exposure
+double GetPortfolioRiskPercent()
+{
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(equity <= 0) return 100.0;
+
+   double totalRisk = 0.0;
+   for(int i = 0; i < posCount; i++)
+   {
+      if(positions[i].isShadow) continue;
+      double slDistance = MathAbs(positions[i].entryPrice - positions[i].currentSL);
+      double posRisk = slDistance * tickValue * positions[i].lots;
+      totalRisk += posRisk;
+   }
+   return SafeDivide(totalRisk, equity, 0.0) * 100.0;
+}
+
+void ExecuteTrade(int symIdx, double lots)
+{
+   // Portfolio-level check
+   double currentRisk = GetPortfolioRiskPercent();
+   double maxPortfolioRisk = InpMaxPositions * InpRiskPercent;
+   if(currentRisk + InpRiskPercent > maxPortfolioRisk * 1.2)
+   {
+      Print("WARNING: Portfolio risk would exceed limit");
+      return;
+   }
+
+   // Margin check
+   double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+   double required = lots * SymbolInfoDouble(symbol, SYMBOL_MARGIN_INITIAL);
+   if(freeMargin < required * 1.5)
+   {
+      Print("WARNING: Insufficient margin");
+      return;
+   }
+
+   trade.Buy(lots, ...);
+}
+```
+
+### ARCH005: RingBuffer for O(1) Operations - MEDIUM
+Use ring buffers instead of array shifting for time-series data.
+
+```mql5
+// NEVER: O(N) array shift per insert
+void AddReturn(double ret)
+{
+   if(count >= ArraySize(returns))
+   {
+      // Shift entire array - O(N)!
+      for(int i = 0; i < count - 1; i++)
+         returns[i] = returns[i + 1];
+      returns[count - 1] = ret;
+   }
+}
+
+// ALWAYS: O(1) ring buffer
+template<typename T>
+struct RingBuffer
+{
+   T data[];
+   int head;
+   int count;
+   int capacity;
+
+   void Add(T value)
+   {
+      data[head] = value;
+      head = (head + 1) % capacity;
+      if(count < capacity) count++;
+   }
+
+   T Get(int i)  // 0 = oldest
+   {
+      int idx = (head - count + i + capacity) % capacity;
+      return data[idx];
+   }
 };
 ```
 
@@ -788,6 +1110,15 @@ Before committing any MQL5 code, verify:
 18. [ ] No redefinition of built-in MQL5 types
 19. [ ] All `.mqh` files have proper include guards
 
+**Architectural Safety (ARCH rules):**
+20. [ ] **ALL input parameters validated in OnInit()** (not just subset)
+21. [ ] Queue Enqueue() return values checked with fallback
+22. [ ] Symbols filtered by type BEFORE allocating resources
+23. [ ] **Portfolio-level exposure check before new trades**
+24. [ ] **Free margin check with buffer before trades**
+25. [ ] RingBuffer used for time-series (not array shifting)
+26. [ ] Queue/buffer drop counts logged for monitoring
+
 ---
 
 ## Audit Commands
@@ -808,6 +1139,7 @@ python3 Tools/update_ai_instructions.py --from-audit --apply
 
 ---
 
-*Document Version: 2.0*
+*Document Version: 3.0*
 *Last Updated: 2025-12-25*
-*Source: Financial audit of VelocityTrader codebase (418 findings analyzed)*
+*Source: Financial audit + architectural review of VelocityTrader codebase*
+*Changes in v3.0: Added ARCH001-005 (input validation, queue backpressure, symbol filtering, portfolio exposure, ring buffers)*

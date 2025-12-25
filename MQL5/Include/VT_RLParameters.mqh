@@ -22,28 +22,42 @@
 struct RLParameters
 {
    // Reward Shaping [0-1]
-   double n_lossPenalty;      // 0=1x, 0.5=2.5x, 1=5x penalty
-   double n_timeDecay;        // 0=0, 0.5=0.01/min, 1=0.05/min
+   // Formula: 1.0 + n * 4.0 → range [1, 5]
+   double n_lossPenalty;      // 0=1x, 0.5=3x, 1=5x penalty
+   // Formula: n * 0.05 → range [0, 0.05]
+   double n_timeDecay;        // 0=0, 0.5=0.025/min, 1=0.05/min
+   // Formula: 1.0 + n * 1.0 → range [1, 2]
    double n_surpriseBoost;    // 0=1x, 0.5=1.5x, 1=2x max boost
 
    // Position Management [0-1]
-   double n_trailATR;         // 0=0.5x, 0.5=1.5x, 1=3x ATR trail
-   double n_slATR;            // 0=0.5x, 0.5=2x, 1=4x ATR stop
-   double n_tpATR;            // 0=0.5x, 0.5=1.5x, 1=3x ATR target
+   // Formula: 0.5 + n * 2.5 → range [0.5, 3]
+   double n_trailATR;         // 0=0.5x, 0.5=1.75x, 1=3x ATR trail
+   // Formula: 0.5 + n * 3.5 → range [0.5, 4]
+   double n_slATR;            // 0=0.5x, 0.5=2.25x, 1=4x ATR stop
+   // Formula: 0.5 + n * 2.5 → range [0.5, 3]
+   double n_tpATR;            // 0=0.5x, 0.5=1.75x, 1=3x ATR target
 
    // Signal Thresholds [0-1]
-   double n_trendMult;        // 0=0.5x, 0.5=0.8x, 1=1x threshold
-   double n_learnMult;        // 0=0.3x, 0.5=0.5x, 1=0.8x during learning
-   double n_momentumMult;     // 0=0.3x, 0.5=0.5x, 1=0.8x for default
+   // Formula: 0.5 + n * 0.5 → range [0.5, 1]
+   double n_trendMult;        // 0=0.5x, 0.5=0.75x, 1=1x threshold
+   // Formula: 0.3 + n * 0.5 → range [0.3, 0.8]
+   double n_learnMult;        // 0=0.3x, 0.5=0.55x, 1=0.8x during learning
+   // Formula: 0.3 + n * 0.5 → range [0.3, 0.8]
+   double n_momentumMult;     // 0=0.3x, 0.5=0.55x, 1=0.8x for default
 
    // Regime Thresholds [0-1]
-   double n_zScoreExtreme;    // 0=1.0, 0.5=2.0, 1=3.0 sigma
-   double n_meanRevThresh;    // 0=0.5, 0.5=1.0, 1=2.0 sigma for entry
-   double n_velocityThresh;   // 0=0.2, 0.5=0.5, 1=1.0 velocity
+   // Formula: 1.0 + n * 2.0 → range [1, 3]
+   double n_zScoreExtreme;    // 0=1.0σ, 0.5=2.0σ, 1=3.0σ
+   // Formula: 0.5 + n * 1.5 → range [0.5, 2]
+   double n_meanRevThresh;    // 0=0.5σ, 0.5=1.25σ, 1=2.0σ for entry
+   // Formula: 0.2 + n * 0.8 → range [0.2, 1]
+   double n_velocityThresh;   // 0=0.2, 0.5=0.6, 1=1.0 velocity
 
    // Acceleration Detection [0-1]
-   double n_decelMult;        // 0=0.5x, 0.5=0.8x, 1=1.0x (decel if below this)
-   double n_accelSpikeMult;   // 0=1.2x, 0.5=1.5x, 1=2.0x (spike if above this)
+   // Formula: 0.5 + n * 0.5 → range [0.5, 1]
+   double n_decelMult;        // 0=0.5x, 0.5=0.75x, 1=1.0x (decel if below this)
+   // Formula: 1.2 + n * 0.8 → range [1.2, 2]
+   double n_accelSpikeMult;   // 0=1.2x, 0.5=1.6x, 1=2.0x (spike if above this)
 
    // Allocation [0-1]
    double n_baseAlloc;        // 0=0.2, 0.5=0.5, 1=0.8 capital alloc

@@ -342,6 +342,8 @@ struct StatisticalGate
          minWR = 0.5;  // Safe default
       }
       minWR += frictionHurdle;
+      // Clamp to [0, 1] range after adding friction hurdle
+      minWR = MathMin(1.0, minWR);
 
       double actualWR = SafeDivide((double)wins, (double)total, 0.0);
       if(!MathIsValidNumber(actualWR))
@@ -349,7 +351,14 @@ struct StatisticalGate
          return false;
       }
 
-      if(actualWR < minWR)
+      // Apply shrinkage for small sample sizes
+      // With few trades, regress actualWR toward 0.5 (prior)
+      // Shrinkage factor: n / (n + k) where k is "prior strength"
+      double priorStrength = 20.0;  // Equivalent to 20 prior trades at 50%
+      double shrinkage = SafeDivide((double)total, (double)total + priorStrength, 0.0);
+      double shrunkWR = (shrinkage * actualWR) + ((1.0 - shrinkage) * 0.5);
+
+      if(shrunkWR < minWR)
       {
          return false;
       }

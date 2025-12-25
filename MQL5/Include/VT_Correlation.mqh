@@ -2,13 +2,14 @@
 //|                                               VT_Correlation.mqh |
 //|                                       VelocityTrader Framework   |
 //|                 Portfolio Correlation & Risk Management          |
+//|                        v7.1.1 (RingBuffer + fixes)               |
 //+------------------------------------------------------------------+
 #ifndef VT_CORRELATION_MQH
 #define VT_CORRELATION_MQH
 
 #property copyright "VelocityTrader"
 
-#include "VT_Performance.mqh"
+#include "VT_Performance.mqh"   // For RingBuffer<T>
 
 //+------------------------------------------------------------------+
 //| CONSTANTS                                                         |
@@ -18,63 +19,64 @@
 #define CORR_UPDATE_TICKS   100    // Update every N ticks
 
 //+------------------------------------------------------------------+
-//| STRUCTURE - Symbol Returns Data                                   |
+//| STRUCTURE - Symbol Returns Data (RingBuffer version)              |
 //+------------------------------------------------------------------+
 struct SymbolReturns
 {
    string            symbol;
-   double            returns[];
-   int               count;
+   RingBuffer<double> returnsBuf;   // O(1) ring buffer instead of O(N) shift
    double            mean;
    double            stdDev;
    datetime          lastUpdate;
+   bool              valid;         // True if we have enough data
 
    void Reset()
    {
       symbol = "";
-      ArrayResize(returns, 0);
-      count = 0;
+      returnsBuf.Reset();
       mean = 0.0;
       stdDev = 0.0;
       lastUpdate = 0;
+      valid = false;
    }
 
    void Init(string sym, int periods)
    {
       symbol = sym;
-      if(ArrayResize(returns, periods) != periods)
-      {
-         Print("ERROR: ArrayResize failed for returns array - correlation data invalid for: ", sym);
-         count = 0;
-         return;
-      }
-      ArrayInitialize(returns, 0.0);
-      count = 0;
+      returnsBuf.Init(periods);
       mean = 0.0;
       stdDev = 0.0;
       lastUpdate = 0;
+      valid = false;
    }
 
    void AddReturn(double ret)
    {
-      if(count < ArraySize(returns))
-      {
-         returns[count] = ret;
-         count++;
-      }
-      else
-      {
-         // Shift array
-         for(int i = 0; i < count - 1; i++)
-            returns[i] = returns[i + 1];
-         returns[count - 1] = ret;
-      }
+      returnsBuf.Add(ret);
       lastUpdate = TimeCurrent();
+      valid = (returnsBuf.Count() >= 10);
+   }
+
+   int Count() { return returnsBuf.Count(); }
+
+   // Get return at logical index (0 = oldest still in buffer)
+   double Get(int i)
+   {
+      if(returnsBuf.Capacity() == 0) return 0.0;
+      return returnsBuf.Get(i);
+   }
+
+   // Get oldest aligned index for covariance with another SymbolReturns
+   // Returns number of aligned samples available
+   int GetOldestAligned(SymbolReturns &other)
+   {
+      return MathMin(returnsBuf.Count(), other.returnsBuf.Count());
    }
 
    void CalculateStats()
    {
-      if(count < 2)
+      int n = returnsBuf.Count();
+      if(n < 2)
       {
          mean = 0.0;
          stdDev = 0.0;
@@ -83,15 +85,15 @@ struct SymbolReturns
 
       // Mean
       double sum = 0.0;
-      for(int i = 0; i < count; i++)
-         sum += returns[i];
-      mean = SafeDivide(sum, (double)count, 0.0);
+      for(int i = 0; i < n; i++)
+         sum += returnsBuf.Get(i);
+      mean = SafeDivide(sum, (double)n, 0.0);
 
       // Std Dev
       double sumSq = 0.0;
-      for(int i = 0; i < count; i++)
-         sumSq += MathPow(returns[i] - mean, 2);
-      stdDev = MathSqrt(SafeDivide(sumSq, (double)count, 0.0));
+      for(int i = 0; i < n; i++)
+         sumSq += MathPow(returnsBuf.Get(i) - mean, 2);
+      stdDev = MathSqrt(SafeDivide(sumSq, (double)n, 0.0));
    }
 };
 
@@ -284,9 +286,8 @@ public:
       if(idx1 == idx2)
          return 1.0;
 
-      // MQL5 doesn't allow references to array elements - access directly
-      // Need sufficient data
-      int n = MathMin(m_symbolData[idx1].count, m_symbolData[idx2].count);
+      // Need sufficient aligned data
+      int n = m_symbolData[idx1].GetOldestAligned(m_symbolData[idx2]);
       if(n < 10)
          return 0.0;
 
@@ -294,12 +295,18 @@ public:
       m_symbolData[idx1].CalculateStats();
       m_symbolData[idx2].CalculateStats();
 
-      // Calculate covariance
+      // Calculate covariance using aligned samples
+      // We use the NEWEST n samples from each buffer
+      int count1 = m_symbolData[idx1].Count();
+      int count2 = m_symbolData[idx2].Count();
+      int offset1 = count1 - n;
+      int offset2 = count2 - n;
+
       double covar = 0.0;
       for(int i = 0; i < n; i++)
       {
-         covar += (m_symbolData[idx1].returns[i] - m_symbolData[idx1].mean) *
-                  (m_symbolData[idx2].returns[i] - m_symbolData[idx2].mean);
+         covar += (m_symbolData[idx1].Get(offset1 + i) - m_symbolData[idx1].mean) *
+                  (m_symbolData[idx2].Get(offset2 + i) - m_symbolData[idx2].mean);
       }
       covar = SafeDivide(covar, (double)n, 0.0);
 
@@ -639,7 +646,7 @@ public:
          return "";
 
       string bestHedge = "";
-      double bestCorr = 0.0;
+      double bestCorr = 0.0;  // Looking for most negative correlation
 
       for(int i = 0; i < m_symbolCount; i++)
       {
@@ -648,17 +655,28 @@ public:
 
          double corr = m_corrMatrix[idx][i];
 
-         // For long position, best hedge is negatively correlated
-         // For short position, best hedge is positively correlated
-         if(isLong && corr < bestCorr)
+         // For BOTH long and short positions, best hedge is most negatively correlated
+         // A long position hedges with a long in negatively correlated asset
+         // A short position hedges with a short in negatively correlated asset
+         // (or equivalently, with a long in positively correlated asset)
+         if(isLong)
          {
-            bestCorr = corr;
-            bestHedge = m_symbolData[i].symbol;
+            // Long position: best hedge is most negative correlation
+            if(corr < bestCorr)
+            {
+               bestCorr = corr;
+               bestHedge = m_symbolData[i].symbol;
+            }
          }
-         else if(!isLong && corr > -bestCorr)
+         else
          {
-            bestCorr = -corr;
-            bestHedge = m_symbolData[i].symbol;
+            // Short position: best hedge is also most negative correlation
+            // (take opposing direction in negatively correlated asset)
+            if(corr < bestCorr)
+            {
+               bestCorr = corr;
+               bestHedge = m_symbolData[i].symbol;
+            }
          }
       }
 
@@ -714,6 +732,13 @@ public:
    //+------------------------------------------------------------------+
    void ToRLFeatures(string symbol, double &features[], int startIdx = 0)
    {
+      // Validate startIdx early - don't corrupt array on invalid input
+      if(startIdx < 0)
+      {
+         Print("ERROR: ToRLFeatures called with negative startIdx=", startIdx);
+         return;
+      }
+
       int idx = FindSymbol(symbol);
 
       // Features: avg correlation, max correlation, min correlation,
@@ -728,9 +753,14 @@ public:
          }
       }
 
+      // Set only our 5 slots to neutral if symbol not found
       if(idx < 0)
       {
-         ArrayInitialize(features, 0.5);
+         features[startIdx + 0] = 0.5;
+         features[startIdx + 1] = 0.5;
+         features[startIdx + 2] = 0.5;
+         features[startIdx + 3] = 0.5;
+         features[startIdx + 4] = 0.5;
          return;
       }
 
@@ -756,17 +786,22 @@ public:
       if(count > 0)
          avgCorr = SafeDivide(avgCorr, (double)count, 0.0);
 
-      // Normalize to 0-1 with bounds check
-      int size = ArraySize(features);
-      if(startIdx + 4 < size)
+      // Normalize correlations to 0-1 range
+      features[startIdx + 0] = (avgCorr + 1.0) / 2.0;
+      features[startIdx + 1] = (maxCorr + 1.0) / 2.0;
+      features[startIdx + 2] = (minCorr + 1.0) / 2.0;
+
+      // Net exposure ratio: normalize to [0,1] where 0.5 = neutral
+      // netExposure/grossExposure ranges from -1 to +1
+      double expRatio = 0.0;
+      if(m_exposure.grossExposure > 0)
       {
-         features[startIdx + 0] = (avgCorr + 1.0) / 2.0;
-         features[startIdx + 1] = (maxCorr + 1.0) / 2.0;
-         features[startIdx + 2] = (minCorr + 1.0) / 2.0;
-         features[startIdx + 3] = m_exposure.grossExposure > 0 ?
-            MathMin(1.0, SafeDivide(m_exposure.netExposure, m_exposure.grossExposure, 0.5)) : 0.5;
-         features[startIdx + 4] = MathMin(1.0, SafeDivide(m_exposure.diversificationRatio, 3.0, 0.0));
+         expRatio = SafeDivide(m_exposure.netExposure, m_exposure.grossExposure, 0.0);
       }
+      features[startIdx + 3] = (expRatio + 1.0) / 2.0;  // Map [-1,1] to [0,1]
+
+      // Diversification ratio: cap at 3.0 and normalize
+      features[startIdx + 4] = MathMin(1.0, SafeDivide(m_exposure.diversificationRatio, 3.0, 0.0));
    }
 
    //+------------------------------------------------------------------+
