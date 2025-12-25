@@ -74,6 +74,10 @@ This codebase manages **real financial trades**. Every bug can cause **real mone
 | External data | Use directly | `MathIsValidNumber()` first |
 | **ATR for SL** | `sl = entry - atr * x` | Validate `atr > 0` first |
 | **Trade fail** | Silent failure | Log retcode + context |
+| **Queue full** | `queue.Enqueue(x);` | Check return, fallback to direct |
+| **Portfolio risk** | Per-trade limits only | Check aggregate exposure |
+| **Symbol init** | Load all, filter later | Filter BEFORE allocating resources |
+| **Input params** | Partial validation | Validate ALL in OnInit() |
 
 ---
 
@@ -839,6 +843,228 @@ public:
 
 ---
 
+## 10. ARCHITECTURAL PATTERNS (System-level Safety)
+
+These patterns prevent systemic issues that can affect stability and profitability.
+
+### ARCH001: Comprehensive Input Validation - CRITICAL
+Validate ALL input parameters in OnInit(), not just a subset.
+
+```mql5
+// NEVER: Partial validation
+bool ValidateInputParameters()
+{
+   if(InpRiskPercent <= 0) return false;
+   // Missing: learning rates, allocation, cooldowns, etc.
+   return true;
+}
+
+// ALWAYS: Comprehensive validation with categories
+bool ValidateInputParameters()
+{
+   bool valid = true;
+   int warnings = 0;
+
+   // ═══ CORE RISK ═══
+   if(InpRiskPercent <= 0 || InpRiskPercent > 10.0)
+   { Print("ERROR: InpRiskPercent out of range"); valid = false; }
+
+   // ═══ LEARNING PARAMETERS ═══
+   if(InpLearningRateMin > InpLearningRateInit)
+   { Print("ERROR: LearningRateMin > Init"); valid = false; }
+
+   if(InpLearningDecay <= 0 || InpLearningDecay > 1.0)
+   { Print("ERROR: LearningDecay out of range"); valid = false; }
+
+   // ═══ ALLOCATION ═══
+   if(InpMaxAllocation < InpMinAllocation)
+   { Print("ERROR: MaxAllocation < MinAllocation"); valid = false; }
+
+   // ═══ SANITY CHECKS ═══
+   if(!InpTradeForex && !InpTradeMetals && !InpTradeCrypto)
+   { Print("ERROR: No asset types enabled"); valid = false; }
+
+   double maxRisk = InpMaxPositions * InpRiskPercent;
+   if(maxRisk > 10.0)
+   { Print("WARNING: Max concurrent risk = ", maxRisk, "%"); warnings++; }
+
+   return valid;
+}
+```
+
+### ARCH002: Queue Backpressure Handling - HIGH
+Never ignore queue return values; implement fallback for full queues.
+
+```mql5
+// NEVER: Ignore return value
+updateQueue.Enqueue(symbolIdx, priority);
+// Symbol update silently dropped if queue full!
+
+// ALWAYS: Check return, implement fallback
+if(!updateQueue.Enqueue(symbolIdx, priority))
+{
+   // Queue full - fall back to direct update
+   UpdateSymbol(symbolIdx);
+}
+
+// Queue should also track drops for monitoring:
+struct AsyncUpdateQueue
+{
+   int dropCount;
+   int dropCountSession;
+   datetime lastDropLog;
+
+   bool Enqueue(int idx, int priority)
+   {
+      if(count >= QUEUE_SIZE)
+      {
+         dropCount++;
+         dropCountSession++;
+         // Throttled logging
+         if(TimeCurrent() - lastDropLog >= 60)
+         {
+            Print("WARNING: Queue dropped ", dropCount, " updates");
+            dropCount = 0;
+            lastDropLog = TimeCurrent();
+         }
+         return false;
+      }
+      // ... enqueue logic
+   }
+};
+```
+
+### ARCH003: Early Symbol Filtering - HIGH
+Filter symbols by asset type BEFORE allocating resources (indicators, buffers).
+
+```mql5
+// NEVER: Allocate then filter
+for(int i = 0; i < SymbolsTotal(true); i++)
+{
+   string sym = SymbolName(i, true);
+   g_symbols[idx].atrHandle = iATR(sym, tf, 14);  // Allocated!
+   g_symbols[idx].physics.Init(sym);               // Memory allocated!
+   g_symbols[idx].typeAllowed = IsTypeAllowed(ClassifyAsset(sym));
+   // Resources wasted if type not allowed
+}
+
+// ALWAYS: Filter first, then allocate
+for(int i = 0; i < SymbolsTotal(true); i++)
+{
+   string sym = SymbolName(i, true);
+
+   // Early filter: no bid = not tradeable
+   if(SymbolInfoDouble(sym, SYMBOL_BID) <= 0) continue;
+
+   // Early filter: asset type not enabled
+   ENUM_ASSET_TYPE type = ClassifyAsset(sym);
+   if(!IsTypeAllowed(type)) continue;
+
+   // NOW allocate resources
+   g_symbols[idx].atrHandle = iATR(sym, tf, 14);
+   g_symbols[idx].physics.Init(sym);
+}
+
+// Log stats for tuning
+Print("Symbols: ", total, " available, ", initialized, " initialized");
+Print("Skipped: ", skippedNoBid, " no bid, ", skippedType, " filtered");
+```
+
+### ARCH004: Portfolio-Level Exposure Limits - CRITICAL
+Check aggregate portfolio risk, not just per-trade limits.
+
+```mql5
+// NEVER: Only per-trade limits
+void ExecuteTrade(int symIdx, double lots)
+{
+   if(lots > InpMaxLot) lots = InpMaxLot;  // Per-trade only
+   trade.Buy(lots, ...);
+   // Portfolio could be 5 positions × 2% risk = 10% exposure!
+}
+
+// ALWAYS: Check portfolio-level exposure
+double GetPortfolioRiskPercent()
+{
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(equity <= 0) return 100.0;
+
+   double totalRisk = 0.0;
+   for(int i = 0; i < posCount; i++)
+   {
+      if(positions[i].isShadow) continue;
+      double slDistance = MathAbs(positions[i].entryPrice - positions[i].currentSL);
+      double posRisk = slDistance * tickValue * positions[i].lots;
+      totalRisk += posRisk;
+   }
+   return SafeDivide(totalRisk, equity, 0.0) * 100.0;
+}
+
+void ExecuteTrade(int symIdx, double lots)
+{
+   // Portfolio-level check
+   double currentRisk = GetPortfolioRiskPercent();
+   double maxPortfolioRisk = InpMaxPositions * InpRiskPercent;
+   if(currentRisk + InpRiskPercent > maxPortfolioRisk * 1.2)
+   {
+      Print("WARNING: Portfolio risk would exceed limit");
+      return;
+   }
+
+   // Margin check
+   double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+   double required = lots * SymbolInfoDouble(symbol, SYMBOL_MARGIN_INITIAL);
+   if(freeMargin < required * 1.5)
+   {
+      Print("WARNING: Insufficient margin");
+      return;
+   }
+
+   trade.Buy(lots, ...);
+}
+```
+
+### ARCH005: RingBuffer for O(1) Operations - MEDIUM
+Use ring buffers instead of array shifting for time-series data.
+
+```mql5
+// NEVER: O(N) array shift per insert
+void AddReturn(double ret)
+{
+   if(count >= ArraySize(returns))
+   {
+      // Shift entire array - O(N)!
+      for(int i = 0; i < count - 1; i++)
+         returns[i] = returns[i + 1];
+      returns[count - 1] = ret;
+   }
+}
+
+// ALWAYS: O(1) ring buffer
+template<typename T>
+struct RingBuffer
+{
+   T data[];
+   int head;
+   int count;
+   int capacity;
+
+   void Add(T value)
+   {
+      data[head] = value;
+      head = (head + 1) % capacity;
+      if(count < capacity) count++;
+   }
+
+   T Get(int i)  // 0 = oldest
+   {
+      int idx = (head - count + i + capacity) % capacity;
+      return data[idx];
+   }
+};
+```
+
+---
+
 ## Project-Specific Helpers
 
 The following helpers are defined in VT_Definitions.mqh:
@@ -884,6 +1110,15 @@ Before committing any MQL5 code, verify:
 18. [ ] No redefinition of built-in MQL5 types
 19. [ ] All `.mqh` files have proper include guards
 
+**Architectural Safety (ARCH rules):**
+20. [ ] **ALL input parameters validated in OnInit()** (not just subset)
+21. [ ] Queue Enqueue() return values checked with fallback
+22. [ ] Symbols filtered by type BEFORE allocating resources
+23. [ ] **Portfolio-level exposure check before new trades**
+24. [ ] **Free margin check with buffer before trades**
+25. [ ] RingBuffer used for time-series (not array shifting)
+26. [ ] Queue/buffer drop counts logged for monitoring
+
 ---
 
 ## Audit Commands
@@ -904,6 +1139,7 @@ python3 Tools/update_ai_instructions.py --from-audit --apply
 
 ---
 
-*Document Version: 2.0*
+*Document Version: 3.0*
 *Last Updated: 2025-12-25*
-*Source: Financial audit of VelocityTrader codebase (418 findings analyzed)*
+*Source: Financial audit + architectural review of VelocityTrader codebase*
+*Changes in v3.0: Added ARCH001-005 (input validation, queue backpressure, symbol filtering, portfolio exposure, ring buffers)*
