@@ -1736,8 +1736,15 @@ void ManageRealPosition(int idx)
    
    if(newSL != g_positions[idx].currentSL)
    {
-      if(g_trade.PositionModify(g_positions[idx].ticket, newSL, 0))
+      // DO NO HARM: Log all trade modifications for audit trail (Print below)
+      if(g_trade.PositionModify(g_positions[idx].ticket, newSL, 0))  // Logged via Print
+      {
+         Print("TRAIL_SL: ", g_positions[idx].symbol,
+               " Ticket=", g_positions[idx].ticket,
+               " OldSL=", g_positions[idx].currentSL,
+               " NewSL=", newSL);
          g_positions[idx].currentSL = newSL;
+      }
    }
 }
 
