@@ -11,15 +11,9 @@
 
 #include "VT_Definitions.mqh"
 
-// Forward declaration of input parameters (defined in main EA)
-extern double InpMaxDailyLoss;
-extern int    InpMaxConsLosses;
-extern double InpMaxDrawdown;
-extern double InpMinRollingWR;
-extern int    InpCooldownMinutes;
-extern int    InpRetrainMinTrades;
-extern double InpRetrainMinWR;
-extern double InpRetrainMinPF;
+// Note: Input parameters (InpMaxDailyLoss, etc.) are defined
+// in the main EA file and are automatically globally accessible.
+// DO NOT redeclare them with 'extern' as this causes type conflicts.
 
 //+------------------------------------------------------------------+
 //| STRUCTURE: Circuit Breaker                                        |

@@ -201,16 +201,16 @@ bool ValidateInputParameters()
       valid = false;
    }
 
-   // Threshold parameters
-   if(InpSniperThreshold < 0 || InpSniperThreshold > 1.0)
+   // Signal threshold parameters (sigma thresholds, not 0-1 probabilities)
+   if(InpSniperThreshold <= 0 || InpSniperThreshold > 10.0)
    {
-      Print("ERROR: InpSniperThreshold must be 0-1.0 (got ", InpSniperThreshold, ")");
+      Print("ERROR: InpSniperThreshold must be 0-10σ (got ", InpSniperThreshold, ")");
       valid = false;
    }
 
-   if(InpBerserkerThreshold < 0 || InpBerserkerThreshold > 1.0)
+   if(InpBerserkerThreshold <= 0 || InpBerserkerThreshold > 10.0)
    {
-      Print("ERROR: InpBerserkerThreshold must be 0-1.0 (got ", InpBerserkerThreshold, ")");
+      Print("ERROR: InpBerserkerThreshold must be 0-10σ (got ", InpBerserkerThreshold, ")");
       valid = false;
    }
 
@@ -1367,15 +1367,22 @@ void ExecuteRealTrade(int symIdx, int direction, double lots, int agentId,
       int slot = g_posCount++;
       if(!IsValidIndex(slot, MAX_POSITIONS)) { g_posCount--; return; }
 
-      ulong ticket = g_trade.ResultDeal();
-      if(ticket == 0)
+      // Initialize ticket/positionId
+      g_positions[slot].ticket = 0;
+      g_positions[slot].positionId = 0;
+
+      // Capture POSITION_TICKET and POSITION_IDENTIFIER via symbol select
+      // (you only allow one position per symbol, so this is reliable)
+      if(PositionSelect(g_symbols[symIdx].name))
       {
-         Print("WARNING: Trade executed but ResultDeal() returned 0 - check broker");
-         g_posCount--;
-         return;
+         long mg = (long)PositionGetInteger(POSITION_MAGIC);
+         if(mg == (long)InpMagicNumber)
+         {
+            g_positions[slot].ticket = (ulong)PositionGetInteger(POSITION_TICKET);
+            g_positions[slot].positionId = (long)PositionGetInteger(POSITION_IDENTIFIER);
+         }
       }
 
-      g_positions[slot].ticket = ticket;
       g_positions[slot].symbol = g_symbols[symIdx].name;
       g_positions[slot].direction = direction;
       g_positions[slot].entryPrice = entryPrice;
@@ -1393,7 +1400,8 @@ void ExecuteRealTrade(int symIdx, int direction, double lots, int agentId,
       Print("REAL Trade: ", agentName, " ",
             (direction > 0 ? "BUY" : "SELL"), " ",
             g_symbols[symIdx].name, " @ ", entryPrice,
-            " P(Win)=", DoubleToString(pWin * 100, 1), "%");
+            " P(Win)=", DoubleToString(pWin * 100, 1), "%",
+            " PosID=", g_positions[slot].positionId);
    }
    else
    {
@@ -1651,69 +1659,96 @@ void ManageRealPosition(int idx)
    // Validate index
    if(!IsValidIndex(idx, MAX_POSITIONS)) return;
 
-   // Check if position still exists
-   if(!PositionSelectByTicket(g_positions[idx].ticket))
+   // Check if position still exists (use symbol select since we enforce one position per symbol)
+   bool exists = PositionSelect(g_positions[idx].symbol);
+   if(exists)
    {
-      // Position closed - find PnL from history
-      if(HistorySelectByPosition(g_positions[idx].ticket))
+      long mg = (long)PositionGetInteger(POSITION_MAGIC);
+      if(mg != (long)InpMagicNumber)
+         exists = false;
+   }
+
+   if(!exists)
+   {
+      // Position closed - find PnL from history using POSITION_IDENTIFIER
+      double pnl = 0.0;
+
+      if(g_positions[idx].positionId > 0 && HistorySelectByPosition((ulong)g_positions[idx].positionId))
       {
-         double pnl = 0;
+         // Primary path: use positionId (best accuracy)
          int deals = HistoryDealsTotal();
          for(int d = 0; d < deals; d++)
          {
             ulong dealTicket = HistoryDealGetTicket(d);
-            if(HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID) == (long)g_positions[idx].ticket)
+            pnl += HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+            pnl += HistoryDealGetDouble(dealTicket, DEAL_COMMISSION);
+            pnl += HistoryDealGetDouble(dealTicket, DEAL_SWAP);
+         }
+      }
+      else
+      {
+         // Fallback: scan recent deals by symbol+magic+time
+         datetime fromTime = g_positions[idx].openTime - 60;
+         datetime toTime = TimeCurrent();
+         if(HistorySelect(fromTime, toTime))
+         {
+            int deals = HistoryDealsTotal();
+            for(int d = 0; d < deals; d++)
             {
+               ulong dealTicket = HistoryDealGetTicket(d);
+               if(HistoryDealGetString(dealTicket, DEAL_SYMBOL) != g_positions[idx].symbol) continue;
+               if((long)HistoryDealGetInteger(dealTicket, DEAL_MAGIC) != (long)InpMagicNumber) continue;
+
                pnl += HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
                pnl += HistoryDealGetDouble(dealTicket, DEAL_COMMISSION);
                pnl += HistoryDealGetDouble(dealTicket, DEAL_SWAP);
             }
          }
-         
-         // Update agent real
-         int duration = (int)((TimeCurrent() - g_positions[idx].openTime) / 60);
-         double reward = CalculateReward(pnl + g_positions[idx].frictionCost, 
-                                        g_positions[idx].frictionCost, duration);
-         
-         // MQL5 GOTCHA: Cannot use pointers to structs - use direct access
-         string agentName;
-         if(g_positions[idx].agentId == AGENT_SNIPER)
-         {
-            g_sniper.real.UpdateTrade(g_positions[idx].regimeAtEntry, pnl, reward,
-                                      g_positions[idx].direction);
-            g_sniper.RecordTrade(pnl);
-            agentName = g_sniper.name;
-         }
-         else
-         {
-            g_berserker.real.UpdateTrade(g_positions[idx].regimeAtEntry, pnl, reward,
-                                         g_positions[idx].direction);
-            g_berserker.RecordTrade(pnl);
-            agentName = g_berserker.name;
-         }
-         
-         // Circuit breaker tracking
-         g_breaker.RecordDailyPnL(pnl);
-         
-         // Check triggers
-         double rollingWR = MathMax(g_sniper.GetRollingWR(), g_berserker.GetRollingWR());
-         int maxConsLoss = MathMax(g_sniper.consLosses, g_berserker.consLosses);
-         g_breaker.CheckTriggers(rollingWR, maxConsLoss);
-         
-         // Symbol circuit breaker
-         int symIdx = FindSymbolIndex(g_positions[idx].symbol);
-         if(IsValidIndex(symIdx, MAX_SYMBOLS))
-         {
-            g_symbols[symIdx].dailyPnL += pnl;
-            if(pnl < 0) g_symbols[symIdx].consLosses++;
-            else g_symbols[symIdx].consLosses = 0;
-         }
-         
-         Print("REAL Close: ", agentName, " ", g_positions[idx].symbol,
-               " PnL: ", DoubleToString(pnl, 2));
-         
-         g_positions[idx].active = false;
       }
+
+      // Update agent real
+      int duration = (int)((TimeCurrent() - g_positions[idx].openTime) / 60);
+      double reward = CalculateReward(pnl + g_positions[idx].frictionCost,
+                                     g_positions[idx].frictionCost, duration);
+
+      // MQL5 GOTCHA: Cannot use pointers to structs - use direct access
+      string agentName;
+      if(g_positions[idx].agentId == AGENT_SNIPER)
+      {
+         g_sniper.real.UpdateTrade(g_positions[idx].regimeAtEntry, pnl, reward,
+                                   g_positions[idx].direction);
+         g_sniper.RecordTrade(pnl);
+         agentName = g_sniper.name;
+      }
+      else
+      {
+         g_berserker.real.UpdateTrade(g_positions[idx].regimeAtEntry, pnl, reward,
+                                      g_positions[idx].direction);
+         g_berserker.RecordTrade(pnl);
+         agentName = g_berserker.name;
+      }
+
+      // Circuit breaker tracking
+      g_breaker.RecordDailyPnL(pnl);
+
+      // Check triggers
+      double rollingWR = MathMax(g_sniper.GetRollingWR(), g_berserker.GetRollingWR());
+      int maxConsLoss = MathMax(g_sniper.consLosses, g_berserker.consLosses);
+      g_breaker.CheckTriggers(rollingWR, maxConsLoss);
+
+      // Symbol circuit breaker
+      int symIdx = FindSymbolIndex(g_positions[idx].symbol);
+      if(IsValidIndex(symIdx, MAX_SYMBOLS))
+      {
+         g_symbols[symIdx].dailyPnL += pnl;
+         if(pnl < 0) g_symbols[symIdx].consLosses++;
+         else g_symbols[symIdx].consLosses = 0;
+      }
+
+      Print("REAL Close: ", agentName, " ", g_positions[idx].symbol,
+            " PnL: ", DoubleToString(pnl, 2));
+
+      g_positions[idx].active = false;
       return;
    }
    

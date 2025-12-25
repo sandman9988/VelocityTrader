@@ -620,6 +620,71 @@ class FinancialAuditRules:
             'description': 'Void function should not return a value',
             'recommendation': 'Use plain return; or change function return type'
         },
+        'LANG008': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Operator Precedence: Mixed && and || Without Parentheses',
+            'pattern': r'if\s*\([^)]*&&[^)]*\|\|[^)]*\)',
+            'exclude_pattern': r'\(\s*[^)]+\|\|[^)]+\)',
+            'description': '&& has higher precedence than ||. Without parentheses, logic may not be as intended.',
+            'recommendation': 'Add parentheses to clarify: (a && b) || c  OR  a && (b || c)'
+        },
+        'LANG009': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'Type Used Without Required Include',
+            'pattern': r'\b(WelfordStats|ENUM_TRADE_TAG|TAG_\w+|SafeOHLCV)\b',
+            'context_check': 'missing_include',
+            'description': 'Type or enum used that requires specific include file',
+            'recommendation': 'Add required include: WelfordStats->VT_Structures.mqh, ENUM_TRADE_TAG->VT_Logger.mqh, SafeOHLCV->VT_Definitions.mqh'
+        },
+        'LANG010': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'FileFlush Returns Void - Cannot Use in Boolean Context',
+            'pattern': r'(!FileFlush|if\s*\(\s*FileFlush|FileFlush\s*\([^)]+\)\s*[!=]=)',
+            'exclude_pattern': r'//|/\*',
+            'description': 'FileFlush() returns void in MQL5, not bool. Cannot use with ! or in conditions.',
+            'recommendation': 'Use pattern: ResetLastError(); FileFlush(handle); if(GetLastError() != 0) ...'
+        },
+        'LANG011': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'Built-in Type Redefinition',
+            'pattern': r'enum\s+(ENUM_ACCOUNT_MARGIN_MODE|ENUM_ORDER_TYPE|ENUM_POSITION_TYPE)\s*\{',
+            'exclude_pattern': r'//|/\*',
+            'description': 'Attempting to redefine a built-in MQL5 enum type',
+            'recommendation': 'Use unique prefix: ENUM_VT_MARGIN_MODE, ENUM_VT_ORDER_TYPE, etc.'
+        },
+        'LANG012': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Bare Identifier May Need Struct Prefix',
+            'pattern': r'(?<!\.)\b(open|close|high|low)\b\s*[,\)\-\+\*\/]',
+            'exclude_pattern': r'//|/\*|\"|iOpen|iClose|iHigh|iLow|candle\.|bar\.|rates\[|\.open|\.close|\.high|\.low|FileOpen|FileClose',
+            'description': 'Bare open/close/high/low may need struct prefix (candle.open, bar.close)',
+            'recommendation': 'Use explicit prefix: candle.open, bar.close, rates[i].high, etc.'
+        },
+        'LANG013': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'Extern Declaration of Input Parameter in Include File',
+            'pattern': r'^extern\s+\w+\s+Inp\w+\s*;',
+            'exclude_pattern': r'//|/\*',
+            'file_type': '.mqh',
+            'description': 'Include files should not redeclare input parameters with extern. Input parameters are globally accessible.',
+            'recommendation': 'Remove extern declarations. Input parameters defined in main EA are automatically available.'
+        },
+        'LANG014': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Function Forward Declaration Outside Class (Causes #import Error)',
+            'pattern': r'^\s*(?:int|double|bool|void|string|datetime|color)\s+\w+\s*\([^)]*\)\s*;',
+            'exclude_pattern': r'//|/\*|class\s+|struct\s+|#import',
+            'file_type': '.mqh',
+            'description': 'Standalone function declarations in .mqh files cause "no #import declaration" errors',
+            'recommendation': 'Move function declaration inside a class, or provide full function definition'
+        },
     }
 
 
@@ -1263,6 +1328,29 @@ class FinancialCodeAuditor:
                             context_back = '\n'.join(lines[max(0, i-30):i])
                             if re.search(r'GetSafeOHLCV|SafeOHLCV|IsValid|HasPriceGap|ValidateData', context_back):
                                 continue
+
+                        # Special handling for LANG009 - check if required includes are present
+                        if rule.get('context_check') == 'missing_include':
+                            match = pattern.search(line)
+                            if match:
+                                type_used = match.group(0)
+                                # Map types to required includes
+                                include_map = {
+                                    'WelfordStats': 'VT_Structures.mqh',
+                                    'ENUM_TRADE_TAG': 'VT_Logger.mqh',
+                                    'SafeOHLCV': 'VT_Definitions.mqh',
+                                }
+                                required_include = None
+                                for type_name, include_file in include_map.items():
+                                    if type_name in type_used or (type_used.startswith('TAG_') and include_file == 'VT_Logger.mqh'):
+                                        required_include = include_file
+                                        break
+
+                                if required_include:
+                                    # Check if file has the required include
+                                    include_pattern = rf'#include\s+[<"].*{required_include}[>"]'
+                                    if re.search(include_pattern, content):
+                                        continue  # Include is present, skip this finding
 
                         try:
                             rel_file = str(file_path.relative_to(self.project_root))

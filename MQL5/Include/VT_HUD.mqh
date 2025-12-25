@@ -12,29 +12,9 @@
 #include "VT_Definitions.mqh"
 #include "VT_Globals.mqh"
 
-// Forward declaration of input parameters (defined in main EA)
-extern bool      InpShowHUD;
-extern int       InpHUD_X;
-extern int       InpHUD_Y;
-extern int       InpDefaultTab;
-extern bool      InpAutoRotateTabs;
-extern int       InpShadowTimeoutMin;
-extern double    InpLearningRateInit;
-extern double    InpMinProbability;
-extern double    InpMaxDrawdown;
-extern double    InpMaxDailyLoss;
-extern int       InpCooldownMinutes;
-extern int       InpRetrainMinTrades;
-extern bool      InpUseOmegaSizing;
-extern double    InpOmegaBaseline;
-extern double    InpOmegaMaxScale;
-extern double    InpRiskPercent;
-extern double    InpMaxLot;
-extern int       InpMaxPositions;
-
-// Forward declarations - these are defined in main EA
-int CountRealPositions();
-int CountShadowPositions();
+// Note: Input parameters (InpShowHUD, InpRiskPercent, etc.) are defined
+// in the main EA file and are automatically globally accessible.
+// DO NOT redeclare them with 'extern' as this causes type conflicts.
 
 //+------------------------------------------------------------------+
 //| HUD_Create: Create/Update Text Label                              |

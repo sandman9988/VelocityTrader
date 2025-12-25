@@ -591,6 +591,158 @@ Sleep(RETRY_DELAY_MS);
 
 ---
 
+## 9. MQL5 LANGUAGE/SYNTAX (Compile-time Issues)
+
+These rules prevent compilation errors that static analysis can catch before pushing to CI.
+
+### LANG001: Reserved Keywords - HIGH
+`vector` and `matrix` are reserved keywords in MQL5 Build 2361+.
+
+```mql5
+// NEVER:
+double vector[10];
+void Calculate(double &vector[]) { }
+
+// ALWAYS:
+double sensorVec[10];
+void Calculate(double &dataVec[]) { }
+```
+
+### LANG002: No References to Struct Members - HIGH
+MQL5 does not allow creating references to struct members.
+
+```mql5
+// NEVER:
+QuadraticRegression &reg = quality.regression;  // Compile error!
+double dev = reg.currentDeviation;
+
+// ALWAYS:
+double dev = quality.regression.currentDeviation;  // Access directly
+```
+
+### LANG003: Operator Precedence - MEDIUM
+`&&` has higher precedence than `||`. Always use parentheses to clarify intent.
+
+```mql5
+// NEVER (ambiguous):
+if(a && b || c)  // Evaluated as: (a && b) || c
+
+// ALWAYS (explicit):
+if((a && b) || c)     // If you want OR to apply to the AND result
+if(a && (b || c))     // If you want AND to apply to the OR result
+```
+
+### LANG004: Include Dependencies - HIGH
+Always include required header files for types you use.
+
+```mql5
+// Type -> Required Include
+// WelfordStats      -> VT_Structures.mqh
+// ENUM_TRADE_TAG    -> VT_Logger.mqh
+// TAG_BERSERKER     -> VT_Logger.mqh
+// SafeOHLCV         -> VT_Definitions.mqh
+// KinematicState    -> VT_KinematicRegimes.mqh
+
+// ALWAYS add includes at the top of your file:
+#include "VT_Definitions.mqh"
+#include "VT_Structures.mqh"    // If using WelfordStats
+#include "VT_Logger.mqh"        // If using ENUM_TRADE_TAG or TAG_*
+```
+
+### LANG005: FileFlush Returns Void - HIGH
+`FileFlush()` returns `void` in MQL5, not `bool`. Cannot use with `!` or in conditions.
+
+```mql5
+// NEVER:
+if(!FileFlush(handle)) { }  // Compile error!
+
+// ALWAYS:
+ResetLastError();
+FileFlush(handle);
+if(GetLastError() != 0)
+{
+    // Handle error
+}
+```
+
+### LANG006: Built-in Type Redefinition - HIGH
+Do not redefine MQL5 built-in enums.
+
+```mql5
+// NEVER:
+enum ENUM_ACCOUNT_MARGIN_MODE { ... }  // Built-in type!
+enum ENUM_ORDER_TYPE { ... }           // Built-in type!
+
+// ALWAYS (use unique prefix):
+enum ENUM_VT_MARGIN_MODE { VT_MARGIN_HEDGING = 0, ... }
+enum ENUM_VT_ORDER_TYPE { VT_ORDER_BUY = 0, ... }
+```
+
+### LANG007: Void Function Returns - HIGH
+Void functions cannot return a value.
+
+```mql5
+// NEVER:
+void AnalyzeEntry(EntryQuality &quality)
+{
+    if(error) return quality;  // Compile error!
+}
+
+// ALWAYS:
+void AnalyzeEntry(EntryQuality &quality)
+{
+    if(error) return;  // Just return, no value
+}
+```
+
+### LANG008: Include Guards - MEDIUM
+All header files must have proper include guards.
+
+```mql5
+// At the TOP of every .mqh file:
+#ifndef VT_MYHEADER_MQH
+#define VT_MYHEADER_MQH
+
+// ... your code ...
+
+// At the BOTTOM:
+#endif // VT_MYHEADER_MQH
+```
+
+### LANG009: No Extern for Input Parameters in Includes - HIGH
+Include files should NOT use `extern` for input parameters.
+
+```mql5
+// NEVER in .mqh files:
+extern double InpRiskPercent;      // Causes type conflict!
+extern int    InpMaxPositions;     // Causes type conflict!
+
+// CORRECT: Input parameters defined in main EA are automatically global.
+// Just use them directly without redeclaration:
+void SomeFunction()
+{
+    double risk = InpRiskPercent;  // Works - no extern needed
+}
+```
+
+### LANG010: No Standalone Function Declarations in Includes - MEDIUM
+Standalone function forward declarations cause `#import` errors.
+
+```mql5
+// NEVER in .mqh files (outside class):
+int CountPositions();              // Error: no #import declaration!
+double CalculateRisk();            // Error: no #import declaration!
+
+// CORRECT: Either provide full implementation or use class:
+class CPositionManager
+{
+public:
+    int CountPositions();          // OK - inside class
+};
+```
+
+---
+
 ## Project-Specific Helpers
 
 The following helpers are defined in VT_Definitions.mqh:
@@ -613,6 +765,7 @@ enum { LOG_ERROR=1, LOG_WARNING=2, LOG_INFO=3, LOG_DEBUG=4 };
 
 Before committing any MQL5 code, verify:
 
+**Runtime Safety:**
 1. [ ] All divisions use SafeDivide() or explicit zero-check
 2. [ ] All array accesses have bounds checks with ArraySize()
 3. [ ] All ArrayResize() calls check return value
@@ -625,6 +778,15 @@ Before committing any MQL5 code, verify:
 10. [ ] Input parameters validated in OnInit()
 11. [ ] **ATR/volatility data validated before stop loss calculation**
 12. [ ] **Trade failures logged with full context (retcode, lots, SL)**
+
+**Compile-time Safety (LANG rules):**
+13. [ ] No reserved keywords used as identifiers (`vector`, `matrix`)
+14. [ ] No references to struct members (`Type &ref = struct.member`)
+15. [ ] Operator precedence clarified with parentheses (`&&`/`||` mixing)
+16. [ ] All required includes present for types used
+17. [ ] No `!FileFlush()` or boolean use of void functions
+18. [ ] No redefinition of built-in MQL5 types
+19. [ ] All `.mqh` files have proper include guards
 
 ---
 

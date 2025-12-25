@@ -14,12 +14,9 @@
 // Forward declaration - g_rlParams must be defined in globals
 extern RLParameters g_rlParams;
 
-// Forward declaration of input parameters (defined in main EA)
-extern double InpLearningRateInit;
-extern double InpLearningRateMin;
-extern double InpLearningDecay;
-extern int    InpSwapMinTrades;
-extern double InpSwapThreshold;
+// Note: Input parameters (InpLearningRateInit, etc.) are defined
+// in the main EA file and are automatically globally accessible.
+// DO NOT redeclare them with 'extern' as this causes type conflicts.
 
 //+------------------------------------------------------------------+
 //| STRUCTURE: Welford Online Statistics                              |
@@ -463,7 +460,8 @@ struct TradingAgent
 //+------------------------------------------------------------------+
 struct PositionData
 {
-   ulong    ticket;
+   ulong    ticket;          // For shadow: 0. For real: POSITION_TICKET (optional if using symbol select)
+   long     positionId;      // POSITION_IDENTIFIER for HistorySelectByPosition() (real trades only)
    string   symbol;
    int      direction;       // 1=BUY, -1=SELL
    double   entryPrice;

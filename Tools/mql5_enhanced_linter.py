@@ -428,6 +428,58 @@ class MQL5Linter:
                             "severity": "warning"
                         })
 
+                # ================================================================
+                # MQL5 LANGUAGE/SYNTAX CHECKS (Compile-time issues)
+                # ================================================================
+
+                # LANG001: Reserved keywords used as identifiers
+                if re.search(r'\b(vector|matrix)\s*[\[\&\s]', line_stripped):
+                    if not line_stripped.startswith('//'):
+                        result["errors"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": "MQL5: 'vector' and 'matrix' are reserved keywords in MQL5 Build 2361+",
+                            "severity": "error"
+                        })
+
+                # LANG002: Reference to struct member (invalid in MQL5)
+                if re.search(r'^\s*\w+\s+&\w+\s*=\s*\w+\.\w+', line_stripped):
+                    result["errors"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "MQL5: Cannot create reference to struct member. Access directly instead.",
+                        "severity": "error"
+                    })
+
+                # LANG008: Operator precedence - mixed && and || without parentheses
+                if re.search(r'if\s*\([^)]*&&[^)]*\|\|', line_stripped):
+                    # Check if the || part is properly parenthesized
+                    if not re.search(r'\([^)]+\|\|[^)]+\)', line_stripped):
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": "Operator precedence: && binds tighter than ||. Add parentheses to clarify intent.",
+                            "severity": "warning"
+                        })
+
+                # LANG010: FileFlush returns void - cannot use in boolean context
+                if re.search(r'!FileFlush|if\s*\(\s*FileFlush', line_stripped):
+                    result["errors"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "MQL5: FileFlush() returns void. Use GetLastError() pattern instead.",
+                        "severity": "error"
+                    })
+
+                # LANG011: Built-in type redefinition
+                if re.search(r'enum\s+(ENUM_ACCOUNT_MARGIN_MODE|ENUM_ORDER_TYPE|ENUM_POSITION_TYPE)\s*\{', line_stripped):
+                    result["errors"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "MQL5: Cannot redefine built-in enum. Use unique prefix (e.g., ENUM_VT_*).",
+                        "severity": "error"
+                    })
+
             # Track variable declarations and usage for unused variable detection
             declared_vars = {}
             used_vars = set()

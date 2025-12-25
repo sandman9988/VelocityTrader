@@ -9,6 +9,8 @@
 #property copyright "VelocityTrader v7.1"
 
 #include "VT_Definitions.mqh"
+#include "VT_Structures.mqh"    // For WelfordStats
+#include "VT_Logger.mqh"        // For ENUM_TRADE_TAG
 #include "VT_RLParameters.mqh"
 
 //+------------------------------------------------------------------+
@@ -17,8 +19,9 @@
 #define MICRO_WINDOW      5     // Micro timescale (fast oscillations)
 #define MESO_WINDOW       20    // Meso timescale (trend detection)
 #define MACRO_WINDOW      60    // Macro timescale (regime persistence)
-#define SENSOR_DIM        24    // Total sensor vector dimension
+#define SENSOR_DIM        28    // Total sensor vector dimension (expanded for breakout)
 #define KINEMATIC_STATES  6     // Number of kinematic states
+#define LEVEL_LOOKBACK    60    // Breakout level break lookback
 
 //+------------------------------------------------------------------+
 //| ENUM - Extended Kinematic States                                  |
@@ -64,6 +67,12 @@ struct KinematicState
    double            mass;             // Synthetic inertia
    double            momentum;         // mass * velocity
 
+   // Breakout sensors (kinematic breakout detection)
+   double            volZ;             // Tick volume z-score
+   double            rangeATR;         // (high-low)/ATR - range expansion
+   double            breakDistATR;     // Distance beyond rolling high/low in ATR (signed)
+   double            spreadATR;        // Spread normalized by ATR
+
    // Derived states
    ENUM_KINEMATIC_STATE state;
    ENUM_REGIME       regime;
@@ -83,6 +92,12 @@ struct KinematicState
       chiZ = 0.0;
       mass = 1.0;
       momentum = 0.0;
+
+      volZ = 0.0;
+      rangeATR = 0.0;
+      breakDistATR = 0.0;
+      spreadATR = 0.0;
+
       state = KIN_CRUISING;
       regime = REGIME_CALIBRATING;
       stateConfidence = 0.0;
@@ -93,9 +108,12 @@ struct KinematicState
    {
       return StringFormat(
          "{\"pos\":%.4f,\"vel\":%.4f,\"acc\":%.4f,\"jerk\":%.4f,"
-         "\"chi\":%.3f,\"chiZ\":%.2f,\"state\":%d,\"regime\":%d,\"conf\":%.2f}",
+         "\"chi\":%.3f,\"chiZ\":%.2f,\"volZ\":%.2f,\"rangeATR\":%.2f,"
+         "\"breakDistATR\":%.2f,\"spreadATR\":%.2f,"
+         "\"state\":%d,\"regime\":%d,\"conf\":%.2f}",
          position, velocity, acceleration, jerk,
-         chi, chiZ, (int)state, (int)regime, stateConfidence);
+         chi, chiZ, volZ, rangeATR, breakDistATR, spreadATR,
+         (int)state, (int)regime, stateConfidence);
    }
 };
 
@@ -243,15 +261,20 @@ struct AgentSensorProfile
       for(int i = 0; i < KINEMATIC_STATES; i++)
          sensorVec[10 + i] = (kin.state == (ENUM_KINEMATIC_STATE)i) ? 1.0 : 0.0;
 
-      // Regime encoding (indices 16-19) - one-hot
-      for(int i = 0; i < 4; i++)
+      // Regime encoding (indices 16-20) - one-hot for 5 regimes
+      for(int i = 0; i < 5; i++)
          sensorVec[16 + i] = (kin.regime == (ENUM_REGIME)i) ? 1.0 : 0.0;
 
-      // Additional features (indices 20-23)
-      sensorVec[20] = kin.stateConfidence;
-      sensorVec[21] = ClampNormalize((double)kin.statePersistence, 0, 20);
-      sensorVec[22] = ClampNormalize(kin.position, 0, 1);
-      sensorVec[23] = ClampNormalize(atr, 0.0001, 0.01);  // ATR normalized
+      // Additional features (indices 21-23)
+      sensorVec[21] = kin.stateConfidence;
+      sensorVec[22] = ClampNormalize((double)kin.statePersistence, 0, 20);
+      sensorVec[23] = ClampNormalize(kin.position, 0, 1);
+
+      // Breakout sensors (indices 24-27)
+      sensorVec[24] = ClampNormalize(kin.volZ, -3.0, 3.0);
+      sensorVec[25] = ClampNormalize(kin.rangeATR, 0.0, 3.0);
+      sensorVec[26] = ClampNormalize(kin.breakDistATR, -3.0, 3.0);
+      sensorVec[27] = ClampNormalize(kin.spreadATR, 0.0, 1.0);
    }
 
    // Calculate weighted signal strength
@@ -565,8 +588,11 @@ class CKinematicRegimeDetector
 private:
    // History buffers
    double            m_priceHistory[];
+   double            m_highHistory[];
+   double            m_lowHistory[];
    double            m_velocityHistory[];
    double            m_accelHistory[];
+   double            m_volHistoryLog[];
    int               m_historySize;
    int               m_historyIdx;
    bool              m_initialized;
@@ -575,6 +601,7 @@ private:
    WelfordStats      m_velocityStats;
    WelfordStats      m_accelStats;
    WelfordStats      m_chiStats;
+   WelfordStats      m_volStats;
 
    // Current state
    KinematicState    m_state;
@@ -589,36 +616,66 @@ public:
       m_initialized = false;
       m_prevState = KIN_CRUISING;
       if(ArrayResize(m_priceHistory, m_historySize) != m_historySize ||
+         ArrayResize(m_highHistory, m_historySize) != m_historySize ||
+         ArrayResize(m_lowHistory, m_historySize) != m_historySize ||
          ArrayResize(m_velocityHistory, m_historySize) != m_historySize ||
-         ArrayResize(m_accelHistory, m_historySize) != m_historySize)
+         ArrayResize(m_accelHistory, m_historySize) != m_historySize ||
+         ArrayResize(m_volHistoryLog, m_historySize) != m_historySize)
       {
          Print("CRITICAL: ArrayResize failed in CKinematicRegimeDetector - regime detection disabled!");
          m_historySize = 0;  // Mark as unusable
          return;
       }
       ArrayInitialize(m_priceHistory, 0);
+      ArrayInitialize(m_highHistory, 0);
+      ArrayInitialize(m_lowHistory, 0);
       ArrayInitialize(m_velocityHistory, 0);
       ArrayInitialize(m_accelHistory, 0);
+      ArrayInitialize(m_volHistoryLog, 0);
       ArrayInitialize(m_stateCount, 0);
       m_velocityStats.Init(100);
       m_accelStats.Init(100);
       m_chiStats.Init(100);
+      m_volStats.Init(100);
       m_state.Reset();
    }
 
-   void Update(double price, double atr)
+   // Updated signature: accepts high/low, tick volume, spread for breakout detection
+   void Update(double closePrice, double high, double low, double atr,
+               long tickVol, double spreadPoints, double point)
    {
+      if(m_historySize <= 0) return;
       if(atr <= 0) atr = 0.0001;
+      if(point <= 0) point = 0.00000001;
 
-      // Store price
       int idx = m_historyIdx % m_historySize;
-      m_priceHistory[idx] = price;
+
+      // Store price data
+      m_priceHistory[idx] = closePrice;
+      m_highHistory[idx] = high;
+      m_lowHistory[idx] = low;
+
+      // === Volume z-score ===
+      double volLog = MathLog((double)MathMax(1, (int)tickVol));
+      m_volHistoryLog[idx] = volLog;
+      m_volStats.Update(volLog);
+      m_state.volZ = m_volStats.GetZScore(volLog);
+
+      // === Spread in ATR units ===
+      double spreadPrice = spreadPoints * point;
+      m_state.spreadATR = SafeDivide(spreadPrice, atr, 0.0);
+
+      // === Range expansion (current bar) ===
+      if(high > 0 && low > 0 && high >= low)
+         m_state.rangeATR = SafeDivide(high - low, atr, 0.0);
+      else
+         m_state.rangeATR = 0.0;
 
       // Calculate velocity (normalized by ATR)
       if(m_historyIdx > 0)
       {
          int prevIdx = (m_historyIdx - 1) % m_historySize;
-         m_state.velocity = (price - m_priceHistory[prevIdx]) / atr;
+         m_state.velocity = SafeDivide(closePrice - m_priceHistory[prevIdx], atr, 0.0);
          m_velocityHistory[idx] = m_state.velocity;
          m_velocityStats.Update(m_state.velocity);
       }
@@ -651,7 +708,7 @@ public:
 
       // Calculate mass (inverse of volatility = inertia)
       double volatility = CalculateVolatility(MESO_WINDOW);
-      m_state.mass = 1.0 / (volatility + 0.1);
+      m_state.mass = SafeDivide(1.0, volatility + 0.1, 1.0);
       m_state.mass = MathMin(m_state.mass, 5.0);
 
       // Calculate momentum
@@ -659,6 +716,9 @@ public:
 
       // Normalize position (0-1 based on recent range)
       m_state.position = CalculateNormalizedPosition();
+
+      // === Level-break distance (ATR units, signed) ===
+      m_state.breakDistATR = CalculateBreakDistATR(LEVEL_LOOKBACK, atr);
 
       // Classify kinematic state
       ClassifyState();
@@ -680,6 +740,41 @@ public:
    }
 
 private:
+   double Clamp01(double v)
+   {
+      if(v < 0.0) return 0.0;
+      if(v > 1.0) return 1.0;
+      return v;
+   }
+
+   double CalculateBreakDistATR(int lookback, double atr)
+   {
+      if(m_historyIdx < lookback + 2) return 0.0;
+      if(atr <= 0.0) return 0.0;
+
+      // Use previous bars only (exclude current bar)
+      int idxCur = m_historyIdx % m_historySize;
+
+      double rollHigh = -1e100;
+      double rollLow  =  1e100;
+
+      for(int i = 1; i <= lookback; i++)
+      {
+         int idx = (m_historyIdx - i) % m_historySize;
+         double h = m_highHistory[idx];
+         double l = m_lowHistory[idx];
+         if(h > rollHigh) rollHigh = h;
+         if(l < rollLow)  rollLow  = l;
+      }
+
+      double c = m_priceHistory[idxCur];
+
+      // Signed distance: + if above rollHigh, - if below rollLow, else 0
+      if(c > rollHigh) return SafeDivide(c - rollHigh, atr, 0.0);
+      if(c < rollLow)  return -SafeDivide(rollLow - c, atr, 0.0);
+      return 0.0;
+   }
+
    double CalculateAverageVelocity(int window)
    {
       if(m_historyIdx < window) return 0.0;
@@ -768,31 +863,31 @@ private:
       double velZ = m_velocityStats.GetZScore(m_state.velocity);
       double accZ = m_accelStats.GetZScore(m_state.acceleration);
 
-      // Classify based on kinematic signatures
+      // Classify based on kinematic signatures (with proper Clamp01 for all confidence values)
       if(MathAbs(accZ) > 2.5)
       {
          m_state.state = KIN_EXPLOSIVE;
-         m_state.stateConfidence = MathMin(1.0, MathAbs(accZ) / 3.0);
+         m_state.stateConfidence = Clamp01(MathAbs(accZ) / 3.0);
       }
       else if(m_state.acceleration > 0 && m_state.jerk > 0)
       {
          m_state.state = KIN_ACCELERATING;
-         m_state.stateConfidence = MathMin(1.0, accZ * 0.5);
+         m_state.stateConfidence = Clamp01(MathMax(0.0, accZ) * 0.5);
       }
       else if(m_state.acceleration < 0 && m_state.jerk < 0)
       {
          m_state.state = KIN_DECELERATING;
-         m_state.stateConfidence = MathMin(1.0, MathAbs(accZ) * 0.5);
+         m_state.stateConfidence = Clamp01(MathAbs(accZ) * 0.5);
       }
       else if(m_state.chiZ > 1.0)
       {
          m_state.state = KIN_OSCILLATING;
-         m_state.stateConfidence = MathMin(1.0, m_state.chiZ / 2.0);
+         m_state.stateConfidence = Clamp01(m_state.chiZ / 2.0);
       }
       else if(MathAbs(m_state.velocity) < 0.2 && m_state.position > 0.3 && m_state.position < 0.7)
       {
          m_state.state = KIN_REVERTING;
-         m_state.stateConfidence = 1.0 - MathAbs(m_state.velocity) * 2.0;
+         m_state.stateConfidence = Clamp01(1.0 - MathAbs(m_state.velocity) * 2.0);
       }
       else
       {
@@ -828,8 +923,37 @@ private:
       if(m_state.mesoVelocity * m_state.macroVelocity > 0) alignScore += 0.33;
       if(m_state.microVelocity * m_state.macroVelocity > 0) alignScore += 0.34;
 
-      // BREAKOUT: Explosive acceleration, strong alignment
-      if(m_state.state == KIN_EXPLOSIVE && alignScore > 0.8)
+      // === BREAKOUT: Weighted composite score approach ===
+      double breakoutScore = 0.0;
+
+      // Kinematic state contribution
+      if(m_state.state == KIN_EXPLOSIVE)
+         breakoutScore += 0.25;
+      else if(m_state.state == KIN_ACCELERATING)
+         breakoutScore += 0.15;
+
+      // Alignment contribution
+      breakoutScore += alignScore * 0.20;
+
+      // Volume impulse contribution
+      if(m_state.volZ >= 2.0) breakoutScore += 0.20;
+      else if(m_state.volZ >= 1.0) breakoutScore += 0.10;
+
+      // Range expansion contribution
+      if(m_state.rangeATR >= 1.5) breakoutScore += 0.15;
+      else if(m_state.rangeATR >= 1.25) breakoutScore += 0.08;
+
+      // Level break contribution
+      if(MathAbs(m_state.breakDistATR) >= 0.5) breakoutScore += 0.20;
+      else if(MathAbs(m_state.breakDistATR) >= 0.25) breakoutScore += 0.10;
+
+      // Direction consistency bonus: velocity matches break direction
+      bool dirMatch = (m_state.breakDistATR > 0 && m_state.velocity > 0) ||
+                      (m_state.breakDistATR < 0 && m_state.velocity < 0);
+      if(dirMatch && MathAbs(m_state.breakDistATR) > 0)
+         breakoutScore *= 1.15;
+
+      if(breakoutScore >= 0.65)
       {
          m_state.regime = REGIME_BREAKOUT;
          return;
