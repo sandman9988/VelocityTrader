@@ -33,6 +33,10 @@
 		</dict>
 		<dict>
 			<key>include</key>
+			<string>#unsupported_cpp</string>
+		</dict>
+		<dict>
+			<key>include</key>
 			<string>#keywords</string>
 		</dict>
 		<dict>
@@ -320,6 +324,212 @@
 					<string>\(\s*(int|short|char|float)\s*\)</string>
 					<key>name</key>
 					<string>invalid.warning.lossy-cast.mql5</string>
+				</dict>
+			</array>
+		</dict>
+		<key>unsupported_cpp</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ exception handling - not available in MQL5</string>
+					<key>match</key>
+					<string>\b(try|catch|throw|noexcept)\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.exception.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ namespaces - not available in MQL5</string>
+					<key>match</key>
+					<string>\b(namespace|using)\s+\w+</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.namespace.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ STL containers - use MQL5 arrays or custom classes</string>
+					<key>match</key>
+					<string>\b(std::)?(vector|map|unordered_map|set|unordered_set|list|deque|queue|stack|priority_queue|array|forward_list|multimap|multiset|bitset|pair|tuple)\s*&lt;</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.stl-container.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ smart pointers - use raw pointers with careful management</string>
+					<key>match</key>
+					<string>\b(std::)?(unique_ptr|shared_ptr|weak_ptr|auto_ptr|make_unique|make_shared)\s*&lt;</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.smart-pointer.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ std:: prefix - standard library not available</string>
+					<key>match</key>
+					<string>\bstd::\w+</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.std-namespace.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ stream I/O - use Print/Comment/Alert instead</string>
+					<key>match</key>
+					<string>\b(cout|cin|cerr|clog|endl|ostream|istream|iostream|stringstream|ostringstream|istringstream|fstream|ifstream|ofstream)\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.iostream.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C memory allocation - use new/delete or ArrayResize</string>
+					<key>match</key>
+					<string>\b(malloc|calloc|realloc|free|memset|memcpy|memmove)\s*\(</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.c-memory.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ type deduction - explicitly declare types</string>
+					<key>match</key>
+					<string>\b(auto|decltype)\b(?!\s*\()</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.auto.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++11 nullptr - use NULL in MQL5</string>
+					<key>match</key>
+					<string>\bnullptr\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.nullptr.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ constexpr - use #define or const</string>
+					<key>match</key>
+					<string>\b(constexpr|consteval|constinit)\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.constexpr.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ lambda expressions</string>
+					<key>match</key>
+					<string>\[\s*[=&amp;]?\s*\]\s*\(</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.lambda.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ explicit type casts - use C-style or (type) casts</string>
+					<key>match</key>
+					<string>\b(static_cast|const_cast|reinterpret_cast)\s*&lt;</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.cast.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ concepts and requires</string>
+					<key>match</key>
+					<string>\b(concept|requires)\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.concept.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ coroutines</string>
+					<key>match</key>
+					<string>\b(co_await|co_yield|co_return)\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.coroutine.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ modules</string>
+					<key>match</key>
+					<string>\b(import|module|export)\b(?!\s+group)</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.module.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ standard headers - use MQL5 #include</string>
+					<key>match</key>
+					<string>#\s*include\s*&lt;(iostream|vector|string|map|set|algorithm|memory|functional|utility|cstdlib|cstdio|cstring|cmath|cassert|climits|cfloat|cctype|ctime)\s*&gt;</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.std-header.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ thread/atomic - MQL5 is single-threaded per EA</string>
+					<key>match</key>
+					<string>\b(std::)?(thread|mutex|lock_guard|unique_lock|condition_variable|atomic|future|promise|async)\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.threading.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ RTTI beyond dynamic_cast</string>
+					<key>match</key>
+					<string>\b(typeid|type_info)\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.rtti.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ friend keyword</string>
+					<key>match</key>
+					<string>\bfriend\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.friend.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ mutable keyword</string>
+					<key>match</key>
+					<string>\bmutable\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.mutable.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ volatile keyword</string>
+					<key>match</key>
+					<string>\bvolatile\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.volatile.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ register keyword</string>
+					<key>match</key>
+					<string>\bregister\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.register.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C goto statement - use structured control flow</string>
+					<key>match</key>
+					<string>\bgoto\b</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.goto.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: C++ inline keyword (compiler decides)</string>
+					<key>match</key>
+					<string>\binline\b</string>
+					<key>name</key>
+					<string>invalid.warning.unsupported-cpp.inline.mql5</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>UNSUPPORTED: Multiple inheritance syntax</string>
+					<key>match</key>
+					<string>:\s*(public|private|protected)\s+\w+\s*,\s*(public|private|protected)</string>
+					<key>name</key>
+					<string>invalid.illegal.unsupported-cpp.multiple-inheritance.mql5</string>
 				</dict>
 			</array>
 		</dict>
