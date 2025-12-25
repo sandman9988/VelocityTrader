@@ -620,65 +620,58 @@ double dev = reg.currentDeviation;
 double dev = quality.regression.currentDeviation;  // Access directly
 ```
 
-### LANG003: Operator Precedence - MEDIUM
-`&&` has higher precedence than `||`. Always use parentheses to clarify intent.
+### LANG003: Potential Enum Value Conflict - MEDIUM
+Common enum values may conflict with other enums or built-ins.
 
 ```mql5
-// NEVER (ambiguous):
-if(a && b || c)  // Evaluated as: (a && b) || c
-
-// ALWAYS (explicit):
-if((a && b) || c)     // If you want OR to apply to the AND result
-if(a && (b || c))     // If you want AND to apply to the OR result
-```
-
-### LANG004: Include Dependencies - HIGH
-Always include required header files for types you use.
-
-```mql5
-// Type -> Required Include
-// WelfordStats      -> VT_Structures.mqh
-// ENUM_TRADE_TAG    -> VT_Logger.mqh
-// TAG_BERSERKER     -> VT_Logger.mqh
-// SafeOHLCV         -> VT_Definitions.mqh
-// KinematicState    -> VT_KinematicRegimes.mqh
-
-// ALWAYS add includes at the top of your file:
-#include "VT_Definitions.mqh"
-#include "VT_Structures.mqh"    // If using WelfordStats
-#include "VT_Logger.mqh"        // If using ENUM_TRADE_TAG or TAG_*
-```
-
-### LANG005: FileFlush Returns Void - HIGH
-`FileFlush()` returns `void` in MQL5, not `bool`. Cannot use with `!` or in conditions.
-
-```mql5
-// NEVER:
-if(!FileFlush(handle)) { }  // Compile error!
-
-// ALWAYS:
-ResetLastError();
-FileFlush(handle);
-if(GetLastError() != 0)
+// RISKY (may conflict):
+enum MyAssetClass
 {
-    // Handle error
-}
+    ASSET_CRYPTO = 0,    // May conflict with other enums
+    ASSET_INDEX = 1
+};
+
+enum MyMarginMode
+{
+    MARGIN_MODE_HEDGE = 0  // May conflict with built-in
+};
+
+// CORRECT (use unique prefixes):
+enum MyAssetClass
+{
+    ACLASS_CRYPTO = 0,
+    ACLASS_INDEX = 1
+};
+
+enum MyMarginMode
+{
+    VT_MARGIN_HEDGING = 0
+};
 ```
 
-### LANG006: Built-in Type Redefinition - HIGH
-Do not redefine MQL5 built-in enums.
+### LANG004: Macro May Conflict with Built-in or Other Definition - MEDIUM
+Common macro names should be guarded or use unique prefixes.
 
 ```mql5
-// NEVER:
-enum ENUM_ACCOUNT_MARGIN_MODE { ... }  // Built-in type!
-enum ENUM_ORDER_TYPE { ... }           // Built-in type!
+// RISKY (may be defined elsewhere):
+#define EPSILON 0.0001
+#define M_PI 3.14159
+#define PERSISTENCE_VERSION 1
 
-// ALWAYS (use unique prefix):
-enum ENUM_VT_MARGIN_MODE { VT_MARGIN_HEDGING = 0, ... }
-enum ENUM_VT_ORDER_TYPE { VT_ORDER_BUY = 0, ... }
+// CORRECT (guard with #ifndef):
+#ifndef VT_EPSILON
+#define VT_EPSILON 0.0001
+#endif
+
+#ifndef VT_PI
+#define VT_PI 3.14159
+#endif
+
+// Or use unique prefix:
+#define VT_PERSISTENCE_VERSION 1
 ```
 
-### LANG007: Void Function Returns - HIGH
+### LANG005: Void Function Returns Value - HIGH
 Void functions cannot return a value.
 
 ```mql5
@@ -695,21 +688,124 @@ void AnalyzeEntry(EntryQuality &quality)
 }
 ```
 
-### LANG008: Include Guards - MEDIUM
-All header files must have proper include guards.
+### LANG006: Mismatched #ifndef/#endif Pair - HIGH
+Include guards must have matching #ifndef and #endif directives.
 
 ```mql5
-// At the TOP of every .mqh file:
+// NEVER:
 #ifndef VT_MYHEADER_MQH
 #define VT_MYHEADER_MQH
+// ... code ...
+// Missing #endif!
 
-// ... your code ...
-
-// At the BOTTOM:
-#endif // VT_MYHEADER_MQH
+// ALWAYS:
+#ifndef VT_MYHEADER_MQH
+#define VT_MYHEADER_MQH
+// ... code ...
+#endif  // VT_MYHEADER_MQH
 ```
 
-### LANG009: No Extern for Input Parameters in Includes - HIGH
+### LANG007: Missing Include Guard Definition - MEDIUM
+Header files should have include guards with #define.
+
+```mql5
+// RISKY:
+#ifndef VT_MYHEADER_MQH
+// Missing #define!
+// ... code ...
+#endif
+
+// CORRECT:
+#ifndef VT_MYHEADER_MQH
+#define VT_MYHEADER_MQH
+// ... code ...
+#endif  // VT_MYHEADER_MQH
+```
+
+### LANG008: Operator Precedence - Mixed && and || Without Parentheses - MEDIUM
+When combining `&&` and `||` in a single condition, always use parentheses to make the intended logic explicit.
+
+```mql5
+// RISKY: Mixed && and || without parentheses
+if(a > 0 && b > 0 || c > 0)
+{
+    // The actual evaluation order may not match your intent
+    // Evaluated as: (a > 0 && b > 0) || c > 0
+}
+
+// CORRECT: Explicitly parenthesize logical groups
+if((a > 0 && b > 0) || c > 0)
+{
+    // Logic is clear and unambiguous
+}
+```
+
+**Note**: The exclude pattern for LANG008 attempts to detect properly parenthesized OR operators but may not handle all nested cases. Complex nested expressions should be manually reviewed for clarity.
+
+### LANG009: Type Used Without Required Include - HIGH
+Always include required header files for types you use.
+
+```mql5
+// Type -> Required Include
+// WelfordStats      -> VT_Structures.mqh
+// ENUM_TRADE_TAG    -> VT_Logger.mqh
+// TAG_BERSERKER     -> VT_Logger.mqh
+// SafeOHLCV         -> VT_Definitions.mqh
+// KinematicState    -> VT_KinematicRegimes.mqh
+
+// ALWAYS add includes at the top of your file:
+#include "VT_Definitions.mqh"
+#include "VT_Structures.mqh"    // If using WelfordStats
+#include "VT_Logger.mqh"        // If using ENUM_TRADE_TAG or TAG_*
+```
+
+### LANG010: FileFlush Returns Void - Cannot Use in Boolean Context - HIGH
+`FileFlush()` returns `void` in MQL5, not `bool`. Cannot use with `!` or in conditions.
+
+```mql5
+// NEVER:
+if(!FileFlush(handle)) { }  // Compile error!
+if(FileFlush(handle)) { }   // Compile error!
+
+// ALWAYS:
+ResetLastError();
+FileFlush(handle);
+if(GetLastError() != 0)
+{
+    // Handle error
+}
+```
+
+### LANG011: Built-in Type Redefinition - HIGH
+Do not redefine MQL5 built-in enums.
+
+```mql5
+// NEVER:
+enum ENUM_ACCOUNT_MARGIN_MODE { ... }  // Built-in type!
+enum ENUM_ORDER_TYPE { ... }           // Built-in type!
+
+// ALWAYS (use unique prefix):
+enum ENUM_VT_MARGIN_MODE { VT_MARGIN_HEDGING = 0, ... }
+enum ENUM_VT_ORDER_TYPE { VT_ORDER_BUY = 0, ... }
+```
+
+### LANG012: Bare Identifier May Need Struct Prefix - MEDIUM
+Bare `open`, `close`, `high`, `low` identifiers may need struct member access notation.
+
+```mql5
+// RISKY (may be ambiguous):
+double value = open + close;  // Which open? Which close?
+
+// CORRECT: Use explicit struct member access
+double value = candle.open + candle.close;
+double value = bar.open + bar.close;
+double value = rates[i].open + rates[i].close;
+
+// Also CORRECT: Use built-in functions
+double value = iOpen(_Symbol, _Period, 0) + iClose(_Symbol, _Period, 0);
+```
+
+### LANG013: No Extern for Input Parameters in Includes - HIGH
 Include files should NOT use `extern` for input parameters.
 
 ```mql5
@@ -725,7 +821,7 @@ void SomeFunction()
 }
 ```
 
-### LANG010: No Standalone Function Declarations in Includes - MEDIUM
+### LANG014: No Standalone Function Declarations in Includes - MEDIUM
 Standalone function forward declarations cause `#import` errors.
 
 ```mql5
