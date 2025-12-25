@@ -1418,8 +1418,8 @@ class FinancialCodeAuditor:
         if experts_dir.exists():
             try:
                 files_to_process.extend(experts_dir.glob("*.mq5"))
-            except (OSError, PermissionError):
-                pass
+            except (OSError, PermissionError) as e:
+                logger.warning(f"Unable to list expert files in '{experts_dir}': {e}")
 
         # Also start from any .mqh that might be entry points
         processed = set()
