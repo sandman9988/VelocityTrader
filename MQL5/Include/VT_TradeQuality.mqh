@@ -839,8 +839,8 @@ public:
          return;
       }
 
-      QuadraticRegression &reg = quality.regression;
-      double devATR = (atr > 0) ? MathAbs(reg.currentDeviation) / atr : 0;
+      // Access regression data directly (MQL5 doesn't support references to struct members)
+      double devATR = (atr > 0) ? MathAbs(quality.regression.currentDeviation) / atr : 0;
 
       // === Mean Reversion Setup Detection ===
       // Price far from regression line = potential MR entry
@@ -849,8 +849,8 @@ public:
          quality.overextended = true;
 
          // Good MR setup: price extended + curving back
-         bool curvingBack = (reg.currentDeviation > 0 && reg.curvature < 0) ||
-                            (reg.currentDeviation < 0 && reg.curvature > 0);
+         bool curvingBack = (quality.regression.currentDeviation > 0 && quality.regression.curvature < 0) ||
+                            (quality.regression.currentDeviation < 0 && quality.regression.curvature > 0);
 
          if(curvingBack)
             quality.regressionScore = 0.85;  // Strong MR signal
@@ -863,10 +863,10 @@ public:
          quality.atRegressionMean = true;
 
          // Good for trend continuation if curving in trade direction
-         bool curvingWithTrade = (isBuy && reg.curvature > 0) ||
-                                 (!isBuy && reg.curvature < 0);
+         bool curvingWithTrade = (isBuy && quality.regression.curvature > 0) ||
+                                 (!isBuy && quality.regression.curvature < 0);
 
-         if(curvingWithTrade && reg.rSquared >= m_thresholds.regMinR2)
+         if(curvingWithTrade && quality.regression.rSquared >= m_thresholds.regMinR2)
             quality.regressionScore = 0.75;  // Good trend entry
          else
             quality.regressionScore = 0.5;   // Neutral
@@ -878,15 +878,15 @@ public:
       }
 
       // === Trend Curving Detection (potential reversal) ===
-      if(MathAbs(reg.a) >= m_thresholds.regCurvatureMin)
+      if(MathAbs(quality.regression.a) >= m_thresholds.regCurvatureMin)
       {
          quality.trendCurving = true;
 
          // If trend is curving against our trade direction, penalize
-         bool curveAgainstTrade = (isBuy && reg.curvature < 0 && reg.b > 0) ||
-                                  (!isBuy && reg.curvature > 0 && reg.b < 0);
+         bool curveAgainstTrade = (isBuy && quality.regression.curvature < 0 && quality.regression.b > 0) ||
+                                  (!isBuy && quality.regression.curvature > 0 && quality.regression.b < 0);
 
-         if(curveAgainstTrade && reg.rSquared >= m_thresholds.regMinR2)
+         if(curveAgainstTrade && quality.regression.rSquared >= m_thresholds.regMinR2)
          {
             // Trend losing momentum - risky entry
             quality.regressionScore *= 0.7;
@@ -894,11 +894,11 @@ public:
       }
 
       // === Bonus for high R² (reliable regression) ===
-      if(reg.rSquared >= 0.85)
+      if(quality.regression.rSquared >= 0.85)
          quality.regressionScore = MathMin(1.0, quality.regressionScore + 0.1);
 
       // === Penalty for low R² (unreliable) ===
-      if(reg.rSquared < 0.5)
+      if(quality.regression.rSquared < 0.5)
          quality.regressionScore *= 0.8;
    }
 
@@ -1033,10 +1033,10 @@ public:
          return;
       }
 
-      EntropyAnalysis &ent = quality.entropy;
+      // Access entropy data directly (MQL5 doesn't support references to struct members)
 
       // === Low entropy = good for trend-following ===
-      if(ent.IsTrending())
+      if(quality.entropy.IsTrending())
       {
          if(quality.withTrend)
             quality.entropyScore = 0.85;  // Trending + with trend = excellent
@@ -1044,7 +1044,7 @@ public:
             quality.entropyScore = 0.4;   // Trending but counter = risky
       }
       // === High entropy = avoid or use MR ===
-      else if(ent.IsChoppy())
+      else if(quality.entropy.IsChoppy())
       {
          quality.entropyScore = 0.35;  // Random, hard to trade
       }
@@ -1054,18 +1054,18 @@ public:
       }
 
       // === Cycle extremes bonus ===
-      if(ent.IsCycleReliable())
+      if(quality.entropy.IsCycleReliable())
       {
          quality.inCycle = true;
 
          // At trough and buying, or at peak and selling
-         if((ent.atCycleTrough && isBuy) || (ent.atCyclePeak && !isBuy))
+         if((quality.entropy.atCycleTrough && isBuy) || (quality.entropy.atCyclePeak && !isBuy))
          {
             quality.atCycleExtreme = true;
             quality.entropyScore = MathMin(1.0, quality.entropyScore + 0.15);
          }
          // Wrong side of cycle
-         else if((ent.atCyclePeak && isBuy) || (ent.atCycleTrough && !isBuy))
+         else if((quality.entropy.atCyclePeak && isBuy) || (quality.entropy.atCycleTrough && !isBuy))
          {
             quality.entropyScore *= 0.7;
          }
@@ -1204,15 +1204,15 @@ public:
          return;
       }
 
-      VPINAnalysis &v = quality.vpin;
+      // Access VPIN data directly (MQL5 doesn't support references to struct members)
 
       // === Low VPIN = retail-friendly, good ===
-      if(v.IsLowRisk())
+      if(quality.vpin.IsLowRisk())
       {
          quality.vpinScore = 0.85;  // Low informed trading, safe
       }
       // === High VPIN = toxic, avoid ===
-      else if(v.IsHighRisk())
+      else if(quality.vpin.IsHighRisk())
       {
          quality.vpinScore = 0.25;  // High toxicity
          quality.toxicFlow = true;
@@ -1223,14 +1223,14 @@ public:
       }
 
       // === Rising toxicity penalty ===
-      if(v.IsRising())
+      if(quality.vpin.IsRising())
       {
          quality.vpinScore *= 0.8;  // Getting worse
       }
 
       // === Volume imbalance bonus/penalty ===
       // Strong imbalance in our direction is good
-      if(v.volumeImbalance > 0.3)
+      if(quality.vpin.volumeImbalance > 0.3)
       {
          quality.vpinScore = MathMin(1.0, quality.vpinScore + 0.1);
       }
@@ -1397,7 +1397,7 @@ public:
       {
          // Invalid OHLCV data - reduce quality score
          quality.priceActionScore = 0.5;
-         return quality;
+         return;  // void function - just return, don't return a value
       }
 
       double body = MathAbs(candle.close - candle.open);
@@ -1410,8 +1410,8 @@ public:
          // Pin bar detection
          if(bodyRatio < 0.3)
          {
-            double upperWick = high - MathMax(open, close);
-            double lowerWick = MathMin(open, close) - low;
+            double upperWick = candle.high - MathMax(candle.open, candle.close);
+            double lowerWick = MathMin(candle.open, candle.close) - candle.low;
 
             if(isBuy && lowerWick > range * 0.6)
             {
@@ -1429,12 +1429,12 @@ public:
          double prevOpen = iOpen(symbol, m_timeframe, 1);
          double prevClose = iClose(symbol, m_timeframe, 1);
 
-         if(isBuy && close > open && open < prevClose && close > prevOpen)
+         if(isBuy && candle.close > candle.open && candle.open < prevClose && candle.close > prevOpen)
          {
             quality.engulfing = true;
             quality.priceActionScore = MathMax(quality.priceActionScore, 0.75);
          }
-         else if(!isBuy && close < open && open > prevClose && close < prevOpen)
+         else if(!isBuy && candle.close < candle.open && candle.open > prevClose && candle.close < prevOpen)
          {
             quality.engulfing = true;
             quality.priceActionScore = MathMax(quality.priceActionScore, 0.75);

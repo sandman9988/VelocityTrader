@@ -3,6 +3,9 @@
 //|                                       VelocityTrader Framework   |
 //|                 Portfolio Correlation & Risk Management          |
 //+------------------------------------------------------------------+
+#ifndef VT_CORRELATION_MQH
+#define VT_CORRELATION_MQH
+
 #property copyright "VelocityTrader"
 
 #include "VT_Performance.mqh"
@@ -281,28 +284,27 @@ public:
       if(idx1 == idx2)
          return 1.0;
 
-      SymbolReturns &s1 = m_symbolData[idx1];
-      SymbolReturns &s2 = m_symbolData[idx2];
-
+      // MQL5 doesn't allow references to array elements - access directly
       // Need sufficient data
-      int n = MathMin(s1.count, s2.count);
+      int n = MathMin(m_symbolData[idx1].count, m_symbolData[idx2].count);
       if(n < 10)
          return 0.0;
 
       // Calculate means
-      s1.CalculateStats();
-      s2.CalculateStats();
+      m_symbolData[idx1].CalculateStats();
+      m_symbolData[idx2].CalculateStats();
 
       // Calculate covariance
       double covar = 0.0;
       for(int i = 0; i < n; i++)
       {
-         covar += (s1.returns[i] - s1.mean) * (s2.returns[i] - s2.mean);
+         covar += (m_symbolData[idx1].returns[i] - m_symbolData[idx1].mean) *
+                  (m_symbolData[idx2].returns[i] - m_symbolData[idx2].mean);
       }
       covar = SafeDivide(covar, (double)n, 0.0);
 
       // Correlation
-      double denom = s1.stdDev * s2.stdDev;
+      double denom = m_symbolData[idx1].stdDev * m_symbolData[idx2].stdDev;
       if(denom > 0)
          return SafeDivide(covar, denom, 0.0);
 

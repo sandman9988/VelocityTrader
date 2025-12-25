@@ -3,6 +3,9 @@
 //|                                       VelocityTrader Framework   |
 //|                        Dynamic Broker Contract Specifications    |
 //+------------------------------------------------------------------+
+#ifndef VT_BROKERSPECS_MQH
+#define VT_BROKERSPECS_MQH
+
 #property copyright "VelocityTrader"
 
 #include "VT_Definitions.mqh"
@@ -33,18 +36,19 @@ enum ENUM_SWAP_DAY
    SWAP_UNKNOWN = 2           // Unknown/variable
 };
 
+// NOTE: ENUM_ASSET_CLASS renamed values to avoid conflict with ENUM_ASSET_TYPE in VT_Definitions.mqh
 enum ENUM_ASSET_CLASS
 {
-   ASSET_FOREX_MAJOR = 0,
-   ASSET_FOREX_MINOR = 1,
-   ASSET_FOREX_EXOTIC = 2,
-   ASSET_CRYPTO = 3,
-   ASSET_INDEX = 4,
-   ASSET_COMMODITY = 5,
-   ASSET_STOCK = 6,
-   ASSET_ETF = 7,
-   ASSET_BOND = 8,
-   ASSET_UNKNOWN = 9
+   ACLASS_FOREX_MAJOR = 0,
+   ACLASS_FOREX_MINOR = 1,
+   ACLASS_FOREX_EXOTIC = 2,
+   ACLASS_CRYPTO = 3,
+   ACLASS_INDEX = 4,
+   ACLASS_COMMODITY = 5,
+   ACLASS_STOCK = 6,
+   ACLASS_ETF = 7,
+   ACLASS_BOND = 8,
+   ACLASS_UNKNOWN = 9
 };
 
 enum ENUM_SPEC_VALIDITY
@@ -55,11 +59,12 @@ enum ENUM_SPEC_VALIDITY
    SPEC_UNAVAILABLE = 3       // Symbol not available
 };
 
-enum ENUM_ACCOUNT_MARGIN_MODE
+// NOTE: Renamed from ENUM_ACCOUNT_MARGIN_MODE to avoid conflict with MQL5 built-in enum
+enum ENUM_VT_MARGIN_MODE
 {
-   MARGIN_MODE_HEDGING = 0,   // Multiple positions per symbol (EU/most)
-   MARGIN_MODE_NETTING = 1,   // One aggregate position per symbol
-   MARGIN_MODE_FIFO = 2       // First-In-First-Out (US/NFA)
+   VT_MARGIN_HEDGING = 0,     // Multiple positions per symbol (EU/most)
+   VT_MARGIN_NETTING = 1,     // One aggregate position per symbol
+   VT_MARGIN_FIFO = 2         // First-In-First-Out (US/NFA)
 };
 
 enum ENUM_CLOSE_PRIORITY
@@ -229,7 +234,7 @@ struct ContractSpec
       symbol = "";
       baseName = "";
       suffix = "";
-      assetClass = ASSET_UNKNOWN;
+      assetClass = ACLASS_UNKNOWN;
 
       lotMin = 0.01;
       lotMax = 100.0;
@@ -373,7 +378,7 @@ struct ClassRisk
 
    void Reset()
    {
-      assetClass = ASSET_UNKNOWN;
+      assetClass = ACLASS_UNKNOWN;
       maxExposure = 25.0;  // 25% of portfolio
       maxCorrelation = 0.6;
       maxInstruments = 5;
@@ -413,7 +418,7 @@ struct PortfolioRisk
 //+------------------------------------------------------------------+
 struct AccountSettings
 {
-   ENUM_ACCOUNT_MARGIN_MODE marginMode;   // Hedging, Netting, or FIFO
+   ENUM_VT_MARGIN_MODE marginMode;        // Hedging, Netting, or FIFO
    ENUM_CLOSE_PRIORITY      closePriority; // Position close order
    bool              hedgingAllowed;      // Hedging allowed
    bool              nettingAllowed;      // Netting allowed
@@ -429,7 +434,7 @@ struct AccountSettings
 
    void Reset()
    {
-      marginMode = MARGIN_MODE_HEDGING;
+      marginMode = VT_MARGIN_HEDGING;
       closePriority = CLOSE_OLDEST_FIRST;
       hedgingAllowed = true;
       nettingAllowed = true;
@@ -633,47 +638,47 @@ public:
       if(StringFind(upper, "BTC") >= 0 || StringFind(upper, "ETH") >= 0 ||
          StringFind(upper, "XRP") >= 0 || StringFind(upper, "LTC") >= 0 ||
          StringFind(upper, "DOGE") >= 0 || StringFind(upper, "SOL") >= 0)
-         return ASSET_CRYPTO;
+         return ACLASS_CRYPTO;
 
       // Index detection
       if(StringFind(upper, "US30") >= 0 || StringFind(upper, "US500") >= 0 ||
          StringFind(upper, "NAS100") >= 0 || StringFind(upper, "DAX") >= 0 ||
          StringFind(upper, "FTSE") >= 0 || StringFind(upper, "NIK") >= 0 ||
          StringFind(upper, "SPX") >= 0 || StringFind(upper, "DJI") >= 0)
-         return ASSET_INDEX;
+         return ACLASS_INDEX;
 
       // Commodity detection
       if(StringFind(upper, "XAUUSD") >= 0 || StringFind(upper, "GOLD") >= 0 ||
          StringFind(upper, "XAGUSD") >= 0 || StringFind(upper, "SILVER") >= 0 ||
          StringFind(upper, "OIL") >= 0 || StringFind(upper, "BRENT") >= 0 ||
          StringFind(upper, "WTI") >= 0 || StringFind(upper, "NATGAS") >= 0)
-         return ASSET_COMMODITY;
+         return ACLASS_COMMODITY;
 
       // Forex classification
       string majors[] = {"EURUSD", "GBPUSD", "USDJPY", "USDCHF",
                          "AUDUSD", "USDCAD", "NZDUSD"};
       for(int i = 0; i < ArraySize(majors); i++)
          if(StringFind(upper, majors[i]) >= 0)
-            return ASSET_FOREX_MAJOR;
+            return ACLASS_FOREX_MAJOR;
 
       string minors[] = {"EURGBP", "EURJPY", "GBPJPY", "EURAUD",
                          "EURCAD", "AUDCAD", "AUDNZD", "NZDJPY"};
       for(int i = 0; i < ArraySize(minors); i++)
          if(StringFind(upper, minors[i]) >= 0)
-            return ASSET_FOREX_MINOR;
+            return ACLASS_FOREX_MINOR;
 
       // Exotic pairs (emerging market currencies)
       string exotics[] = {"TRY", "ZAR", "MXN", "PLN", "HUF",
                           "CZK", "SEK", "NOK", "DKK", "SGD"};
       for(int i = 0; i < ArraySize(exotics); i++)
          if(StringFind(upper, exotics[i]) >= 0)
-            return ASSET_FOREX_EXOTIC;
+            return ACLASS_FOREX_EXOTIC;
 
       // Default to forex if 6 chars (currency pair)
       if(StringLen(baseName) == 6)
-         return ASSET_FOREX_MINOR;
+         return ACLASS_FOREX_MINOR;
 
-      return ASSET_UNKNOWN;
+      return ACLASS_UNKNOWN;
    }
 
    //+------------------------------------------------------------------+
@@ -689,22 +694,22 @@ public:
 
       switch(assetClass)
       {
-         case ASSET_CRYPTO:
+         case ACLASS_CRYPTO:
             // Crypto markets trade 24/7, triple swap varies
             return SWAP_FRIDAY;
 
-         case ASSET_FOREX_MAJOR:
-         case ASSET_FOREX_MINOR:
-         case ASSET_FOREX_EXOTIC:
+         case ACLASS_FOREX_MAJOR:
+         case ACLASS_FOREX_MINOR:
+         case ACLASS_FOREX_EXOTIC:
             // Standard forex uses Wednesday
             return SWAP_WEDNESDAY;
 
-         case ASSET_INDEX:
-         case ASSET_STOCK:
+         case ACLASS_INDEX:
+         case ACLASS_STOCK:
             // Indices/stocks typically Friday
             return SWAP_FRIDAY;
 
-         case ASSET_COMMODITY:
+         case ACLASS_COMMODITY:
             // Commodities usually Wednesday
             return SWAP_WEDNESDAY;
 
@@ -966,8 +971,8 @@ public:
    //+------------------------------------------------------------------+
    void NormalizeSpec(ContractSpec &spec)
    {
-      NormalizedSpecs &norm = spec.normalized;
-      norm.lastUpdate = TimeCurrent();
+      // MQL5 doesn't allow references to struct members - access directly
+      spec.normalized.lastUpdate = TimeCurrent();
 
       // Spread normalization (log scale for wide range)
       if(spec.spreadCurrent > 0)
@@ -976,7 +981,7 @@ public:
          double minLog = MathLog(m_spreadMin + 1);
          double maxLog = MathLog(m_spreadMax + 1);
          double logRange = maxLog - minLog;
-         norm.spreadNorm = MathMin(1.0, MathMax(0.0,
+         spec.normalized.spreadNorm = MathMin(1.0, MathMax(0.0,
             SafeDivide(spreadLog - minLog, logRange, 0.5)));
       }
 
@@ -984,20 +989,20 @@ public:
       double swapRange = m_swapMax - m_swapMin;
       if(swapRange > 0)
       {
-         norm.swapLongNorm = MathMin(1.0, MathMax(-1.0,
+         spec.normalized.swapLongNorm = MathMin(1.0, MathMax(-1.0,
             2.0 * SafeDivide(spec.swapLong - m_swapMin, swapRange, 0.5) - 1.0));
-         norm.swapShortNorm = MathMin(1.0, MathMax(-1.0,
+         spec.normalized.swapShortNorm = MathMin(1.0, MathMax(-1.0,
             2.0 * SafeDivide(spec.swapShort - m_swapMin, swapRange, 0.5) - 1.0));
       }
 
       // Commission normalization (assume max $50 per lot)
-      norm.commissionNorm = MathMin(1.0, spec.commission / 50.0);
+      spec.normalized.commissionNorm = MathMin(1.0, spec.commission / 50.0);
 
       // Margin normalization (assume 0.1% to 100% range)
       if(spec.marginInitial > 0 && spec.contractSize > 0)
       {
          double marginPercent = SafeDivide(spec.marginInitial, spec.contractSize, 0.0) * 100;
-         norm.marginNorm = MathMin(1.0, SafeDivide(marginPercent, 100.0, 0.5));
+         spec.normalized.marginNorm = MathMin(1.0, SafeDivide(marginPercent, 100.0, 0.5));
       }
 
       // Session time normalization (time to close as fraction of session)
@@ -1005,16 +1010,16 @@ public:
       {
          datetime remaining = spec.nextClose - TimeCurrent();
          // Assume 24-hour max session
-         norm.sessionNorm = MathMin(1.0, MathMax(0.0,
+         spec.normalized.sessionNorm = MathMin(1.0, MathMax(0.0,
             (double)remaining / 86400.0));
       }
       else
       {
-         norm.sessionNorm = 0.0;  // Market closed
+         spec.normalized.sessionNorm = 0.0;  // Market closed
       }
 
       // Risk score (composite)
-      norm.riskScoreNorm = CalculateRiskScore(spec);
+      spec.normalized.riskScoreNorm = CalculateRiskScore(spec);
    }
 
    //+------------------------------------------------------------------+
@@ -1033,14 +1038,14 @@ public:
       // Exotic assets = higher risk
       switch(spec.assetClass)
       {
-         case ASSET_CRYPTO:
+         case ACLASS_CRYPTO:
             score += 0.15;
             break;
-         case ASSET_FOREX_EXOTIC:
+         case ACLASS_FOREX_EXOTIC:
             score += 0.1;
             break;
-         case ASSET_INDEX:
-         case ASSET_COMMODITY:
+         case ACLASS_INDEX:
+         case ACLASS_COMMODITY:
             score += 0.05;
             break;
       }
@@ -1567,38 +1572,38 @@ public:
    //+------------------------------------------------------------------+
    //| Detect account margin mode (Hedging/Netting/FIFO)                |
    //+------------------------------------------------------------------+
-   ENUM_ACCOUNT_MARGIN_MODE DetectAccountMode()
+   ENUM_VT_MARGIN_MODE DetectAccountMode()
    {
       if(m_accountDetected)
          return m_accountSettings.marginMode;
 
-      // Get account margin mode from MT5
+      // Get account margin mode from MT5 (uses built-in enum)
       ENUM_ACCOUNT_MARGIN_MODE mode = (ENUM_ACCOUNT_MARGIN_MODE)
          AccountInfoInteger(ACCOUNT_MARGIN_MODE);
 
       switch(mode)
       {
          case ACCOUNT_MARGIN_MODE_RETAIL_HEDGING:
-            m_accountSettings.marginMode = MARGIN_MODE_HEDGING;
+            m_accountSettings.marginMode = VT_MARGIN_HEDGING;
             m_accountSettings.hedgingAllowed = true;
             m_accountSettings.fifoRequired = false;
             break;
 
          case ACCOUNT_MARGIN_MODE_RETAIL_NETTING:
-            m_accountSettings.marginMode = MARGIN_MODE_NETTING;
+            m_accountSettings.marginMode = VT_MARGIN_NETTING;
             m_accountSettings.hedgingAllowed = false;
             m_accountSettings.fifoRequired = false;
             break;
 
          case ACCOUNT_MARGIN_MODE_EXCHANGE:
             // Exchange mode - typically netting with FIFO
-            m_accountSettings.marginMode = MARGIN_MODE_FIFO;
+            m_accountSettings.marginMode = VT_MARGIN_FIFO;
             m_accountSettings.hedgingAllowed = false;
             m_accountSettings.fifoRequired = true;
             break;
 
          default:
-            m_accountSettings.marginMode = MARGIN_MODE_HEDGING;
+            m_accountSettings.marginMode = VT_MARGIN_HEDGING;
       }
 
       // Detect if FIFO is required (US/NFA regulation)
@@ -1928,11 +1933,11 @@ public:
 
       switch(m_accountSettings.marginMode)
       {
-         case MARGIN_MODE_HEDGING:
+         case VT_MARGIN_HEDGING:
             return "Hedging";
-         case MARGIN_MODE_NETTING:
+         case VT_MARGIN_NETTING:
             return "Netting";
-         case MARGIN_MODE_FIFO:
+         case VT_MARGIN_FIFO:
             return "FIFO";
       }
       return "Unknown";

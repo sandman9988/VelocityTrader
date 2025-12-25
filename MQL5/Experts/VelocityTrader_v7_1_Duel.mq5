@@ -37,12 +37,17 @@
 // ═══════════════════════════════════════════════════════════════════
 // MODULAR INCLUDES - VelocityTrader v7.1 Component Library
 // ═══════════════════════════════════════════════════════════════════
-// Note: VT_Globals.mqh includes all other headers in correct order:
-//   - VT_Definitions.mqh (constants, enums, colors)
-//   - VT_RLParameters.mqh (RL tunable parameters)
-//   - VT_Structures.mqh (core data structures)
-//   - VT_Predictor.mqh (probability predictor, statistical gate)
+// Include chain (loaded via VT_Globals.mqh):
+//   - VT_Definitions.mqh    (constants, enums, safe math helpers)
+//   - VT_RLParameters.mqh   (RL tunable parameters)
+//   - VT_Structures.mqh     (core data structures: BrokerSpec, etc.)
+//   - VT_Predictor.mqh      (probability predictor, statistical gate)
 //   - VT_CircuitBreaker.mqh (risk management state machine)
+//   - VT_KinematicRegimes.mqh (regime detection)
+// Additional includes loaded directly:
+//   - VT_HUD.mqh            (heads-up display rendering)
+//   - VT_Persistence.mqh    (state save/load)
+//   - VT_Performance.mqh    (ring buffers, caches)
 // ═══════════════════════════════════════════════════════════════════
 
 //+------------------------------------------------------------------+

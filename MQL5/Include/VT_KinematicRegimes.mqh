@@ -210,47 +210,48 @@ struct AgentSensorProfile
    }
 
    // Calculate sensor vector (normalized 0-1) for RL input
-   void CalculateSensorVector(KinematicState &kin, double atr, double &vector[])
+   // NOTE: 'vector' renamed to 'sensorVec' - 'vector' is a reserved keyword in MQL5
+   void CalculateSensorVector(KinematicState &kin, double atr, double &sensorVec[])
    {
-      if(ArrayResize(vector, SENSOR_DIM) != SENSOR_DIM)
+      if(ArrayResize(sensorVec, SENSOR_DIM) != SENSOR_DIM)
       {
          Print("ERROR: ArrayResize failed for sensor vector - cannot compute kinematics");
          return;
       }
 
       // Core kinematics (indices 0-5)
-      vector[0] = ClampNormalize(kin.velocity, -2.0, 2.0);
-      vector[1] = ClampNormalize(kin.acceleration, -2.0, 2.0);
-      vector[2] = ClampNormalize(kin.jerk, -1.0, 1.0);
-      vector[3] = ClampNormalize(kin.momentum, -2.0, 2.0);
-      vector[4] = ClampNormalize(kin.chi, 0.5, 3.0);
-      vector[5] = ClampNormalize(kin.chiZ, -3.0, 3.0);
+      sensorVec[0] = ClampNormalize(kin.velocity, -2.0, 2.0);
+      sensorVec[1] = ClampNormalize(kin.acceleration, -2.0, 2.0);
+      sensorVec[2] = ClampNormalize(kin.jerk, -1.0, 1.0);
+      sensorVec[3] = ClampNormalize(kin.momentum, -2.0, 2.0);
+      sensorVec[4] = ClampNormalize(kin.chi, 0.5, 3.0);
+      sensorVec[5] = ClampNormalize(kin.chiZ, -3.0, 3.0);
 
       // Multi-timescale (indices 6-8)
-      vector[6] = ClampNormalize(kin.microVelocity, -2.0, 2.0);
-      vector[7] = ClampNormalize(kin.mesoVelocity, -2.0, 2.0);
-      vector[8] = ClampNormalize(kin.macroVelocity, -2.0, 2.0);
+      sensorVec[6] = ClampNormalize(kin.microVelocity, -2.0, 2.0);
+      sensorVec[7] = ClampNormalize(kin.mesoVelocity, -2.0, 2.0);
+      sensorVec[8] = ClampNormalize(kin.macroVelocity, -2.0, 2.0);
 
       // Timescale alignment (index 9)
       double align = 0.0;
       if(kin.microVelocity * kin.mesoVelocity > 0) align += 0.33;
       if(kin.mesoVelocity * kin.macroVelocity > 0) align += 0.33;
       if(kin.microVelocity * kin.macroVelocity > 0) align += 0.34;
-      vector[9] = align;
+      sensorVec[9] = align;
 
       // State encoding (indices 10-15) - one-hot
       for(int i = 0; i < KINEMATIC_STATES; i++)
-         vector[10 + i] = (kin.state == (ENUM_KINEMATIC_STATE)i) ? 1.0 : 0.0;
+         sensorVec[10 + i] = (kin.state == (ENUM_KINEMATIC_STATE)i) ? 1.0 : 0.0;
 
       // Regime encoding (indices 16-19) - one-hot
       for(int i = 0; i < 4; i++)
-         vector[16 + i] = (kin.regime == (ENUM_REGIME)i) ? 1.0 : 0.0;
+         sensorVec[16 + i] = (kin.regime == (ENUM_REGIME)i) ? 1.0 : 0.0;
 
       // Additional features (indices 20-23)
-      vector[20] = kin.stateConfidence;
-      vector[21] = ClampNormalize((double)kin.statePersistence, 0, 20);
-      vector[22] = ClampNormalize(kin.position, 0, 1);
-      vector[23] = ClampNormalize(atr, 0.0001, 0.01);  // ATR normalized
+      sensorVec[20] = kin.stateConfidence;
+      sensorVec[21] = ClampNormalize((double)kin.statePersistence, 0, 20);
+      sensorVec[22] = ClampNormalize(kin.position, 0, 1);
+      sensorVec[23] = ClampNormalize(atr, 0.0001, 0.01);  // ATR normalized
    }
 
    // Calculate weighted signal strength

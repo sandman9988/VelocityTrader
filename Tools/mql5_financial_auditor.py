@@ -571,6 +571,55 @@ class FinancialAuditRules:
             'description': 'Header files should have include guards',
             'recommendation': 'Add #ifndef FILENAME_MQH / #define FILENAME_MQH / #endif'
         },
+
+        # ================================================================
+        # MQL5 LANGUAGE/SYNTAX CHECKS (Compile-time issues)
+        # ================================================================
+        'LANG001': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'MQL5 Reserved Keyword Used as Identifier',
+            'pattern': r'\b(vector|matrix)\s*[\[\&]',
+            'exclude_pattern': r'//|/\*|\*/',
+            'description': 'vector and matrix are reserved keywords in MQL5 Build 2361+',
+            'recommendation': 'Rename variable to sensorVec, dataMatrix, etc.'
+        },
+        'LANG002': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'Reference to Struct Member (Invalid in MQL5)',
+            'pattern': r'^\s*\w+\s+&\w+\s*=\s*\w+\.\w+',
+            'exclude_pattern': r'//|/\*|function\s*\(|void\s+\w+\s*\(',
+            'description': 'MQL5 does not allow creating references to struct members',
+            'recommendation': 'Access struct member directly: obj.member.field instead of Type &ref = obj.member'
+        },
+        'LANG003': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Potential Enum Value Conflict',
+            'pattern': r'^\s*(ASSET_CRYPTO|ASSET_INDEX|MARGIN_MODE_)',
+            'exclude_pattern': r'//|/\*|case\s+|==|!=',
+            'description': 'Common enum values that may conflict with other enums or built-ins',
+            'recommendation': 'Use unique prefixes for enum values (e.g., ACLASS_CRYPTO, VT_MARGIN_HEDGING)'
+        },
+        'LANG004': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Macro May Conflict with Built-in or Other Definition',
+            'pattern': r'#define\s+(PERSISTENCE_VERSION|EPSILON|M_PI)\s+',
+            'exclude_pattern': r'#ifndef\s+\w+\s*\n\s*#define',
+            'description': 'Common macro names that may be defined elsewhere',
+            'recommendation': 'Check if already defined with #ifndef guard, or use unique prefix'
+        },
+        'LANG005': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'Void Function Returns Value',
+            'pattern': r'^\s*return\s+[a-zA-Z_]\w*\s*;',
+            'context_check': 'void_function_return',
+            'description': 'Void function should not return a value',
+            'recommendation': 'Use plain return; or change function return type'
+        },
     }
 
 
@@ -1325,11 +1374,172 @@ class FinancialCodeAuditor:
         if files_with_errors > 0:
             logger.warning(f"{files_with_errors} file(s) could not be audited")
 
+        # Check for orphaned include files
+        orphan_findings = self._check_orphaned_includes(mql5_dir)
+        all_findings.extend(orphan_findings)
+
+        # Check for include guard mismatches (LANG006/LANG007)
+        guard_findings = self._check_include_guard_mismatch(mql5_dir)
+        all_findings.extend(guard_findings)
+
         self.findings = all_findings
 
         # Generate summary
         summary = self._generate_summary()
         return summary
+
+    def _check_orphaned_includes(self, mql5_dir: Path) -> List[AuditFinding]:
+        """Check for .mqh files that are not included in the build chain"""
+        findings = []
+
+        if not mql5_dir.exists():
+            return findings
+
+        include_dir = mql5_dir / "Include"
+        experts_dir = mql5_dir / "Experts"
+
+        if not include_dir.exists():
+            return findings
+
+        # Get all .mqh files in Include folder
+        try:
+            all_mqh_files = set(f.name for f in include_dir.glob("*.mqh"))
+        except (OSError, PermissionError):
+            return findings
+
+        if not all_mqh_files:
+            return findings
+
+        # Find all includes by tracing from .mq5 files
+        included_files = set()
+        files_to_process = []
+
+        # Start with main EA files
+        if experts_dir.exists():
+            try:
+                files_to_process.extend(experts_dir.glob("*.mq5"))
+            except (OSError, PermissionError) as e:
+                logger.warning(f"Unable to list expert files in '{experts_dir}': {e}")
+
+        # Also start from any .mqh that might be entry points
+        processed = set()
+
+        while files_to_process:
+            current_file = files_to_process.pop(0)
+            if current_file in processed:
+                continue
+            processed.add(current_file)
+
+            try:
+                content = current_file.read_text(encoding='utf-8-sig')
+            except Exception:
+                try:
+                    content = current_file.read_text(encoding='latin-1')
+                except Exception:
+                    continue
+
+            # Find all #include statements
+            includes = re.findall(r'#include\s*[<"]([^>"]+)[>"]', content)
+
+            for inc in includes:
+                # Extract just the filename
+                inc_name = inc.split('/')[-1].split('\\')[-1]
+
+                if inc_name.endswith('.mqh'):
+                    included_files.add(inc_name)
+
+                    # Add to processing queue if it's in our Include folder
+                    inc_path = include_dir / inc_name
+                    if inc_path.exists() and inc_path not in processed:
+                        files_to_process.append(inc_path)
+
+        # Find orphaned files
+        orphaned = all_mqh_files - included_files
+
+        for orphan in sorted(orphaned):
+            orphan_path = include_dir / orphan
+            try:
+                size = orphan_path.stat().st_size
+                size_kb = size / 1024
+            except Exception:
+                size_kb = 0
+
+            findings.append(AuditFinding(
+                file=f"MQL5/Include/{orphan}",
+                line=0,
+                category=AuditCategory.CODE_QUALITY,
+                severity=Severity.HIGH if size_kb > 10 else Severity.MEDIUM,
+                rule_id="QUAL004",
+                title="Orphaned Include File",
+                description=f"File not included in build chain ({size_kb:.1f} KB of unused code)",
+                recommendation="Either include this file or remove it from the project",
+                code_context=f"#include \"{orphan}\" is missing from include chain"
+            ))
+
+        return findings
+
+    def _check_include_guard_mismatch(self, mql5_dir: Path) -> List[AuditFinding]:
+        """Check for mismatched #ifndef/#endif pairs in header files"""
+        findings = []
+
+        include_dir = mql5_dir / "Include"
+        if not include_dir.exists():
+            return findings
+
+        for mqh_file in include_dir.glob("*.mqh"):
+            try:
+                content = mqh_file.read_text(encoding='utf-8-sig')
+            except Exception:
+                try:
+                    content = mqh_file.read_text(encoding='latin-1')
+                except Exception:
+                    continue
+
+            lines = content.split('\n')
+
+            # Count preprocessor directives
+            ifndef_count = 0
+            endif_count = 0
+            has_define_mqh = False
+
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if stripped.startswith('#ifndef'):
+                    ifndef_count += 1
+                elif stripped.startswith('#endif'):
+                    endif_count += 1
+                elif stripped.startswith('#define') and '_MQH' in stripped:
+                    has_define_mqh = True
+
+            # Check for mismatch
+            if ifndef_count != endif_count:
+                findings.append(AuditFinding(
+                    file=f"MQL5/Include/{mqh_file.name}",
+                    line=len(lines),
+                    category=AuditCategory.CODE_QUALITY,
+                    severity=Severity.HIGH,
+                    rule_id="LANG006",
+                    title="Mismatched #ifndef/#endif Pair",
+                    description=f"Found {ifndef_count} #ifndef but {endif_count} #endif directives",
+                    recommendation="Ensure every #ifndef has a matching #endif at the end of the file",
+                    code_context=f"#ifndef: {ifndef_count}, #endif: {endif_count}"
+                ))
+
+            # Check for missing include guard
+            if mqh_file.name.startswith('VT_') and not has_define_mqh:
+                findings.append(AuditFinding(
+                    file=f"MQL5/Include/{mqh_file.name}",
+                    line=1,
+                    category=AuditCategory.CODE_QUALITY,
+                    severity=Severity.MEDIUM,
+                    rule_id="LANG007",
+                    title="Missing Include Guard Definition",
+                    description="Header file missing #define FILENAME_MQH include guard",
+                    recommendation="Add #ifndef VT_FILENAME_MQH / #define VT_FILENAME_MQH at top, #endif at bottom",
+                    code_context=""
+                ))
+
+        return findings
 
     def _generate_summary(self) -> Dict:
         """Generate audit summary"""
