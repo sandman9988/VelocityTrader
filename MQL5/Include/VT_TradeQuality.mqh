@@ -1511,8 +1511,8 @@ public:
       // Price overextended from regression, curving back
       if(entry.overextended &&
          entry.regression.IsReliable() &&
-         entry.rsiValue <= m_thresholds.mrRSIExtreme ||
-         entry.rsiValue >= (100 - m_thresholds.mrRSIExtreme))
+         (entry.rsiValue <= m_thresholds.mrRSIExtreme ||
+          entry.rsiValue >= (100 - m_thresholds.mrRSIExtreme)))
       {
          // Curving back towards mean?
          if(entry.trendCurving)
