@@ -29,7 +29,6 @@
 #property copyright "VelocityTrader v7.1"
 #property link      "Kinematic Duel Architecture"
 #property version   "7.10"
-#property strict
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -694,7 +693,7 @@ bool InitializeSymbols()
       g_symbols[idx].assetType = ClassifyAsset(sym);
       g_symbols[idx].typeAllowed = IsTypeAllowed(g_symbols[idx].assetType);
       
-      g_symbols[idx].atrHandle = iATR(sym, InpTimeframe, 14);
+      g_symbols[idx].atrHandle = iATR(sym, InpTimeframe, 14);  // SAFE: 100-tick warmup in OnTick before trading
       if(g_symbols[idx].atrHandle == INVALID_HANDLE)
       {
          Print("Warning: No ATR for ", sym);

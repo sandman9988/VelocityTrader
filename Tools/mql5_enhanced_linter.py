@@ -213,13 +213,15 @@ class MQL5Linter:
     def _lint_basic(self, file_path: Path) -> Dict[str, Any]:
         """
         Basic syntax checking without external tools
-        
+
         Args:
             file_path: Path to file
-            
+
         Returns:
             Basic linting results
         """
+        import re
+
         result = {
             "file": str(file_path),
             "success": True,
@@ -227,41 +229,282 @@ class MQL5Linter:
             "warnings": [],
             "method": "basic"
         }
-        
+
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-            
+
             lines = content.split('\n')
-            
-            # Basic checks
+
+            # Track brace balance across file
+            brace_count = 0
+            paren_count = 0
+            in_multiline_comment = False
+            in_string = False
+
+            # Patterns for recognizing constructs that don't need semicolons
+            func_def_pattern = re.compile(
+                r'^[\w\s\*&:<>]+\s+\w+\s*\([^)]*\)\s*(const)?\s*$'
+            )
+            control_flow_pattern = re.compile(
+                r'^\s*(if|else\s*if|else|while|for|switch|do)\s*[\(\{]?'
+            )
+            struct_class_pattern = re.compile(
+                r'^\s*(struct|class|enum)\s+\w+'
+            )
+
             for i, line in enumerate(lines, 1):
+                original_line = line
                 line_stripped = line.strip()
-                
-                # Check for common issues
-                if line_stripped and not line_stripped.startswith('//'):
-                    # Unmatched braces (simple check)
-                    if line_stripped.count('{') != line_stripped.count('}'):
-                        if '{' in line_stripped and '}' not in line_stripped:
+
+                # Skip empty lines
+                if not line_stripped:
+                    continue
+
+                # Handle multi-line comments
+                if '/*' in line_stripped and '*/' not in line_stripped:
+                    in_multiline_comment = True
+                    continue
+                if in_multiline_comment:
+                    if '*/' in line_stripped:
+                        in_multiline_comment = False
+                    continue
+
+                # Skip single-line comments
+                if line_stripped.startswith('//'):
+                    continue
+
+                # Remove inline comments for analysis
+                comment_pos = line_stripped.find('//')
+                if comment_pos > 0:
+                    line_stripped = line_stripped[:comment_pos].strip()
+
+                # Skip preprocessor directives
+                if line_stripped.startswith('#'):
+                    continue
+
+                # Count braces (excluding those in strings/comments)
+                for char in line_stripped:
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                    elif char == '(':
+                        paren_count += 1
+                    elif char == ')':
+                        paren_count -= 1
+
+                # Check for unbalanced braces going negative
+                if brace_count < 0:
+                    result["errors"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "Unmatched closing brace",
+                        "severity": "error"
+                    })
+                    brace_count = 0  # Reset to continue checking
+
+                # Check for common real issues
+
+                # 1. Empty blocks (but not for forward declarations)
+                if line_stripped == '{}':
+                    # Check previous line for context
+                    if i > 1:
+                        prev = lines[i - 2].strip()
+                        if not prev.endswith(';') and 'class' not in prev:
                             result["warnings"].append({
                                 "line": i,
-                                "column": line.index('{') + 1,
-                                "message": "Possible unmatched opening brace",
+                                "column": 1,
+                                "message": "Empty block - consider adding implementation or comment",
                                 "severity": "warning"
                             })
-                    
-                    # Missing semicolons (heuristic)
-                    if (line_stripped.endswith(')') and 
-                        not line_stripped.startswith('if') and
-                        not line_stripped.startswith('while') and
-                        not line_stripped.startswith('for')):
+
+                # 2. Assignment in condition (common bug)
+                # Only check the condition part inside if(...), not the statement after
+                if_match = re.search(r'\bif\s*\(([^)]+)\)', line_stripped)
+                if if_match:
+                    condition = if_match.group(1)
+                    # Look for single = that's not ==, !=, <=, >=
+                    if re.search(r'(?<![=!<>])=(?!=)', condition):
                         result["warnings"].append({
                             "line": i,
-                            "column": len(line),
-                            "message": "Possible missing semicolon",
+                            "column": 1,
+                            "message": "Possible assignment in condition (use == for comparison)",
                             "severity": "warning"
                         })
-        
+
+                # 3. Potential division by zero (basic check)
+                if re.search(r'/\s*0[^.]', line_stripped):
+                    result["warnings"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "Potential division by zero",
+                        "severity": "warning"
+                    })
+
+                # 4. TODO/FIXME comments
+                if 'TODO' in original_line or 'FIXME' in original_line:
+                    result["warnings"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "TODO/FIXME marker found",
+                        "severity": "info"
+                    })
+
+                # 5. Very long lines (readability)
+                if len(original_line) > 150:
+                    result["warnings"].append({
+                        "line": i,
+                        "column": 150,
+                        "message": f"Line too long ({len(original_line)} chars)",
+                        "severity": "info"
+                    })
+
+                # 6. FINANCIAL SAFETY: Lossy type conversions (critical for money)
+                # Explicit casts that lose precision
+                # Each entry: (regex_pattern, message, default_severity)
+                lossy_casts = [
+                    # Casts to int are very common (indices, loop counters, enums).
+                    # Treat them as info by default and only escalate in financial contexts.
+                    (r'\(int\)\s*\w+', 'Cast to int loses decimal precision', 'info'),
+                    (r'\(short\)\s*\w+', 'Cast to short may overflow', 'warning'),
+                    (r'\(char\)\s*\w+', 'Cast to char loses data', 'warning'),
+                    (r'\(float\)\s*\w+', 'Cast to float loses double precision', 'warning'),
+                    (r'\(uint\)\s*-', 'Cast negative to unsigned', 'warning'),
+                    (r'\(ulong\)\s*-', 'Cast negative to unsigned long', 'warning'),
+                ]
+                for pattern, msg, default_severity in lossy_casts:
+                    if re.search(pattern, line_stripped):
+                        severity = default_severity
+                        # Escalate int casts to warning when line looks financially relevant.
+                        if pattern.startswith(r'\(int\)'):
+                            if re.search(r'(price|amount|lot|volume|balance|equity|profit|loss|pips?)',
+                                         line_stripped,
+                                         re.IGNORECASE):
+                                severity = 'warning'
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": f"FINANCIAL RISK: {msg}",
+                            "severity": severity
+                        })
+
+                # 7. FINANCIAL SAFETY: Implicit integer division (loses decimals)
+                # Pattern: int/int without explicit double conversion
+                if re.search(r'\b\d+\s*/\s*\d+\b', line_stripped):
+                    # Check if not already in a double context
+                    if not re.search(r'\d+\.\d*\s*/|\s*/\s*\d+\.\d*', line_stripped):
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": "FINANCIAL RISK: Integer division may lose decimal precision",
+                            "severity": "warning"
+                        })
+
+                # 8. SECURITY: Magic numbers in financial context
+                # Large numbers that look like prices/amounts without constants
+                if re.search(r'[=<>+\-*/]\s*\d{4,}\.?\d*\s*[;,)\]]', line_stripped):
+                    if not line_stripped.startswith('#define') and 'const' not in line_stripped:
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": "SECURITY: Magic number detected - use named constant",
+                            "severity": "warning"
+                        })
+
+                # 9. SECURITY: Hardcoded lot sizes or monetary values
+                lot_patterns = [
+                    r'OrderSend\s*\([^)]*,\s*\d+\.?\d*\s*,',  # Hardcoded lot in OrderSend
+                    r'PositionOpen\s*\([^)]*,\s*\d+\.?\d*\s*,',
+                    r'lotSize\s*=\s*\d+\.?\d*\s*;',
+                    r'volume\s*=\s*\d+\.?\d*\s*;',
+                ]
+                for pattern in lot_patterns:
+                    if re.search(pattern, line_stripped, re.IGNORECASE):
+                        result["warnings"].append({
+                            "line": i,
+                            "column": 1,
+                            "message": "SECURITY: Hardcoded trading volume - use parameter",
+                            "severity": "warning"
+                        })
+
+            # Track variable declarations and usage for unused variable detection
+            declared_vars = {}
+            used_vars = set()
+            in_struct_or_class = False
+            struct_brace_depth = 0
+
+            # Second pass: detect unused variables (attack vector)
+            # Only flag function-local variables, not struct/class members
+            var_decl_pattern = re.compile(
+                r'^\s*(?:int|double|float|string|bool|long|ulong|datetime|color)\s+'
+                r'(\w+)\s*[;=]'
+            )
+
+            for i, line in enumerate(lines, 1):
+                line_stripped = line.strip()
+                if line_stripped.startswith('//') or not line_stripped:
+                    continue
+
+                # Track struct/class context to avoid flagging member fields
+                if re.match(r'^\s*(struct|class|enum)\s+\w+', line_stripped):
+                    in_struct_or_class = True
+                    struct_brace_depth = 0
+
+                if in_struct_or_class:
+                    struct_brace_depth += line_stripped.count('{')
+                    struct_brace_depth -= line_stripped.count('}')
+                    if struct_brace_depth <= 0 and '}' in line_stripped:
+                        in_struct_or_class = False
+                    continue  # Skip struct/class member declarations
+
+                # Find declarations (only in function scope)
+                match = var_decl_pattern.match(line_stripped)
+                if match:
+                    var_name = match.group(1)
+                    # Skip loop vars, globals (g_), and member vars (m_)
+                    if var_name not in ['i', 'j', 'k', 'n', 'x', 'y', 'm']:
+                        if not var_name.startswith('g_') and not var_name.startswith('m_'):
+                            declared_vars[var_name] = i
+
+                # Find usages (simple word boundary check)
+                for var in list(declared_vars.keys()):
+                    if re.search(rf'\b{var}\b', line_stripped):
+                        # Check if it's not just the declaration line
+                        if declared_vars[var] != i:
+                            used_vars.add(var)
+
+            # Report unused variables (potential dead code / attack vector)
+            for var, line_num in declared_vars.items():
+                if var not in used_vars:
+                    result["warnings"].append({
+                        "line": line_num,
+                        "column": 1,
+                        "message": f"SECURITY: Unused variable '{var}' - dead code is an attack vector",
+                        "severity": "warning"
+                    })
+
+            # Final brace balance check
+            if brace_count != 0:
+                result["errors"].append({
+                    "line": len(lines),
+                    "column": 1,
+                    "message": f"Unbalanced braces: {brace_count} unclosed '{{'" if brace_count > 0 else f"Unbalanced braces: {-brace_count} extra '}}'",
+                    "severity": "error"
+                })
+
+            # Final paren balance check
+            if paren_count != 0:
+                result["errors"].append({
+                    "line": len(lines),
+                    "column": 1,
+                    "message": f"Unbalanced parentheses: {paren_count} unclosed '('" if paren_count > 0 else f"Unbalanced parentheses: {-paren_count} extra ')'",
+                    "severity": "error"
+                })
+
+            # Set success based on errors
+            result["success"] = len(result["errors"]) == 0
+
         except Exception as e:
             result["success"] = False
             result["errors"].append({
@@ -270,7 +513,7 @@ class MQL5Linter:
                 "message": f"Failed to lint file: {str(e)}",
                 "severity": "error"
             })
-        
+
         return result
     
     def format_for_ai(self, lint_result: Dict[str, Any]) -> str:

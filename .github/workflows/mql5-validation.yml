@@ -16,9 +16,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  code-audit:
-    name: MQL5 Code Audit
+  super-audit:
+    name: MQL5 Super Audit (Primary Gate)
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run MQL5 Super Audit
+        run: |
+          echo "Running MQL5 Super Audit (Comprehensive Code Quality Check)..."
+          python Tools/mql5_super_audit.py --project . --output super_audit_report.json --verbose --fail-on-error
+
+      - name: Upload Audit Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mql5-super-audit-report
+          path: super_audit_report.json
+          retention-days: 30
+
+  code-audit:
+    name: MQL5 Code Auditor (Legacy)
+    runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -33,7 +60,7 @@ jobs:
         run: |
           echo "Running MQL5 code audit..."
           if [ -f "Tools/mql5_code_auditor.py" ]; then
-            python Tools/mql5_code_auditor.py --dir MQL5/ --output audit_report.json || true
+            python Tools/mql5_code_auditor.py --project . --output audit_report.json || true
             if [ -f "audit_report.json" ]; then
               echo "Audit report generated:"
               cat audit_report.json | python -m json.tool | head -100
@@ -45,6 +72,7 @@ jobs:
   integrity-check:
     name: MQL5 Integrity Check
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -59,7 +87,7 @@ jobs:
         run: |
           echo "Running MQL5 integrity check..."
           if [ -f "Tools/mql5_integrity_checker.py" ]; then
-            python Tools/mql5_integrity_checker.py MQL5/ || true
+            python Tools/mql5_integrity_checker.py --report || true
           else
             echo "Integrity checker not found, skipping..."
           fi
@@ -67,6 +95,7 @@ jobs:
   financial-audit:
     name: Financial Standards Audit
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -81,7 +110,7 @@ jobs:
         run: |
           echo "Running financial standards audit..."
           if [ -f "Tools/mql5_financial_auditor.py" ]; then
-            python Tools/mql5_financial_auditor.py --dir MQL5/ || true
+            python Tools/mql5_financial_auditor.py --project . || true
           else
             echo "Financial auditor not found, skipping..."
           fi
@@ -89,6 +118,7 @@ jobs:
   syntax-validation:
     name: MQL5 Syntax Validation
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -121,6 +151,7 @@ jobs:
   include-check:
     name: Include Dependencies Check
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -145,9 +176,190 @@ jobs:
 
           echo "Include check complete."
 
+  mql4-deprecation:
+    name: MQL4 Deprecation Check
+    runs-on: ubuntu-latest
+    needs: super-audit
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for deprecated MQL4 patterns
+        run: |
+          echo "=== Checking for Deprecated MQL4 Code ==="
+          ERRORS=0
+
+          # Check for MQL4 event handlers
+          echo "Checking for MQL4 event handlers (init/deinit/start)..."
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '\b(init|deinit|start)\s*\(' MQL5/ 2>/dev/null; then
+            echo "ERROR: Found deprecated MQL4 event handlers. Use OnInit/OnDeinit/OnTick instead."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          # Check for MQL4 trade functions
+          echo "Checking for MQL4 trade functions..."
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '\b(OrderClose|OrderModify|OrderDelete|OrderSelect|OrdersTotal|MarketInfo|RefreshRates)\b' MQL5/ 2>/dev/null; then
+            echo "ERROR: Found deprecated MQL4 trade functions. Use MQL5 trade API."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          # Check for MQL4 constants
+          echo "Checking for MQL4 constants..."
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '\b(OP_BUY|OP_SELL|MODE_TRADES|MODE_HISTORY)\b' MQL5/ 2>/dev/null; then
+            echo "ERROR: Found deprecated MQL4 constants."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          # Check for #property strict
+          echo "Checking for #property strict..."
+          if grep -rn --include="*.mq5" --include="*.mqh" '#\s*property\s+strict' MQL5/ 2>/dev/null; then
+            echo "WARNING: #property strict is MT4-era. MQL5 is strict by design."
+          fi
+
+          if [ $ERRORS -eq 0 ]; then
+            echo "✓ No deprecated MQL4 patterns found"
+          else
+            echo "Found $ERRORS deprecated pattern categories"
+            exit 1
+          fi
+
+  cpp-compatibility:
+    name: C++ Compatibility Check
+    runs-on: ubuntu-latest
+    needs: super-audit
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for unsupported C++ patterns
+        run: |
+          echo "=== Checking for Unsupported C++ Code ==="
+          ERRORS=0
+
+          # Check for C++ stdlib
+          echo "Checking for std::/boost:: usage..."
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '\b(std|boost)\s*::' MQL5/ 2>/dev/null; then
+            echo "ERROR: C++ standard library not available in MQL5."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          # Check for C++ iostream
+          echo "Checking for iostream usage..."
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '\b(cout|cin|cerr|printf|scanf)\b' MQL5/ 2>/dev/null; then
+            echo "ERROR: C++ iostream not available. Use Print/Comment/Alert."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          # Check for C memory functions
+          echo "Checking for C memory functions..."
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '\b(malloc|calloc|realloc|free)\s*\(' MQL5/ 2>/dev/null; then
+            echo "ERROR: C memory functions not available. Use new/delete."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          # Check for exception handling (exclude comments - "try" often appears in comments)
+          echo "Checking for exception handling..."
+          # Look for actual C++ exception syntax: try { or catch( or throw expression
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '^\s*try\s*\{|\bcatch\s*\(|\bthrow\s+\w' MQL5/ 2>/dev/null | grep -v "//.*try\|//.*catch\|//.*throw"; then
+            echo "ERROR: Exception handling not supported in MQL5."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          # Check for nullptr
+          echo "Checking for nullptr..."
+          if grep -rn --include="*.mq5" --include="*.mqh" '\bnullptr\b' MQL5/ 2>/dev/null; then
+            echo "ERROR: Use NULL instead of nullptr in MQL5."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          # Check for auto keyword
+          echo "Checking for auto keyword..."
+          if grep -rn --include="*.mq5" --include="*.mqh" -E '\bauto\b[^(]' MQL5/ 2>/dev/null | grep -v "//"; then
+            echo "ERROR: auto type deduction not supported in MQL5."
+            ERRORS=$((ERRORS+1))
+          fi
+
+          if [ $ERRORS -eq 0 ]; then
+            echo "✓ No unsupported C++ patterns found"
+          else
+            echo "Found $ERRORS unsupported C++ pattern categories"
+            exit 1
+          fi
+
+  best-practices:
+    name: Best Practices Check
+    runs-on: ubuntu-latest
+    needs: super-audit
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for anti-patterns
+        run: |
+          echo "=== Checking for Anti-Patterns ==="
+          WARNINGS=0
+
+          # Check for Sleep() calls
+          echo "Checking for Sleep() calls..."
+          if grep -rn --include="*.mq5" --include="*.mqh" '\bSleep\s*(' MQL5/ 2>/dev/null; then
+            echo "WARNING: Sleep() blocks tick processing. Consider async patterns."
+            WARNINGS=$((WARNINGS+1))
+          fi
+
+          # Check for unchecked OrderSend
+          echo "Checking for unchecked OrderSend..."
+          if grep -rn --include="*.mq5" --include="*.mqh" 'OrderSend\s*([^)]*)\s*;' MQL5/ 2>/dev/null; then
+            echo "WARNING: OrderSend without result check. Always check return value."
+            WARNINGS=$((WARNINGS+1))
+          fi
+
+          # Check for while(true)
+          echo "Checking for infinite loops..."
+          if grep -rn --include="*.mq5" --include="*.mqh" 'while\s*(\s*true\s*)' MQL5/ 2>/dev/null; then
+            echo "WARNING: while(true) found. Ensure proper break conditions."
+            WARNINGS=$((WARNINGS+1))
+          fi
+
+          # Check for magic = 0
+          echo "Checking for zero magic numbers..."
+          if grep -rn --include="*.mq5" --include="*.mqh" '\.magic\s*=\s*0' MQL5/ 2>/dev/null; then
+            echo "WARNING: Magic number = 0 found. Consider unique magic for EA identification."
+            WARNINGS=$((WARNINGS+1))
+          fi
+
+          # Count lossy casts
+          echo "Checking for lossy type casts..."
+          CAST_COUNT=$(grep -rn --include="*.mq5" --include="*.mqh" -E '\(\s*(int|short|char|float)\s*\)' MQL5/ 2>/dev/null | wc -l)
+          if [ "$CAST_COUNT" -gt 0 ]; then
+            echo "INFO: Found $CAST_COUNT lossy type casts. Review for financial precision."
+          fi
+
+          # Count unchecked ArrayResize
+          RESIZE_COUNT=$(grep -rn --include="*.mq5" --include="*.mqh" 'ArrayResize\s*([^)]*)\s*;' MQL5/ 2>/dev/null | wc -l)
+          if [ "$RESIZE_COUNT" -gt 0 ]; then
+            echo "INFO: Found $RESIZE_COUNT unchecked ArrayResize calls."
+          fi
+
+          # Count unchecked CopyBuffer
+          COPY_COUNT=$(grep -rn --include="*.mq5" --include="*.mqh" -E '(CopyBuffer|CopyRates|CopyClose)\s*\([^)]+\)\s*;' MQL5/ 2>/dev/null | wc -l)
+          if [ "$COPY_COUNT" -gt 0 ]; then
+            echo "INFO: Found $COPY_COUNT unchecked Copy* calls."
+          fi
+
+          echo ""
+          echo "=== Best Practices Summary ==="
+          echo "Warnings: $WARNINGS"
+          echo "Lossy casts: $CAST_COUNT"
+          echo "Unchecked ArrayResize: $RESIZE_COUNT"
+          echo "Unchecked Copy*: $COPY_COUNT"
+
   metrics:
     name: Code Metrics
     runs-on: ubuntu-latest
+    needs: super-audit
 
     steps:
       - name: Checkout repository
@@ -176,5 +388,53 @@ jobs:
           struct_count=$(grep -rh "^struct\|^class" MQL5/ --include="*.mq5" --include="*.mqh" 2>/dev/null | wc -l)
           echo "Struct/Class count: $struct_count"
 
+          # Count NULL checks (good practice)
+          null_checks=$(grep -rn --include="*.mq5" --include="*.mqh" -E '\w+\s*(==|!=)\s*NULL' MQL5/ 2>/dev/null | wc -l)
+          echo "NULL pointer checks: $null_checks"
+
+          # Count NormalizeDouble usage
+          normalize_count=$(grep -rn --include="*.mq5" --include="*.mqh" 'NormalizeDouble' MQL5/ 2>/dev/null | wc -l)
+          echo "NormalizeDouble usage: $normalize_count"
+
           echo ""
           echo "=== Metrics Complete ==="
+
+  validation-summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [super-audit, code-audit, integrity-check, financial-audit, syntax-validation, include-check, mql4-deprecation, cpp-compatibility, best-practices, metrics]
+    if: always()
+
+    steps:
+      - name: Check validation status
+        run: |
+          echo "=== MQL5 Validation Summary ==="
+          echo ""
+          echo "Super Audit (Primary Gate): ${{ needs.super-audit.result }}"
+          echo "Code Audit: ${{ needs.code-audit.result }}"
+          echo "Integrity Check: ${{ needs.integrity-check.result }}"
+          echo "Financial Audit: ${{ needs.financial-audit.result }}"
+          echo "Syntax Validation: ${{ needs.syntax-validation.result }}"
+          echo "Include Check: ${{ needs.include-check.result }}"
+          echo "MQL4 Deprecation: ${{ needs.mql4-deprecation.result }}"
+          echo "C++ Compatibility: ${{ needs.cpp-compatibility.result }}"
+          echo "Best Practices: ${{ needs.best-practices.result }}"
+          echo "Metrics: ${{ needs.metrics.result }}"
+          echo ""
+
+          if [ "${{ needs.super-audit.result }}" != "success" ]; then
+            echo "❌ VALIDATION FAILED - Super audit did not pass"
+            exit 1
+          fi
+
+          if [ "${{ needs.mql4-deprecation.result }}" != "success" ]; then
+            echo "❌ VALIDATION FAILED - MQL4 deprecation check failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.cpp-compatibility.result }}" != "success" ]; then
+            echo "❌ VALIDATION FAILED - C++ compatibility check failed"
+            exit 1
+          fi
+
+          echo "✅ VALIDATION PASSED - All critical checks succeeded"

@@ -44,7 +44,12 @@ void HUD_Create(string name, int x, int y, string text, color clr, int size = 8)
    if(ObjectFind(0, name) < 0)
    {
       ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
-      ArrayResize(g_hudObjects, g_hudCount + 1);
+      int newSize = g_hudCount + 1;
+      if(ArrayResize(g_hudObjects, newSize) < 0)
+      {
+         Print("ERROR: ArrayResize failed for HUD objects - UI element not tracked: ", name);
+         return;
+      }
       g_hudObjects[g_hudCount++] = name;
       ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetString(0, name, OBJPROP_FONT, "Consolas");
@@ -65,7 +70,12 @@ void HUD_Rect(string name, int x, int y, int w, int h, color bg, color border)
    if(ObjectFind(0, name) < 0)
    {
       ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-      ArrayResize(g_hudObjects, g_hudCount + 1);
+      int newSize = g_hudCount + 1;
+      if(ArrayResize(g_hudObjects, newSize) != newSize)
+      {
+         Print("ERROR: ArrayResize failed for HUD objects - UI element not tracked: ", name);
+         return;
+      }
       g_hudObjects[g_hudCount++] = name;
       ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetInteger(0, name, OBJPROP_BACK, false);
@@ -166,10 +176,7 @@ void DrawHUD()
    string rlSt = g_status.rlActive ? "~" : "o";
    string riskSt = g_status.riskOK ? "~" : "!";
 
-   color brokerClr = g_status.brokerConnected ? CLR_POSITIVE : CLR_NEGATIVE;
-   color netClr = g_status.networkOK ? CLR_POSITIVE : CLR_NEGATIVE;
-   color rlClr = g_status.rlActive ? CLR_POSITIVE : CLR_NEUTRAL;
-   color riskClr = g_status.riskOK ? CLR_POSITIVE : CLR_NEGATIVE;
+   // Colors removed - using combined color in HUD_Create call
 
    bool isBacktest = (MQLInfoInteger(MQL_TESTER) != 0);
    string modeStr = isBacktest ? "BACKTEST" : "LIVE";
@@ -641,7 +648,6 @@ void DrawTab_Instruments(int x, int &y, int h, int sec)
 
       ENUM_REGIME regime = g_symbols[idx].symc.GetRegime();
       double accel = g_symbols[idx].physics.GetAcceleration();
-      double score = MathAbs(accel);
 
       if(regime == REGIME_TREND && trdCnt < 5)
       {

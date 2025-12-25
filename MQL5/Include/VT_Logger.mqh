@@ -4,7 +4,6 @@
 //|                    Central Logger for RL Replay Learning         |
 //+------------------------------------------------------------------+
 #property copyright "VelocityTrader"
-#property strict
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -134,8 +133,15 @@ struct MarketState
    // Export to normalized feature array (0-1)
    void ToFeatures(double &features[], int startIdx = 0)
    {
-      if(ArraySize(features) < startIdx + 8)
-         ArrayResize(features, startIdx + 8);
+      int requiredSize = startIdx + 8;
+      if(ArraySize(features) < requiredSize)
+      {
+         if(ArrayResize(features, requiredSize) != requiredSize)
+         {
+            Print("ERROR: ArrayResize failed for market state features");
+            return;
+         }
+      }
 
       features[startIdx + 0] = MathMin(1.0, spread / 50.0);  // Spread norm
       features[startIdx + 1] = rsi / 100.0;                   // RSI norm
@@ -1162,13 +1168,17 @@ public:
       mc.relatedTicket = ticket;
       mc.score = score;
 
-      // Final bounds check before array access
+      // Ensure array has space before assignment
       if(m_markedCount >= ArraySize(m_markedCandles))
       {
-         Print("ERROR: CVTLogger::MarkCandle - array bounds check failed");
-         return false;
+         int newSize = m_markedCount + 100;
+         int resized  = ArrayResize(m_markedCandles, newSize);
+         if(resized < 0)
+         {
+            Print("ERROR: CVTLogger::MarkCandle - failed to resize array");
+            return false;
+         }
       }
-
       m_markedCandles[m_markedCount] = mc;
       m_markedCount++;
 
@@ -1257,16 +1267,9 @@ public:
          int newSize = m_markedCount + 100;
          if(ArrayResize(m_markedCandles, newSize) != newSize)
          {
-            Print("ERROR: CVTLogger::MarkTradeOnChart - cannot allocate memory for marked candles");
+            Print("ERROR: ArrayResize failed for marked candles - marker not saved");
             return;
          }
-      }
-
-      // Final bounds check before array access
-      if(m_markedCount >= ArraySize(m_markedCandles))
-      {
-         Print("ERROR: CVTLogger::MarkTradeOnChart - array bounds check failed");
-         return;
       }
 
       m_markedCandles[m_markedCount] = mc;
@@ -1382,14 +1385,19 @@ public:
    //+------------------------------------------------------------------+
    int GetMarkedByTag(ENUM_TRADE_TAG tag, MarkedCandle &result[])
    {
-      ArrayResize(result, 0);
+      ArrayResize(result, 0);  // Clear array - always succeeds
       int count = 0;
 
       for(int i = 0; i < m_markedCount; i++)
       {
          if(m_markedCandles[i].tag == tag)
          {
-            ArrayResize(result, count + 1);
+            int newSize = count + 1;
+            if(ArrayResize(result, newSize) != newSize)
+            {
+               Print("ERROR: ArrayResize failed in GetMarkedByTag - incomplete results");
+               break;
+            }
             result[count] = m_markedCandles[i];
             count++;
          }

@@ -50,7 +50,12 @@ struct RingBuffer
    void Init(int size)
    {
       capacity = size;
-      ArrayResize(data, capacity);
+      if(ArrayResize(data, capacity) != capacity)
+      {
+         Print("ERROR: ArrayResize failed for ring buffer - capacity set to 0");
+         capacity = 0;
+         return;
+      }
       head = 0;
       count = 0;
    }
