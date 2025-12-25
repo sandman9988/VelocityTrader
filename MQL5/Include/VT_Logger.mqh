@@ -961,7 +961,10 @@ public:
          Print("WARNING: CVTLogger::SampleBatch - only sampled ", sampledCount, "/", actualSize, " entries");
          // Resize batch to actual size
          if(sampledCount > 0)
-            ArrayResize(batch, sampledCount);
+         {
+            if(ArrayResize(batch, sampledCount) != sampledCount)
+               Print("WARNING: CVTLogger::SampleBatch - ArrayResize to ", sampledCount, " failed");
+         }
       }
 
       return sampledCount;

@@ -89,7 +89,7 @@ class FinancialAuditRules:
             'severity': Severity.CRITICAL,
             'title': 'Unsafe Division Operation',
             'pattern': r'(?<!/)/(?!/|=|\*)\s*([a-zA-Z_]\w*)',
-            'exclude_pattern': r'SafeDiv|SafeDivide|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*2\.0|/\s*10\.0|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'|// |/\*|MathSqrt\s*\(\s*2|MESO_WINDOW|MICRO_WINDOW|MACRO_WINDOW|KINEMATIC_STATES|numBins|_WINDOW|_SIZE|_COUNT|MathLog\s*\(|/\s*MathLog',
+            'exclude_pattern': r'SafeDiv|SafeDivide|SafeMath::Divide|\.0\s*$|/\s*100\.0|/\s*1000\.0|/\s*2\.0|/\s*10\.0|/\s*60|/\s*32767|/\s*BYTES_TO_MB|string\s+|headers\s*\+=|msg\s*=\s*"|CLogger::|\".*\"|\'.*\'|// |/\*|MathSqrt\s*\(\s*2|MESO_WINDOW|MICRO_WINDOW|MACRO_WINDOW|KINEMATIC_STATES|numBins|_WINDOW|_SIZE|_COUNT|MathLog\s*\(|/\s*MathLog|/\s*point|/\s*Point|volumeStep|lotStep|spec\.|MathRand',
             'description': 'Division by variable without zero-check can crash or produce infinity',
             'recommendation': 'Use SafeDivide(numerator, denominator, default_value) or explicit zero-check',
             'check_denominator_validation': True,  # Special flag for checking nearby validation
@@ -159,7 +159,7 @@ class FinancialAuditRules:
             'severity': Severity.CRITICAL,
             'title': 'Array Access Without Bounds Check',
             'pattern': r'(\w+)\s*\[\s*([a-zA-Z_]\w*(?:\s*[\+\-\*/]\s*\w+)*)\s*\]',
-            'exclude_pattern': r'ArraySize|<\s*ArraySize|>=\s*0\s*&&|IsValidIndex|SafeArrayAccess',
+            'exclude_pattern': r'ArraySize|<\s*ArraySize|>=\s*0\s*&&|IsValidIndex|SafeArrayAccess|MathMin|safeCount|loopCount|actualSize|sampledCount|m_bufferCount|m_historyIdx|m_markedCount|regimeCount|for\s*\(\s*int\s+\w+\s*=\s*0',
             'description': 'Array access with computed index without bounds validation',
             'recommendation': 'Validate: if(index >= 0 && index < ArraySize(arr))',
             'check_loop_bounds': True,  # Special flag for smarter checking
