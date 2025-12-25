@@ -1892,8 +1892,8 @@ public:
             continue;
 
          int newSize = closeCount + 1;
-         if(ArrayResize(tickets, newSize) != newSize ||
-            ArrayResize(volumes, newSize) != newSize)
+         if(ArrayResize(tickets, newSize) < 0 ||
+            ArrayResize(volumes, newSize) < 0)
          {
             Print("ERROR: ArrayResize failed in FIFO sequence - aborting to prevent invalid trades");
             return closeCount;  // Return what we have so far
