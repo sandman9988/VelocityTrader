@@ -45,7 +45,7 @@ void HUD_Create(string name, int x, int y, string text, color clr, int size = 8)
    {
       ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
       int newSize = g_hudCount + 1;
-      if(ArrayResize(g_hudObjects, newSize) != newSize)
+      if(ArrayResize(g_hudObjects, newSize) < 0)
       {
          Print("ERROR: ArrayResize failed for HUD objects - UI element not tracked: ", name);
          return;
