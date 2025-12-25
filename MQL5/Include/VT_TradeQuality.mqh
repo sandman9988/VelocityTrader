@@ -198,9 +198,17 @@ struct EntryQuality
 
    // Breakout Quality
    double            breakoutScore;    // 0-1: S/R break quality
-   double            breakoutStrength; // How far past level
+   double            breakoutStrength; // How far past level in ATR units
    bool              volumeConfirm;    // Volume spike on break
    int               retests;          // Number of level retests before break
+
+   // Kinematic Features (for ML replay learning)
+   double            roc5;             // Rate of change over 5 bars (percent)
+   double            roc15;            // Rate of change over 15 bars (percent)
+   double            acc5;             // Acceleration (roc5 - prev roc5)
+   double            volZ60;           // Volume z-score over 60 bars
+   double            rangeATR;         // Current candle range / ATR
+   double            breakDistATR;     // Distance beyond rolling high/low in ATR (signed)
 
    // Volatility Context
    double            volatilityScore;  // 0-1: appropriate volatility
@@ -261,6 +269,13 @@ struct EntryQuality
       volumeConfirm = false;
       retests = 0;
 
+      roc5 = 0.0;
+      roc15 = 0.0;
+      acc5 = 0.0;
+      volZ60 = 0.0;
+      rangeATR = 0.0;
+      breakDistATR = 0.0;
+
       volatilityScore = 0.5;
       atrRatio = 1.0;
       inRange = false;
@@ -300,18 +315,18 @@ struct EntryQuality
 
    void CalculateOverall()
    {
-      // Weighted average of all components (with regression, entropy, VPIN)
+      // Weighted average - shift towards kinematic breakout, reduce RSI-centric momentum
       overallScore = (
-         trendScore * 0.15 +
-         momentumScore * 0.10 +
-         breakoutScore * 0.10 +
-         volatilityScore * 0.07 +
-         priceActionScore * 0.10 +
-         rrSetupScore * 0.15 +
-         timingScore * 0.05 +
-         regressionScore * 0.10 +  // Quadratic regression context
-         entropyScore * 0.08 +     // Cycle/regime tradability
-         vpinScore * 0.10          // Order flow favorability
+         trendScore * 0.12 +
+         momentumScore * 0.12 +     // Now kinematic (ROC/acc based)
+         breakoutScore * 0.16 +     // Increased - kinematic breakout is primary
+         volatilityScore * 0.06 +
+         priceActionScore * 0.08 +
+         rrSetupScore * 0.14 +
+         timingScore * 0.04 +
+         regressionScore * 0.10 +   // Quadratic regression context
+         entropyScore * 0.08 +      // Cycle/regime tradability
+         vpinScore * 0.10           // Order flow favorability
       );
    }
 
@@ -322,11 +337,14 @@ struct EntryQuality
          "\"pa\":%.3f,\"rr\":%.3f,\"time\":%.3f,\"reg\":%.3f,"
          "\"ent\":%.3f,\"vpin\":%.3f,\"overall\":%.3f,"
          "\"rrRatio\":%.2f,\"rsi\":%.1f,\"atr\":%.2f,"
+         "\"roc5\":%.5f,\"roc15\":%.5f,\"acc5\":%.5f,"
+         "\"volZ\":%.2f,\"rangeATR\":%.2f,\"breakDistATR\":%.2f,"
          "\"regression\":%s,\"entropy\":%s,\"vpinData\":%s}",
          trendScore, momentumScore, breakoutScore, volatilityScore,
          priceActionScore, rrSetupScore, timingScore, regressionScore,
          entropyScore, vpinScore, overallScore,
          rrRatio, rsiValue, atrRatio,
+         roc5, roc15, acc5, volZ60, rangeATR, breakDistATR,
          regression.ToJSON(), entropy.ToJSON(), vpin.ToJSON());
    }
 };
@@ -482,10 +500,13 @@ struct ClassificationThresholds
    double            berserkerMinMomentum;   // Strong momentum
    bool              berserkerCounterTrend;  // Against main trend
 
-   // Breakout: S/R break with confirmation
-   double            breakoutMinStrength;    // Min break strength (ATR)
-   double            breakoutMinVolume;      // Volume spike ratio
-   int               breakoutMinRetests;     // Level retests
+   // Breakout: Kinematic breakout with confirmation
+   double            breakoutMinStrength;    // Min break distance beyond range (ATR units)
+   double            breakoutMinVolumeZ;     // Volume z-score threshold
+   double            breakoutMinRangeATR;    // Candle range / ATR threshold
+   double            breakoutMinROC5;        // Min ROC5 (percent)
+   double            breakoutMinScore;       // Min composite breakoutScore
+   int               breakoutLookback;       // Rolling range lookback bars
 
    // Trend: With-trend, aligned MAs
    int               trendMinMAAlign;        // Min MAs aligned
@@ -534,10 +555,13 @@ struct ClassificationThresholds
       berserkerMinMomentum = 0.7;
       berserkerCounterTrend = true;
 
-      // Breakout
-      breakoutMinStrength = 0.5;  // 0.5 ATR past level
-      breakoutMinVolume = 1.5;    // 150% of average
-      breakoutMinRetests = 2;
+      // Breakout (kinematic)
+      breakoutMinStrength = 0.25;   // ATR units beyond rolling range
+      breakoutMinVolumeZ = 1.0;     // Volume z-score threshold
+      breakoutMinRangeATR = 1.25;   // Candle range / ATR threshold
+      breakoutMinROC5 = 0.02;       // 0.02% ROC over 5 bars (tune per timeframe)
+      breakoutMinScore = 0.65;      // Composite breakoutScore threshold
+      breakoutLookback = 60;        // Rolling range lookback bars
 
       // Trend
       trendMinMAAlign = 2;
@@ -686,20 +710,198 @@ public:
    //+------------------------------------------------------------------+
    bool RefreshIndicators(int count = 10)
    {
-      int copied = 0;
-      copied += CopyBuffer(m_hATR, 0, 0, count, m_atr);
-      copied += CopyBuffer(m_hRSI, 0, 0, count, m_rsi);
-      copied += CopyBuffer(m_hADX, 0, 0, count, m_adx);
-      copied += CopyBuffer(m_hMA_fast, 0, 0, count, m_maFast);
-      copied += CopyBuffer(m_hMA_medium, 0, 0, count, m_maMedium);
-      copied += CopyBuffer(m_hMA_slow, 0, 0, count, m_maSlow);
+      if(count <= 0) return false;
 
-      if(copied < count * 6)  // All 6 buffers should have 'count' elements
+      // Validate each buffer independently (summing is flawed - one can fail while another overcounts)
+      int c1 = CopyBuffer(m_hATR, 0, 0, count, m_atr);
+      int c2 = CopyBuffer(m_hRSI, 0, 0, count, m_rsi);
+      int c3 = CopyBuffer(m_hADX, 0, 0, count, m_adx);
+      int c4 = CopyBuffer(m_hMA_fast, 0, 0, count, m_maFast);
+      int c5 = CopyBuffer(m_hMA_medium, 0, 0, count, m_maMedium);
+      int c6 = CopyBuffer(m_hMA_slow, 0, 0, count, m_maSlow);
+
+      bool ok = true;
+      if(c1 != count) ok = false;
+      if(c2 != count) ok = false;
+      if(c3 != count) ok = false;
+      if(c4 != count) ok = false;
+      if(c5 != count) ok = false;
+      if(c6 != count) ok = false;
+
+      if(!ok)
       {
-         Print("WARNING: CopyBuffer incomplete - indicator data may be stale (", copied, "/", count * 6, ")");
-         return false;
+         Print("WARNING: CopyBuffer incomplete - ATR=", c1, " RSI=", c2, " ADX=", c3,
+               " MA10=", c4, " MA20=", c5, " MA50=", c6, " expected=", count);
       }
-      return true;
+      return ok;
+   }
+
+   //+------------------------------------------------------------------+
+   //| Helper: Clamp value to [0, 1]                                     |
+   //+------------------------------------------------------------------+
+   double Clamp01(double v)
+   {
+      return MathMax(0.0, MathMin(1.0, v));
+   }
+
+   //+------------------------------------------------------------------+
+   //| Calculate ROC (Rate of Change) as percent                         |
+   //+------------------------------------------------------------------+
+   double CalcROCPercent(string symbol, int shift, int period)
+   {
+      if(period <= 0) return 0.0;
+
+      double closes[];
+      ArraySetAsSeries(closes, true);
+      int need = shift + period + 1;
+      int copied = CopyClose(symbol, m_timeframe, 0, need, closes);
+
+      if(copied < need) return 0.0;
+      if(shift < 0 || shift >= copied) return 0.0;
+      if(shift + period >= copied) return 0.0;
+
+      double current = closes[shift];
+      double prev = closes[shift + period];
+
+      return SafeDivide(current - prev, prev, 0.0) * 100.0;  // Return as percent
+   }
+
+   //+------------------------------------------------------------------+
+   //| Calculate Volume Z-score over lookback period                     |
+   //+------------------------------------------------------------------+
+   double CalcVolZ60(string symbol, int lookback = 60)
+   {
+      if(lookback <= 1) return 0.0;
+
+      long volumes[];
+      ArraySetAsSeries(volumes, true);
+      int copied = CopyTickVolume(symbol, m_timeframe, 0, lookback + 1, volumes);
+
+      if(copied < lookback + 1) return 0.0;
+
+      // Calculate mean and stddev of historical volumes (excluding current)
+      double sum = 0.0;
+      for(int i = 1; i <= lookback; i++)
+         sum += (double)volumes[i];
+      double mean = SafeDivide(sum, (double)lookback, 1.0);
+
+      double sumSq = 0.0;
+      for(int i = 1; i <= lookback; i++)
+      {
+         double diff = (double)volumes[i] - mean;
+         sumSq += diff * diff;
+      }
+      double variance = SafeDivide(sumSq, (double)lookback, 1.0);
+      double stdDev = (variance > 0) ? MathSqrt(variance) : 1.0;
+
+      // Z-score of current volume
+      double currentVol = (double)volumes[0];
+      return SafeDivide(currentVol - mean, stdDev, 0.0);
+   }
+
+   //+------------------------------------------------------------------+
+   //| Get rolling high/low over lookback period                         |
+   //+------------------------------------------------------------------+
+   void CalcRollingHighLow(string symbol, int lookback, double &rollingHigh, double &rollingLow)
+   {
+      rollingHigh = 0.0;
+      rollingLow = DBL_MAX;
+
+      if(lookback <= 0) return;
+
+      double highs[], lows[];
+      ArraySetAsSeries(highs, true);
+      ArraySetAsSeries(lows, true);
+
+      int copiedH = CopyHigh(symbol, m_timeframe, 1, lookback, highs);  // Start from bar 1
+      int copiedL = CopyLow(symbol, m_timeframe, 1, lookback, lows);
+
+      if(copiedH < lookback || copiedL < lookback) return;
+
+      for(int i = 0; i < lookback; i++)
+      {
+         if(highs[i] > rollingHigh) rollingHigh = highs[i];
+         if(lows[i] < rollingLow) rollingLow = lows[i];
+      }
+   }
+
+   //+------------------------------------------------------------------+
+   //| Analyze Kinematic Breakout Features                               |
+   //| Fills: roc5, roc15, acc5, volZ60, rangeATR, breakDistATR         |
+   //| Also calculates breakoutScore and breakoutStrength               |
+   //+------------------------------------------------------------------+
+   void AnalyzeKinematicBreakout(const string symbol, const bool isBuy, EntryQuality &quality)
+   {
+      double atr = (ArraySize(m_atr) > 0) ? m_atr[0] : 0.0;
+      if(atr <= 0.0) return;
+
+      // === Velocity + Acceleration ===
+      quality.roc5  = CalcROCPercent(symbol, 0, 5);
+      quality.roc15 = CalcROCPercent(symbol, 0, 15);
+
+      // Acceleration = change in ROC over last 5 bars
+      double roc5_prev = CalcROCPercent(symbol, 5, 5);
+      quality.acc5 = quality.roc5 - roc5_prev;
+
+      // === Volume impulse ===
+      quality.volZ60 = CalcVolZ60(symbol, 60);
+
+      // === Range expansion ===
+      SafeOHLCV candle;
+      if(GetSafeOHLCV(symbol, m_timeframe, 0, candle))
+      {
+         double range = candle.high - candle.low;
+         quality.rangeATR = SafeDivide(range, atr, 0.0);
+      }
+
+      // === Level break (distance beyond rolling range) ===
+      double rollingHigh = 0.0, rollingLow = DBL_MAX;
+      CalcRollingHighLow(symbol, m_thresholds.breakoutLookback, rollingHigh, rollingLow);
+
+      double closePrice = iClose(symbol, m_timeframe, 0);
+      if(closePrice > 0 && rollingHigh > 0 && rollingLow < DBL_MAX)
+      {
+         if(isBuy)
+         {
+            // Long breakout: how far above rolling high
+            quality.breakDistATR = SafeDivide(closePrice - rollingHigh, atr, 0.0);
+         }
+         else
+         {
+            // Short breakout: how far below rolling low (negative = below)
+            quality.breakDistATR = SafeDivide(rollingLow - closePrice, atr, 0.0);
+         }
+      }
+
+      // === Calculate breakoutScore (composite 0-1) ===
+      // Components: velocity, acceleration, volume, range, level break
+      double velScore = Clamp01(MathAbs(quality.roc5) / 0.5);  // 0.5% ROC = max
+      double accScore = Clamp01(MathAbs(quality.acc5) / 0.3);  // 0.3% acc = max
+      double volScore = Clamp01(quality.volZ60 / 2.0);         // Z=2 = max
+      double rangeScore = Clamp01((quality.rangeATR - 1.0) / 1.0);  // 2x ATR = max
+      double breakScore = Clamp01(quality.breakDistATR / 0.5);     // 0.5 ATR beyond = max
+
+      // Directional agreement bonus
+      bool directionMatch = (isBuy && quality.roc5 > 0) || (!isBuy && quality.roc5 < 0);
+
+      // Weighted composite
+      quality.breakoutScore = (
+         velScore * 0.25 +
+         accScore * 0.15 +
+         volScore * 0.25 +
+         rangeScore * 0.15 +
+         breakScore * 0.20
+      );
+
+      // Bonus for directional agreement
+      if(directionMatch)
+         quality.breakoutScore = MathMin(1.0, quality.breakoutScore * 1.1);
+
+      // === breakoutStrength = raw ATR distance ===
+      quality.breakoutStrength = quality.breakDistATR;
+
+      // === volumeConfirm flag ===
+      quality.volumeConfirm = (quality.volZ60 >= m_thresholds.breakoutMinVolumeZ);
    }
 
    //+------------------------------------------------------------------+
@@ -1279,39 +1481,48 @@ public:
             quality.trendScore = 1.0;
       }
 
-      // === MOMENTUM ===
+      // === KINEMATIC BREAKOUT (must run early to populate ROC/acc for momentum) ===
+      AnalyzeKinematicBreakout(symbol, isBuy, quality);
+
+      // === MOMENTUM (now kinematic: ROC + acceleration based) ===
+      // Store RSI for reference only
       if(ArraySize(m_rsi) >= 2)
       {
          quality.rsiValue = m_rsi[0];
+      }
 
-         // RSI momentum score
-         if(isBuy)
-         {
-            if(quality.rsiValue > 50 && quality.rsiValue < 70)
-               quality.momentumScore = 0.8;  // Sweet spot
-            else if(quality.rsiValue < 30)
-               quality.momentumScore = 0.3;  // Oversold but risky
-            else if(quality.rsiValue > 70)
-               quality.momentumScore = 0.4;  // Overbought
-            else
-               quality.momentumScore = 0.5;
-         }
+      // Momentum score is now based on ROC and acceleration (set by AnalyzeKinematicBreakout)
+      // roc5, roc15, acc5 are already populated
+      {
+         double absROC = MathAbs(quality.roc5);
+         double absAcc = MathAbs(quality.acc5);
+
+         // Directional agreement: ROC in trade direction
+         bool rocWithTrade = (isBuy && quality.roc5 > 0) || (!isBuy && quality.roc5 < 0);
+
+         // Base momentum score from velocity (ROC)
+         if(absROC >= 0.3)
+            quality.momentumScore = 0.85;  // Strong velocity
+         else if(absROC >= 0.15)
+            quality.momentumScore = 0.7;   // Moderate velocity
+         else if(absROC >= 0.05)
+            quality.momentumScore = 0.5;   // Weak velocity
          else
-         {
-            if(quality.rsiValue < 50 && quality.rsiValue > 30)
-               quality.momentumScore = 0.8;
-            else if(quality.rsiValue > 70)
-               quality.momentumScore = 0.3;
-            else if(quality.rsiValue < 30)
-               quality.momentumScore = 0.4;
-            else
-               quality.momentumScore = 0.5;
-         }
+            quality.momentumScore = 0.3;   // No velocity
 
-         // Momentum slope
-         quality.momentumSlope = m_rsi[0] - m_rsi[1];
-         if((isBuy && quality.momentumSlope > 0) || (!isBuy && quality.momentumSlope < 0))
-            quality.momentumScore += 0.1;
+         // Acceleration bonus: increasing momentum
+         bool accWithTrade = (isBuy && quality.acc5 > 0) || (!isBuy && quality.acc5 < 0);
+         if(accWithTrade && absAcc >= 0.1)
+            quality.momentumScore = MathMin(1.0, quality.momentumScore + 0.15);
+         else if(!accWithTrade && absAcc >= 0.1)
+            quality.momentumScore *= 0.85;  // Decelerating = penalty
+
+         // Directional mismatch penalty
+         if(!rocWithTrade)
+            quality.momentumScore *= 0.7;
+
+         // momentumSlope now tracks ROC change (acceleration)
+         quality.momentumSlope = quality.acc5;
       }
 
       // === VOLATILITY ===
@@ -1476,9 +1687,19 @@ public:
          return TAG_BERSERKER;
       }
 
-      // === BREAKOUT ===
-      if(entry.breakoutScore >= 0.6 &&
+      // === BREAKOUT (kinematic) ===
+      // Primary: composite score meets threshold
+      if(entry.breakoutScore >= m_thresholds.breakoutMinScore &&
          entry.breakoutStrength >= m_thresholds.breakoutMinStrength)
+      {
+         return TAG_BREAKOUT;
+      }
+
+      // Secondary: strong individual kinematic signals
+      if(entry.breakDistATR >= m_thresholds.breakoutMinStrength &&
+         entry.volZ60 >= m_thresholds.breakoutMinVolumeZ &&
+         entry.rangeATR >= m_thresholds.breakoutMinRangeATR &&
+         MathAbs(entry.roc5) >= m_thresholds.breakoutMinROC5)
       {
          return TAG_BREAKOUT;
       }
