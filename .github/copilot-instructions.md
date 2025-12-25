@@ -1,40 +1,98 @@
 # GitHub Copilot Instructions for VelocityTrader
 
-## MQL5 Safety Rules
+**These rules are mandatory for all MQL5 code suggestions.**
 
-When generating MQL5 code for this project, follow these mandatory patterns:
+## Quick Reference
 
-### Division: Always use SafeDivide
+| Operation | Pattern to Use |
+|-----------|----------------|
+| Division | `SafeDivide(a, b, 0.0)` |
+| Array access | `if(i >= 0 && i < ArraySize(arr))` before access |
+| ArrayResize | `if(ArrayResize(arr, n) != n) return false;` |
+| File handle | `if(h == INVALID_HANDLE) return false;` |
+| Float compare | `MathAbs(a - b) < EPSILON` |
+| Square root | `(x >= 0) ? MathSqrt(x) : 0.0` |
+| OrderSend | Always check `ResultRetcode()` after |
+| External data | `MathIsValidNumber(value)` before use |
+
+## Numerical Safety
+
 ```mql5
-// Use: SafeDivide(numerator, denominator, default_value)
-double rate = SafeDivide(value, count, 0.0);
+// Division - use SafeDivide
+double rate = SafeDivide(profit, trades, 0.0);
+
+// Float comparison - use epsilon
+if(MathAbs(price - target) < Point)
+
+// Square root - validate input
+double std = (variance >= 0) ? MathSqrt(variance) : 0.0;
 ```
 
-### Array Access: Always bounds check
+## Memory Safety
+
 ```mql5
-if(index >= 0 && index < ArraySize(array))
-    array[index] = value;
+// Array bounds - always check
+if(i >= 0 && i < ArraySize(arr))
+    arr[i] = value;
+
+// ArrayResize - check return
+if(ArrayResize(buffer, size) != size)
+    return false;
 ```
 
-### ArrayResize: Always verify
+## Execution Safety
+
 ```mql5
-if(ArrayResize(arr, size) != size) return false;
+// Normalize lots before trading
+double lots = NormalizeLots(symbol, calculatedLots);
+
+// Check trade result
+if(!trade.Buy(lots, symbol, price, sl, tp))
+{
+    Log(LOG_ERROR, StringFormat("Trade failed: %d", trade.ResultRetcode()));
+    return false;
+}
 ```
 
-### File Operations: Always validate handle
+## Risk Controls
+
 ```mql5
-int h = FileOpen(path, FILE_READ);
-if(h == INVALID_HANDLE) return false;
+// Check drawdown in OnTick
+if(IsDrawdownExceeded())
+    return;
+
+// Limit position size
+lots = MathMin(lots, MAX_POSITION_SIZE);
 ```
 
-### Numeric Data: Always validate
+## Data Integrity
+
 ```mql5
-if(!MathIsValidNumber(value)) value = 0.0;
+// Validate historical data
+double close = iClose(symbol, period, shift);
+if(close == 0 || close == EMPTY_VALUE)
+    return;
+
+// Validate file handles
+int h = FileOpen(filename, FILE_READ);
+if(h == INVALID_HANDLE)
+    return false;
 ```
 
-## Project Conventions
+## Logging
 
-- Error logging: `Log(LOG_ERROR, "message")`
-- Warning logging: `Log(LOG_WARNING, "message")`
-- SafeDivide is in VT_Definitions.mqh
-- All trading code must validate prices before OrderSend
+```mql5
+// Use Log() with appropriate level
+Log(LOG_ERROR, "Critical failure");
+Log(LOG_WARNING, "Spread too wide");
+Log(LOG_INFO, "Position opened");
+```
+
+## Project Helpers (VT_Definitions.mqh)
+
+- `SafeDivide(num, denom, default)` - Safe division
+- `Log(level, message)` - Structured logging
+- `LOG_ERROR`, `LOG_WARNING`, `LOG_INFO`, `LOG_DEBUG` - Log levels
+
+---
+*Based on financial audit of 418 findings*
