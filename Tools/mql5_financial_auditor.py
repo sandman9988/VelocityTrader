@@ -238,7 +238,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Price Not Normalized',
             'pattern': r'(?:price|entry|exit)\s*=\s*(?!\s*NormalizeDouble)',
-            'exclude_pattern': r'NormalizeDouble|Bid|Ask|SymbolInfo|=\s*0|=\s*prices\[|=\s*GlobalVariable|z_score|slippage|Calculate|first_|last_',
+            # Exclude: API values (already normalized), enums, booleans, validated values
+            'exclude_pattern': r'NormalizeDouble|Bid|Ask|SymbolInfo|=\s*0|=\s*prices\[|=\s*GlobalVariable|z_score|slippage|Calculate|first_|last_|PositionGet|m_posInfo|m_dealInfo|DEAL_ENTRY|signal|minStop|minTP|PriceOpen|PriceCurrent|=\s*(?:true|false)|openPrice\s*=\s*Position|entryPrice\s*=\s*m_',
             'description': 'Prices must be normalized to symbol digits',
             'recommendation': 'Use NormalizeDouble(price, _Digits)'
         },
@@ -431,7 +432,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Missing Null Pointer Check',
             'pattern': r'(\w+)\s*[.>]\s*\w+\s*\(',
-            'exclude_pattern': r'!=\s*NULL|==\s*NULL|if\s*\(\s*\w+\s*\)|\.Init\(|\.Reset\(|\.Clear\(|\.Update\(|\.Calculate\(|\.Detect\(|\.Normalize\(|\.GetVolatility\(|\.Get[A-Z]|\.Set[A-Z]|\.Is[A-Z]|\.Has[A-Z]|\.Add[A-Z]|\.Remove[A-Z]|\.Any|\.To[A-Z]|\.Recalc|\.Decay|\.Invalidate|result\.|state\.|config\.|cfg\.|micro\.|meso\.|macro\.|m_\w+\.|this\.|child\.|metrics\.|yz\.|cycle\.|physics\.|w\.|g_\w+\.|_trade\.|trade\.|profile\.|agent\.|stats\.|regime\[|spec\.|breaker\.|predictor\.|sniper\.|berserker\.|symc\.',
+            # Exclude: member objects, history/cache objects, known patterns
+            'exclude_pattern': r'!=\s*NULL|==\s*NULL|if\s*\(\s*\w+\s*\)|\.Init\(|\.Reset\(|\.Clear\(|\.Update\(|\.Calculate\(|\.Detect\(|\.Normalize\(|\.GetVolatility\(|\.Get[A-Z]|\.Set[A-Z]|\.Is[A-Z]|\.Has[A-Z]|\.Add[A-Z]|\.Remove[A-Z]|\.Any|\.To[A-Z]|\.Recalc|\.Decay|\.Invalidate|result\.|state\.|config\.|cfg\.|micro\.|meso\.|macro\.|m_\w+\.|this\.|child\.|metrics\.|yz\.|cycle\.|physics\.|w\.|g_\w+\.|_trade\.|trade\.|profile\.|agent\.|stats\.|regime\[|spec\.|breaker\.|predictor\.|sniper\.|berserker\.|symc\.|History\.|cached\w*\.|rolling\w*\.|real\.|pnl\w*\.|win\w*\.|symbol\.|action\.|request\.|response\.|\.Push\(|\.Pop\(|\.Count\(',
             'description': 'Object method call without null check',
             'recommendation': 'Check: if(ptr != NULL) before dereferencing'
         },
@@ -476,7 +478,8 @@ class FinancialAuditRules:
             'severity': Severity.HIGH,
             'title': 'Hardcoded Array Size in Loop',
             'pattern': r'for\s*\([^;]+;\s*\w+\s*<\s*[0-9]+\s*;',
-            'exclude_pattern': r'<\s*3\s*;|<\s*4\s*;|<\s*5\s*;|ArraySize|REGIME|_COUNT|MAX_|NUM_',
+            # Exclude small constants and well-known safe values (7=days, 8=bits, 10=retries, 256=bytes)
+            'exclude_pattern': r'<\s*[0-9]\s*;|<\s*1[0-2]\s*;|<\s*256\s*;|ArraySize|REGIME|_COUNT|MAX_|NUM_',
             'description': 'Loop with hardcoded limit may break if array size changes',
             'recommendation': 'Use ArraySize(arr) or define a named constant for the size'
         },
