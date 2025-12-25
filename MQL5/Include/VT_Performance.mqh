@@ -60,6 +60,14 @@ struct RingBuffer
       count = 0;
    }
 
+   void Reset()
+   {
+      head = 0;
+      count = 0;
+      capacity = 0;
+      ArrayResize(data, 0);
+   }
+
    void Push(T value)
    {
       // Guard: capacity==0 would cause modulo division by zero

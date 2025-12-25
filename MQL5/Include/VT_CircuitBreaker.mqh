@@ -2,6 +2,7 @@
 //|                                           VT_CircuitBreaker.mqh  |
 //|                         VelocityTrader v7.1: Duel Architecture   |
 //|                           Circuit Breaker for Risk Management    |
+//|                         v7.1.1 (floating DD/daily loss fixes)    |
 //+------------------------------------------------------------------+
 #property copyright "VelocityTrader v7.1"
 #property link      "Kinematic Duel Architecture"
@@ -31,12 +32,12 @@ struct CircuitBreaker
    double             retrainUpside;
    double             retrainDownside;
 
-   // Daily tracking
+   // Daily tracking (dailyPnL is realized; dailyStartEquity is used for floating-inclusive checks)
    double             dailyPnL;
    double             dailyStartEquity;
    datetime           dayStart;
 
-   // Drawdown tracking
+   // Drawdown tracking (session peak by design)
    double             peakEquity;
    double             currentDD;
 
@@ -73,13 +74,13 @@ struct CircuitBreaker
       datetime today = GetDayStart(TimeCurrent());
       if(today != dayStart)
       {
-         // New day - reset daily stats
+         // New day - reset daily stats (but keep peakEquity as session peak)
          dayStart = today;
          dailyPnL = 0;
          dailyStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
       }
 
-      // Update drawdown
+      // Update drawdown from session peak
       double equity = AccountInfoDouble(ACCOUNT_EQUITY);
       if(equity > peakEquity) peakEquity = equity;
       currentDD = SafeDivide(peakEquity - equity, peakEquity, 0.0);
@@ -91,34 +92,41 @@ struct CircuitBreaker
 
       UpdateDaily();
 
-      double equity = AccountInfoDouble(ACCOUNT_EQUITY);
-      double dailyLossPct = SafeDivide(-dailyPnL, dailyStartEquity, 0.0);
+      const double equity = AccountInfoDouble(ACCOUNT_EQUITY);
 
-      // Check triggers
-      if(dailyLossPct > InpMaxDailyLoss)
+      // Floating-inclusive daily loss (more conservative / correct)
+      // dailyPnL is realized; this check is equity-based.
+      const double dailyPnL_equity = equity - dailyStartEquity;              // includes floating
+      const double dailyLossPct    = SafeDivide(-MathMin(0.0, dailyPnL_equity), dailyStartEquity, 0.0);
+
+      // Daily loss (treat <=0 as disabled)
+      if(InpMaxDailyLoss > 0.0 && dailyLossPct > InpMaxDailyLoss)
       {
          Halt(StringFormat("Daily loss %.1f%% > %.1f%%",
-              dailyLossPct * 100, InpMaxDailyLoss * 100));
+              dailyLossPct * 100.0, InpMaxDailyLoss * 100.0));
          return true;
       }
 
-      if(consLosses >= InpMaxConsLosses)
+      // Consecutive losses (treat <=0 as disabled)
+      if(InpMaxConsLosses > 0 && consLosses >= InpMaxConsLosses)
       {
          Halt(StringFormat("%d consecutive losses", consLosses));
          return true;
       }
 
-      if(rollingWR < InpMinRollingWR)
+      // Rolling win rate (treat <=0 as disabled)
+      if(InpMinRollingWR > 0.0 && rollingWR < InpMinRollingWR)
       {
          Halt(StringFormat("Rolling WR %.1f%% < %.1f%%",
-              rollingWR * 100, InpMinRollingWR * 100));
+              rollingWR * 100.0, InpMinRollingWR * 100.0));
          return true;
       }
 
-      if(currentDD > InpMaxDrawdown)
+      // Drawdown (session peak) (treat <=0 as disabled)
+      if(InpMaxDrawdown > 0.0 && currentDD > InpMaxDrawdown)
       {
          Halt(StringFormat("Drawdown %.1f%% > %.1f%%",
-              currentDD * 100, InpMaxDrawdown * 100));
+              currentDD * 100.0, InpMaxDrawdown * 100.0));
          return true;
       }
 
@@ -138,7 +146,6 @@ struct CircuitBreaker
       retrainUpside = 0;
       retrainDownside = 0;
 
-      // Alert user
       Alert("CIRCUIT BREAKER: ", reason);
 
       Print("======================================================");
@@ -154,8 +161,8 @@ struct CircuitBreaker
       if(state == STATE_HALTED)
       {
          // Cooldown period
-         int elapsed = (int)(TimeCurrent() - haltTime) / 60;
-         if(elapsed >= InpCooldownMinutes)
+         int elapsedMin = (int)(TimeCurrent() - haltTime) / 60;
+         if(elapsedMin >= InpCooldownMinutes)
          {
             state = STATE_RETRAINING;
             Print("Cooldown complete. Entering RETRAIN mode (shadow only).");
@@ -163,8 +170,7 @@ struct CircuitBreaker
       }
       else if(state == STATE_RETRAINING)
       {
-         // Check if retrain criteria met
-         if(retrainTrades >= InpRetrainMinTrades)
+         if(retrainTrades >= InpRetrainMinTrades && InpRetrainMinTrades > 0)
          {
             double wr = SafeDivide((double)retrainWins, (double)retrainTrades, 0.0);
             double pf = SafeDivide(retrainUpside, retrainDownside, 0.0);
@@ -182,16 +188,12 @@ struct CircuitBreaker
       }
       else if(state == STATE_PENDING)
       {
-         // Check for manual reinstatement (via input parameter)
-         // This is handled in OnTick/OnTimer
+         // Manual reinstatement handled elsewhere
       }
 
       UpdateDaily();
    }
 
-   //+------------------------------------------------------------------+
-   //| Get state as string for display                                   |
-   //+------------------------------------------------------------------+
    string GetStateString()
    {
       switch(state)
@@ -204,57 +206,46 @@ struct CircuitBreaker
       }
    }
 
-   //+------------------------------------------------------------------+
-   //| Can execute shadow trades (learning)?                             |
-   //+------------------------------------------------------------------+
    bool CanTradeShadow()
    {
-      // Shadow trades are allowed in all states except forced halt
-      return (state != STATE_HALTED ||
-              (int)(TimeCurrent() - haltTime) / 60 >= InpCooldownMinutes);
+      // Shadow trades allowed after cooldown; during cooldown keep system quiet.
+      if(state == STATE_HALTED)
+         return ((int)(TimeCurrent() - haltTime) / 60 >= InpCooldownMinutes);
+
+      return true;
    }
 
-   //+------------------------------------------------------------------+
-   //| Can execute real (live) trades?                                   |
-   //+------------------------------------------------------------------+
    bool CanTradeLive()
    {
       return (state == STATE_LIVE);
    }
 
-   //+------------------------------------------------------------------+
-   //| Record a trade during retraining phase                            |
-   //+------------------------------------------------------------------+
    void RecordRetrainTrade(double pnl)
    {
-      if(state == STATE_RETRAINING || state == STATE_HALTED)
-      {
-         retrainTrades++;
-         retrainPnL += pnl;
+      // Only record during actual retraining phase
+      if(state != STATE_RETRAINING)
+         return;
 
-         if(pnl > 0)
-         {
-            retrainWins++;
-            retrainUpside += pnl;
-         }
-         else
-         {
-            retrainDownside += MathAbs(pnl);
-         }
+      retrainTrades++;
+      retrainPnL += pnl;
+
+      if(pnl > 0)
+      {
+         retrainWins++;
+         retrainUpside += pnl;
+      }
+      else
+      {
+         retrainDownside += MathAbs(pnl);
       }
    }
 
-   //+------------------------------------------------------------------+
-   //| Record daily P&L for circuit breaker tracking                     |
-   //+------------------------------------------------------------------+
    void RecordDailyPnL(double pnl)
    {
+      // Realized-only tracking (equity-based daily loss is handled in CheckTriggers)
       dailyPnL += pnl;
    }
 
-   //+------------------------------------------------------------------+
-   //| Manual reinstatement                                              |
-   //+------------------------------------------------------------------+
    void Reinstate()
    {
       if(state == STATE_PENDING)
@@ -266,9 +257,6 @@ struct CircuitBreaker
       }
    }
 
-   //+------------------------------------------------------------------+
-   //| Force halt (manual override)                                      |
-   //+------------------------------------------------------------------+
    void ForceHalt()
    {
       Halt("Manual force halt");
