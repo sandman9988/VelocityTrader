@@ -676,7 +676,7 @@ class FinancialAuditRules:
             'category': AuditCategory.CODE_QUALITY,
             'severity': Severity.MEDIUM,
             'title': 'Bare Identifier May Need Struct Prefix',
-            'pattern': r'\b(open|close|high|low)\b\s*[,\)\+\*\/-]',
+            'pattern': r'\b(open|close|high|low)\b\s*[,\)\+\*/\-]',
             'exclude_pattern': r'//|/\*|\"|iOpen|iClose|iHigh|iLow|candle\.|bar\.|rates\[|\.open|\.close|\.high|\.low|FileOpen|FileClose',
             'description': 'Bare open/close/high/low may need struct prefix (candle.open, bar.close)',
             'recommendation': 'Use explicit prefix: candle.open, bar.close, rates[i].high, etc.'
