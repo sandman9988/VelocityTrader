@@ -1,0 +1,37 @@
+#!/bin/bash
+# Pre-commit hook: Block commits with CRITICAL audit findings
+# Install: git config core.hooksPath .githooks
+
+set -e
+
+echo "Running DO NO HARM audit..."
+
+# Run financial auditor with critical-only flag
+OUTPUT=$(python3 Tools/mql5_financial_auditor.py --project . --critical-only 2>&1)
+EXIT_CODE=$?
+
+# Check for CRITICAL findings
+if echo "$OUTPUT" | grep -q "CRITICAL: [1-9]"; then
+    echo ""
+    echo "=========================================="
+    echo "COMMIT BLOCKED: Critical issues found"
+    echo "=========================================="
+    echo "$OUTPUT" | grep -A 100 "CRITICAL FINDINGS"
+    echo ""
+    echo "Fix these issues before committing."
+    exit 1
+fi
+
+# Quick syntax check with super audit
+SUPER_OUTPUT=$(python3 Tools/mql5_super_audit.py --project . 2>&1)
+if echo "$SUPER_OUTPUT" | grep -q "CRITICAL:"; then
+    echo ""
+    echo "=========================================="
+    echo "COMMIT BLOCKED: Super audit critical issues"
+    echo "=========================================="
+    echo "$SUPER_OUTPUT" | grep -B 2 -A 2 "CRITICAL"
+    exit 1
+fi
+
+echo "Audit passed - no critical issues."
+exit 0
