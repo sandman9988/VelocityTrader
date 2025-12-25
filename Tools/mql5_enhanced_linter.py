@@ -213,13 +213,15 @@ class MQL5Linter:
     def _lint_basic(self, file_path: Path) -> Dict[str, Any]:
         """
         Basic syntax checking without external tools
-        
+
         Args:
             file_path: Path to file
-            
+
         Returns:
             Basic linting results
         """
+        import re
+
         result = {
             "file": str(file_path),
             "success": True,
@@ -227,41 +229,158 @@ class MQL5Linter:
             "warnings": [],
             "method": "basic"
         }
-        
+
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-            
+
             lines = content.split('\n')
-            
-            # Basic checks
+
+            # Track brace balance across file
+            brace_count = 0
+            paren_count = 0
+            in_multiline_comment = False
+            in_string = False
+
+            # Patterns for recognizing constructs that don't need semicolons
+            func_def_pattern = re.compile(
+                r'^[\w\s\*&:<>]+\s+\w+\s*\([^)]*\)\s*(const)?\s*$'
+            )
+            control_flow_pattern = re.compile(
+                r'^\s*(if|else\s*if|else|while|for|switch|do)\s*[\(\{]?'
+            )
+            struct_class_pattern = re.compile(
+                r'^\s*(struct|class|enum)\s+\w+'
+            )
+
             for i, line in enumerate(lines, 1):
+                original_line = line
                 line_stripped = line.strip()
-                
-                # Check for common issues
-                if line_stripped and not line_stripped.startswith('//'):
-                    # Unmatched braces (simple check)
-                    if line_stripped.count('{') != line_stripped.count('}'):
-                        if '{' in line_stripped and '}' not in line_stripped:
+
+                # Skip empty lines
+                if not line_stripped:
+                    continue
+
+                # Handle multi-line comments
+                if '/*' in line_stripped and '*/' not in line_stripped:
+                    in_multiline_comment = True
+                    continue
+                if in_multiline_comment:
+                    if '*/' in line_stripped:
+                        in_multiline_comment = False
+                    continue
+
+                # Skip single-line comments
+                if line_stripped.startswith('//'):
+                    continue
+
+                # Remove inline comments for analysis
+                comment_pos = line_stripped.find('//')
+                if comment_pos > 0:
+                    line_stripped = line_stripped[:comment_pos].strip()
+
+                # Skip preprocessor directives
+                if line_stripped.startswith('#'):
+                    continue
+
+                # Count braces (excluding those in strings/comments)
+                for char in line_stripped:
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                    elif char == '(':
+                        paren_count += 1
+                    elif char == ')':
+                        paren_count -= 1
+
+                # Check for unbalanced braces going negative
+                if brace_count < 0:
+                    result["errors"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "Unmatched closing brace",
+                        "severity": "error"
+                    })
+                    brace_count = 0  # Reset to continue checking
+
+                # Check for common real issues
+
+                # 1. Empty blocks (but not for forward declarations)
+                if line_stripped == '{}':
+                    # Check previous line for context
+                    if i > 1:
+                        prev = lines[i - 2].strip()
+                        if not prev.endswith(';') and 'class' not in prev:
                             result["warnings"].append({
                                 "line": i,
-                                "column": line.index('{') + 1,
-                                "message": "Possible unmatched opening brace",
+                                "column": 1,
+                                "message": "Empty block - consider adding implementation or comment",
                                 "severity": "warning"
                             })
-                    
-                    # Missing semicolons (heuristic)
-                    if (line_stripped.endswith(')') and 
-                        not line_stripped.startswith('if') and
-                        not line_stripped.startswith('while') and
-                        not line_stripped.startswith('for')):
+
+                # 2. Assignment in condition (common bug)
+                # Only check the condition part inside if(...), not the statement after
+                if_match = re.search(r'\bif\s*\(([^)]+)\)', line_stripped)
+                if if_match:
+                    condition = if_match.group(1)
+                    # Look for single = that's not ==, !=, <=, >=
+                    if re.search(r'(?<![=!<>])=(?!=)', condition):
                         result["warnings"].append({
                             "line": i,
-                            "column": len(line),
-                            "message": "Possible missing semicolon",
+                            "column": 1,
+                            "message": "Possible assignment in condition (use == for comparison)",
                             "severity": "warning"
                         })
-        
+
+                # 3. Potential division by zero (basic check)
+                if re.search(r'/\s*0[^.]', line_stripped):
+                    result["warnings"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "Potential division by zero",
+                        "severity": "warning"
+                    })
+
+                # 4. TODO/FIXME comments
+                if 'TODO' in original_line or 'FIXME' in original_line:
+                    result["warnings"].append({
+                        "line": i,
+                        "column": 1,
+                        "message": "TODO/FIXME marker found",
+                        "severity": "info"
+                    })
+
+                # 5. Very long lines (readability)
+                if len(original_line) > 150:
+                    result["warnings"].append({
+                        "line": i,
+                        "column": 150,
+                        "message": f"Line too long ({len(original_line)} chars)",
+                        "severity": "info"
+                    })
+
+            # Final brace balance check
+            if brace_count != 0:
+                result["errors"].append({
+                    "line": len(lines),
+                    "column": 1,
+                    "message": f"Unbalanced braces: {brace_count} unclosed '{{'" if brace_count > 0 else f"Unbalanced braces: {-brace_count} extra '}}'",
+                    "severity": "error"
+                })
+
+            # Final paren balance check
+            if paren_count != 0:
+                result["errors"].append({
+                    "line": len(lines),
+                    "column": 1,
+                    "message": f"Unbalanced parentheses: {paren_count} unclosed '('" if paren_count > 0 else f"Unbalanced parentheses: {-paren_count} extra ')'",
+                    "severity": "error"
+                })
+
+            # Set success based on errors
+            result["success"] = len(result["errors"]) == 0
+
         except Exception as e:
             result["success"] = False
             result["errors"].append({
@@ -270,7 +389,7 @@ class MQL5Linter:
                 "message": f"Failed to lint file: {str(e)}",
                 "severity": "error"
             })
-        
+
         return result
     
     def format_for_ai(self, lint_result: Dict[str, Any]) -> str:
