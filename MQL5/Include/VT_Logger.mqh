@@ -941,8 +941,9 @@ public:
          if(randIdx >= ArraySize(m_replayBuffer))
             randIdx = ArraySize(m_replayBuffer) - 1;
 
-         // Final validation before access
-         if(randIdx >= 0 && randIdx < m_bufferCount && randIdx < ArraySize(m_replayBuffer))
+         // Final validation before access (check all array bounds)
+         if(randIdx >= 0 && randIdx < m_bufferCount && randIdx < ArraySize(m_replayBuffer) &&
+            sampledCount >= 0 && sampledCount < ArraySize(batch))
          {
             batch[sampledCount] = m_replayBuffer[randIdx];
             sampledCount++;
@@ -1125,10 +1126,11 @@ public:
       FileFlush(h);
       FileClose(h);
 
-      if(errorCount > 0)
+      if(errorCount > 0 && m_bufferCount > 0)
       {
+         double successRate = SafeDivide((double)exportedCount, (double)m_bufferCount, 0.0) * 100.0;
          Log(LOG_WARNING, StringFormat("ExportReplayBuffer - %d/%d entries had errors (%.1f%% success rate)",
-             errorCount, m_bufferCount, (double)exportedCount / m_bufferCount * 100));
+             errorCount, m_bufferCount, successRate));
       }
 
       Log(LOG_INFO, StringFormat("Exported %d/%d experiences to %s", exportedCount, m_bufferCount, filename));
