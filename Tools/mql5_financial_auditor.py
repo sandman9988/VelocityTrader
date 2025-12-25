@@ -620,6 +620,22 @@ class FinancialAuditRules:
             'description': 'Void function should not return a value',
             'recommendation': 'Use plain return; or change function return type'
         },
+        'LANG006': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.HIGH,
+            'title': 'Mismatched #ifndef/#endif Pair',
+            'pattern': None,  # Checked programmatically
+            'description': 'Include guard has mismatched #ifndef and #endif directives',
+            'recommendation': 'Ensure every #ifndef has a matching #endif at the end of the file'
+        },
+        'LANG007': {
+            'category': AuditCategory.CODE_QUALITY,
+            'severity': Severity.MEDIUM,
+            'title': 'Missing Include Guard Definition',
+            'pattern': None,  # Checked programmatically
+            'description': 'Header file missing #define FILENAME_MQH include guard',
+            'recommendation': 'Add #ifndef VT_FILENAME_MQH / #define VT_FILENAME_MQH at top, #endif at bottom'
+        },
         'LANG008': {
             'category': AuditCategory.CODE_QUALITY,
             'severity': Severity.MEDIUM,
@@ -660,7 +676,7 @@ class FinancialAuditRules:
             'category': AuditCategory.CODE_QUALITY,
             'severity': Severity.MEDIUM,
             'title': 'Bare Identifier May Need Struct Prefix',
-            'pattern': r'(?<!\.)\b(open|close|high|low)\b\s*[,\)\-\+\*\/]',
+            'pattern': r'\b(open|close|high|low)\b\s*[,\)\-\+\*\/]',
             'exclude_pattern': r'//|/\*|\"|iOpen|iClose|iHigh|iLow|candle\.|bar\.|rates\[|\.open|\.close|\.high|\.low|FileOpen|FileClose',
             'description': 'Bare open/close/high/low may need struct prefix (candle.open, bar.close)',
             'recommendation': 'Use explicit prefix: candle.open, bar.close, rates[i].high, etc.'
