@@ -460,7 +460,8 @@ struct TradingAgent
 //+------------------------------------------------------------------+
 struct PositionData
 {
-   ulong    ticket;
+   ulong    ticket;          // For shadow: 0. For real: POSITION_TICKET (optional if using symbol select)
+   long     positionId;      // POSITION_IDENTIFIER for HistorySelectByPosition() (real trades only)
    string   symbol;
    int      direction;       // 1=BUY, -1=SELL
    double   entryPrice;
