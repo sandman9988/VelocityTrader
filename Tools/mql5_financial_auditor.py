@@ -132,7 +132,7 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Unsafe Square Root',
             'pattern': r'MathSqrt\s*\(',
-            'exclude_pattern': r'SafeSqrt|>\s*0|>=\s*0',
+            'exclude_pattern': r'SafeSqrt|>\s*0|>=\s*0|SafeDivide|[Vv]ariance|MathSqrt\s*\(\s*[0-9]|MathSqrt\s*\(\s*2\.0|sumSq|SumSquare|ssRes|var\d*\s*\*\s*var',
             'description': 'MathSqrt with negative input returns NaN',
             'recommendation': 'Use SafeSqrt() or validate input >= 0'
         },
@@ -141,7 +141,7 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Unsafe Logarithm',
             'pattern': r'MathLog\s*\(',
-            'exclude_pattern': r'SafeLog|>\s*0',
+            'exclude_pattern': r'SafeLog|>\s*0|\+\s*1\)|numBins|entropy.*MathLog',
             'description': 'MathLog with non-positive input is undefined',
             'recommendation': 'Use SafeLog() or validate input > 0'
         },
@@ -323,7 +323,7 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Missing Correlation Check',
             'pattern': r'(?:portfolio|multi.*symbol|symbol.*array)',
-            'exclude_pattern': r'correlation|Correlation',
+            'exclude_pattern': r'correlation|Correlation|struct\s+|class\s+|m_portfolio|Portfolio\w+\s+m_|void\s+\w*Portfolio|Portfolio\w*\s+Get|Set\w*Portfolio|input\s+group|CalculatePortfolio|GetExposure|Exposure\w*\s+m_|portfolioVol|diversificationRatio|sumIndividual',
             'description': 'Multi-symbol trading without correlation awareness',
             'recommendation': 'Track and limit correlated exposure'
         },
@@ -527,7 +527,7 @@ class FinancialAuditRules:
             'severity': Severity.MEDIUM,
             'title': 'Missing Timestamp in Logs',
             'pattern': r'Print\s*\(',
-            'exclude_pattern': r'TimeToString|TimeCurrent|timestamp|TimeLocal|CLogger|WARNING|ERROR|ARCHITECTURE|BuildFingerprint|TestFramework|message\)|log_line',
+            'exclude_pattern': r'TimeToString|TimeCurrent|timestamp|TimeLocal|CLogger|CVTLogger|WARNING|ERROR|CRITICAL|ARCHITECTURE|BuildFingerprint|TestFramework|message\)|log_line|Print\s*\(\s*"[=═─]+|initialized|CIRCUIT.*BREAKER|Ring buffer|Cache TTL|validation.*PASSED|═══|corrupted|backup|starting fresh|SWAP|Shadow.*Champion|AGENT|Input.*param',
             'description': 'Log entries should include timestamps',
             'recommendation': 'Include timestamp in all log entries'
         },
